@@ -1,0 +1,41 @@
+<MapGeneBatchProcessing>
+	<RelativePath></RelativePath>
+	<WriteToConsole>true</WriteToConsole>
+
+
+		<!-- 完整线实体被分幅、行政区划等要素切割后，根据单个字段或组合字段Field进行线拓扑连接 -->
+		<Mission id="175" note="拓扑连接线（增强版）:">
+			<ParaIn>
+				<Layers note="SourceDataStore">
+					<FilePath>处理前的分割线.shp</FilePath><!-- 自己修改输入图层名称 -->
+					<FilePath>处理前的分割线2.shp</FilePath><!-- 自己修改输入图层名称 -->
+				</Layers>
+				<Parameter>
+					<FuzzyTolerance note="结点拟合">0.005</FuzzyTolerance>
+					<IntersectionEpsilon note="线段相交容差">0.00001</IntersectionEpsilon>
+					<RedundancyVertexTolerance note="拓扑节点冗余容差">0.005</RedundancyVertexTolerance>
+					<TesselationMode note="图斑或面要素铺盖模式">true</TesselationMode>
+					<Precision note="数据精度（精确到小数点后几位）">-1</Precision>
+					<TopologyConnectionString note="拓扑持久化存储数据"></TopologyConnectionString>
+					<Field>CODE,NAME</Field><!-- 目前是根据两个字段值联合识别唯一性，也可以根据实际情况自由组合 -->
+					<IsEmptyLink note="名称为空时是否连接线">true</IsEmptyLink>
+					<EmptyValue note="名称为空时的值"></EmptyValue>
+					<AidField note="名称为空时的辅助字段，可以进一步细分"></AidField>
+					<MinValField note="合并后计算该字段的最小值"></MinValField>
+					<MaxValField note="合并后计算该字段的最大值"></MaxValField>
+					<IsRestuctEntity note="拓扑打散化简后是否重构实体">true</IsRestuctEntity>
+					<LinkProcessMode note="弧段连接模式 1-假结点弧段 2-任意名称相同弧段">2</LinkProcessMode>
+					<LinkMode note="连接模式 1-同一图层内处理 2-不同图层之间处理 4-方向一致内处理">1</LinkMode>
+					<LinkArcMode note="假结点去除限制模式 1-图层限制 2-要素限制 4-名称限制">0</LinkArcMode>
+				</Parameter>
+			</ParaIn>
+			<ParaOut>
+				<Layers note="DstDataStores">
+					<FilePath>处理后的合并线.shp</FilePath><!-- 自己修改输出图层名称 -->
+					<FilePath>处理后的合并线2.shp</FilePath><!-- 自己修改输出图层名称 -->
+				</Layers>
+			</ParaOut>
+		</Mission>
+
+
+</MapGeneBatchProcessing>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- 成果存储与管理 - 文件夹+上传箭头图标 -->
+  <path d="M2 6h7l2 2h9a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" fill="none" stroke="#5B8FF9" stroke-width="1.5"/>
+  <path d="M12 10l-3 3h2v4h2v-4h2l-3-3z" fill="#F6BD16" stroke="#E8A810" stroke-width="0.5"/>
+</svg>

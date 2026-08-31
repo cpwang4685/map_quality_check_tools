@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ParamConfigDialog</class>
+ <widget class="QDialog" name="ParamConfigDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1000</width>
+    <height>700</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>参数配置</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="spacing">
+    <number>8</number>
+   </property>
+
+   <!-- ===== 主内容区：左树 + 右表格 ===== -->
+   <item>
+    <layout class="QHBoxLayout" name="contentLayout">
+     <property name="spacing">
+      <number>8</number>
+     </property>
+
+     <!-- ===== 左侧：树形导航 ===== -->
+     <item>
+      <widget class="QGroupBox" name="groupBox_checkItems">
+       <property name="title">
+        <string>导航</string>
+       </property>
+       <property name="styleSheet">
+        <string>QGroupBox { font-weight: bold; }</string>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>340</width>
+         <height>0</height>
+        </size>
+       </property>
+       <layout class="QVBoxLayout" name="checkItemGroupLayout">
+        <item>
+         <layout class="QHBoxLayout" name="checkItemToolbarLayout">
+          <item>
+           <widget class="QPushButton" name="pushButton_openXml">
+            <property name="text">
+             <string>选择XML文件...</string>
+            </property>
+            <property name="toolTip">
+             <string>从已有的XML文件加载检查方案</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="pushButton_resetDefaults">
+            <property name="text">
+             <string>重新加载</string>
+            </property>
+            <property name="toolTip">
+             <string>从原文件重新加载参数</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="lineEdit_search">
+          <property name="placeholderText">
+           <string>搜索参数ID或名称，回车逐一定位...</string>
+          </property>
+          <property name="clearButtonEnabled">
+           <bool>true</bool>
+          </property>
+          <property name="styleSheet">
+           <string>padding: 4px 8px; border: 1px solid #ccc; border-radius: 3px;</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="treeToolbarLayout">
+          <item>
+           <widget class="QPushButton" name="pushButton_expandAll">
+            <property name="text">
+             <string>展开全部</string>
+            </property>
+            <property name="toolTip">
+             <string>展开所有树节点</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="pushButton_collapseAll">
+            <property name="text">
+             <string>折叠全部</string>
+            </property>
+            <property name="toolTip">
+             <string>折叠所有树节点</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_checkItemToolbar">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QTreeWidget" name="treeWidget_checkItems">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>280</height>
+           </size>
+          </property>
+          <property name="alternatingRowColors">
+           <bool>true</bool>
+          </property>
+          <property name="selectionMode">
+           <enum>QAbstractItemView::SingleSelection</enum>
+          </property>
+          <property name="animated">
+           <bool>true</bool>
+          </property>
+          <property name="expandsOnDoubleClick">
+           <bool>true</bool>
+          </property>
+          <column>
+           <property name="text">
+            <string>节点</string>
+           </property>
+          </column>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+
+     <!-- ===== 右侧：参数编辑表格 ===== -->
+     <item>
+      <widget class="QGroupBox" name="groupBox_params">
+       <property name="title">
+        <string>参数编辑</string>
+       </property>
+       <property name="styleSheet">
+        <string>QGroupBox { font-weight: bold; }</string>
+       </property>
+       <layout class="QVBoxLayout" name="paramGroupLayout">
+        <item>
+         <layout class="QHBoxLayout" name="tableToolbarLayout">
+          <item>
+           <widget class="QCheckBox" name="checkBox_filterMarked">
+            <property name="text">
+             <string>仅显示已修改</string>
+            </property>
+            <property name="toolTip">
+             <string>筛选只显示参数值已修改的行</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_tableToolbar">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QTableWidget" name="tableWidget_params">
+          <property name="alternatingRowColors">
+           <bool>true</bool>
+          </property>
+          <property name="selectionBehavior">
+           <enum>QAbstractItemView::SelectRows</enum>
+          </property>
+          <property name="selectionMode">
+           <enum>QAbstractItemView::SingleSelection</enum>
+          </property>
+          <property name="editTriggers">
+           <set>QAbstractItemView::DoubleClicked|QAbstractItemView::EditKeyPressed|QAbstractItemView::AnyKeyPressed</set>
+          </property>
+          <property name="styleSheet">
+           <string>QTableWidget { gridline-color: #ddd; }</string>
+          </property>
+          <column>
+           <property name="text">
+            <string>序号</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>ID</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>参数名称</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>参数值</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>参数说明</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>状态</string>
+           </property>
+          </column>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
+
+   <!-- ===== 底部按钮 ===== -->
+   <item>
+    <layout class="QHBoxLayout" name="bottomBtnLayout">
+     <item>
+      <widget class="QLabel" name="label_status">
+       <property name="text">
+        <string>就绪</string>
+       </property>
+       <property name="styleSheet">
+        <string>color: #888;</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_bottom">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton_saveConfig">
+       <property name="text">
+        <string>保存</string>
+       </property>
+       <property name="toolTip">
+        <string>保存当前配置到文件</string>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>80</width>
+         <height>0</height>
+        </size>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton_saveAs">
+       <property name="text">
+        <string>另存为...</string>
+       </property>
+       <property name="toolTip">
+        <string>将当前参数保存为新的XML配置文件</string>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>80</width>
+         <height>0</height>
+        </size>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton_close">
+       <property name="text">
+        <string>关闭</string>
+       </property>
+       <property name="toolTip">
+        <string>关闭此窗口</string>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>80</width>
+         <height>0</height>
+        </size>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources>
+  <include location="../map_quality_check_tools.qrc"/>
+ </resources>
+ <connections/>
+</ui>

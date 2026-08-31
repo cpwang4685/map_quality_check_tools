@@ -1,0 +1,44 @@
+﻿<MapGeneBatchProcessing>
+	<RelativePath></RelativePath>
+	<WriteToConsole>true</WriteToConsole>
+	
+
+	<!-- 完整面实体被分幅、行政区划等要素切割后，根据单个字段或组合字段AdminField进行面合并 -->
+		<Mission id="327" note="实体合并:">
+			<ParaIn>
+				<Layers note="SourceDataStore">
+					<FilePath>处理前的分割面.shp</FilePath><!-- 自己修改输入图层名称 -->
+					<FilePath>处理前的分割面2.shp</FilePath><!-- 自己修改输入图层名称 -->
+				</Layers>
+				<Parameter>
+					<Scale note="比例尺">0</Scale>
+
+					<FuzzyToleranceSource note="结点拟合">0.001</FuzzyToleranceSource>
+					<IntersectionEpsilonSource note="线段相交容差">0.00001</IntersectionEpsilonSource>
+					<RedundancyVertexToleranceSource note="弧段冗余节点容差">0.001</RedundancyVertexToleranceSource>
+					<LinkArcStyle note="假结点连接类型（1-图层ID 2-名称ID 4-要素ID）">7</LinkArcStyle>
+					<MemeoryLinkFIDs note="缓存记录LinkFID">false</MemeoryLinkFIDs>
+
+					<SingleLayer note="是否单图层处理">true</SingleLayer>
+					<AdminField note="权属字段">CODE,NAME</AdminField><!-- 目前是根据两个字段值联合识别唯一性，也可以根据实际情况自由组合 -->
+					<ProcessMode note="处理模式 1-不同属性且考虑角度 2-相同属性考虑狭长度 4-不考虑属性且不考虑角度和狭长度 8-不同属性 16-相同属性 32-不考虑属性">16</ProcessMode>
+
+					<BufferDistance note="识别缓冲误差">1</BufferDistance>
+					<NeighborStyle note="临近识别模式，1-快速直接临近(先进行拓扑预处理) 2-缓冲 4-全局拓扑直接临近(构面) 8-全局拓扑直接临近(不构面)">2</NeighborStyle>
+
+					<AngleEpsilon note="角度过滤阈值">181</AngleEpsilon>
+					<DistanceEpsilon note="角度计算距离容差" multiScale="false">3</DistanceEpsilon>
+					<CrossBuffer note="存在中心线时判断路口结点缓冲半径" multiScale="false">0</CrossBuffer>
+					<LineAngleEpsilon note="存在中心线时判断相交处的延展角度阈值">60</LineAngleEpsilon>
+				</Parameter>
+			</ParaIn>
+			<ParaOut>
+				<Layers note="DstDataStore">
+					<FilePath>处理后的合并面.shp</FilePath><!-- 自己修改输出图层名称 -->
+					<FilePath>处理后的合并面2.shp</FilePath><!-- 自己修改输出图层名称 -->
+				</Layers>
+			</ParaOut>
+		</Mission>
+	
+  
+</MapGeneBatchProcessing>

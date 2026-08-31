@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ============================================================
+  mission_config.xml — 综合成果自动化质检 统一配置文件
+  管理 Mission 453-459 共 45 项检查规则、阈值参数
+  修改此文件即可调整检查项和参数，无需重新编译
+  ============================================================ -->
+<MissionConfig version="1.0" notice="地图成果质检配置">
+
+  <GlobalParams>
+    <Scale note="比例尺">10000</Scale>
+    <FuzzyTolerance note="结点拟合容差(米)">0.001</FuzzyTolerance>
+    <IsGeographic note="是否为经纬度坐标">false</IsGeographic>
+    <FlagField note="检查结果标识字段名">error</FlagField>
+  </GlobalParams>
+
+  <Thresholds>
+    <AcuteAngle note="尖锐角阈值(度)" default="10.0" min="0.1" max="180.0"/>
+    <SliverArea note="碎面面积阈值" default="1.0" min="0.0" max="100000.0"/>
+    <NarrowWidth note="狭长面宽度阈值(米)" default="0.5" min="0.0" max="1000.0"/>
+    <MinArea note="最小面积阈值" default="1.0" min="0.0" max="100000.0"/>
+    <MinNodeDistance note="节点最小距离(米)" default="0.001" min="0.0" max="100.0"/>
+    <AvgNodeDensityUpper note="节点平均密度上界" default="0.0" min="0.0" max="1000.0"/>
+    <AvgNodeDensityLower note="节点平均密度下界" default="0.0" min="0.0" max="1000.0"/>
+    <NodeDensityUpper note="节点密度上界" default="0.0" min="0.0" max="1000.0"/>
+    <NodeDensityLower note="节点密度下界" default="0.0" min="0.0" max="1000.0"/>
+  </Thresholds>
+
+  <Mission id="453" name="属性检查" category="属性" note="校验矢量字段名称、类型、长度、精度等">
+    <CheckItem name="字段名称检查" mode="1" enabled="true" applyTo="all" note="字段名是否与规范一致"/>
+    <CheckItem name="数据类型检查" mode="2" enabled="true" applyTo="all" note="字段类型是否匹配"/>
+    <CheckItem name="字段长度检查" mode="4" enabled="true" applyTo="all" note="字段长度是否超限"/>
+    <CheckItem name="精度检查" mode="8" enabled="true" applyTo="all" note="数值精度是否符合规范"/>
+    <CheckItem name="枚举字段检查" mode="16" enabled="true" applyTo="all" note="枚举值是否在允许列表内"/>
+    <CheckItem name="约束条件检查" mode="32" enabled="true" applyTo="all" note="字段值是否符合约束条件"/>
+    <CheckItem name="唯一约束检查" mode="128" enabled="true" applyTo="all" note="字段值是否唯一"/>
+    <CheckItem name="非空约束检查" mode="256" enabled="true" applyTo="all" note="必填字段是否为空"/>
+    <CheckItem name="约束类型检查" mode="512" enabled="true" applyTo="all" note="约束类型是否匹配"/>
+    <CheckItem name="约束组合检查" mode="1024" enabled="true" applyTo="all" note="组合约束是否满足"/>
+  </Mission>
+
+  <Mission id="454" name="点拓扑检查" category="拓扑" note="点图层空间拓扑规则校验">
+    <CheckItem name="点必须重合" mode="1" enabled="true" applyTo="point" note="点与点必须在容差内重合"/>
+    <CheckItem name="点必须分离" mode="2" enabled="true" applyTo="point" note="点与点距离必须大于容差"/>
+    <CheckItem name="点被线端点覆盖" mode="4" enabled="true" applyTo="point" note="点必须被线要素端点覆盖"/>
+    <CheckItem name="点必须被线覆盖" mode="8" enabled="true" applyTo="point" note="点必须落在线上"/>
+    <CheckItem name="点必须在面内部" mode="16" enabled="true" applyTo="point" note="点必须位于多边形内部"/>
+    <CheckItem name="点必须在面边界上" mode="32" enabled="true" applyTo="point" note="点必须位于多边形边界上"/>
+  </Mission>
+
+  <Mission id="455" name="线拓扑检查" category="拓扑" note="线图层拓扑缺陷检测">
+    <CheckItem name="不能有悬挂节点" mode="1" enabled="true" applyTo="line" note="线端点出现次数为1即为悬挂"/>
+    <CheckItem name="不能有伪节点" mode="2" enabled="true" applyTo="line" note="节点连接线数等于2为伪节点"/>
+    <CheckItem name="线不能自重叠" mode="4" enabled="true" applyTo="line" note="线自身不能有重叠部分"/>
+    <CheckItem name="线不能自相交" mode="8" enabled="true" applyTo="line" note="线自身不能相交"/>
+    <CheckItem name="必须是单部件" mode="16" enabled="true" applyTo="line" note="线要素必须是单部件"/>
+    <CheckItem name="线不能相互重叠" mode="32" enabled="true" applyTo="line" note="两条线不能相互重叠"/>
+    <CheckItem name="线不能相互相交" mode="64" enabled="true" applyTo="line" note="两条线不能相互交叉"/>
+    <CheckItem name="线必须在面内部" mode="4096" enabled="false" applyTo="line" note="线必须完全位于面内部(需参考面图层)"/>
+  </Mission>
+
+  <Mission id="456" name="面拓扑检查" category="拓扑" note="面图层拓扑缺陷检测">
+    <CheckItem name="面不能重叠" mode="1" enabled="true" applyTo="polygon" note="两个面不能有重叠区域"/>
+    <CheckItem name="面不能有缝隙" mode="2" enabled="true" applyTo="polygon" note="相邻面之间不能有缝隙"/>
+    <CheckItem name="面必须包含点" mode="4" enabled="true" applyTo="polygon" note="面必须包含指定的点要素"/>
+    <CheckItem name="面边界必须被线覆盖" mode="32" enabled="false" applyTo="polygon" note="面边界必须被线要素覆盖(需参考线图层)"/>
+    <CheckItem name="面必须大于聚类容差" mode="1024" enabled="true" applyTo="polygon" note="面面积必须大于聚类容差阈值"/>
+  </Mission>
+
+  <Mission id="457" name="关联表检查" category="关联" note="检查同一数据源内关联图层间的引用完整性（基于EntityID/LocationID外键）">
+    <CheckItem name="外键引用检查" mode="1" enabled="true" applyTo="all" note="关联图层中的EntityID/LocationID必须在基础图层中存在"/>
+    <CheckItem name="关联记录存在性检查" mode="2" enabled="true" applyTo="all" note="基础图层的每条记录在关联图层中必须有对应记录"/>
+    <CheckItem name="关联字段一致性检查" mode="4" enabled="true" applyTo="all" note="关联图层间的ClassID/ClassName等分类字段必须一致"/>
+    <CheckItem name="关联表结构检查" mode="8" enabled="true" applyTo="all" note="关联图层必须包含EntityID/LocationID/ClassID等关键字段"/>
+    <CheckItem name="关联数据完整性检查" mode="16" enabled="true" applyTo="all" note="关联图层记录数必须匹配，无孤立记录或缺失依赖"/>
+  </Mission>
+
+  <Mission id="458" name="综合前后匹配" category="匹配" note="对比原始数据(综合前)与成果数据(综合后)的要素变化（需两个数据源）">
+    <CheckItem name="综合前后要素匹配检查" mode="1" enabled="true" applyTo="all" note="通过EntityID/FormerID匹配综合前后要素，检测新增/消失/几何属性变化"/>
+  </Mission>
+
+  <Mission id="459" name="图形规范性检查" category="图形" note="检测几何形态异常">
+    <CheckItem name="多部件检查" mode="1" enabled="true" applyTo="polygon,line" note="几何必须是单部件"/>
+    <CheckItem name="空图形检查" mode="2" enabled="true" applyTo="all" note="不能存在空几何"/>
+    <CheckItem name="尖锐角检查" mode="4" enabled="true" applyTo="polygon,line" note="检测小于阈值的尖锐角" threshold="AcuteAngle"/>
+    <CheckItem name="碎面检查" mode="8" enabled="true" applyTo="polygon" note="检测面积小于阈值的碎面" threshold="SliverArea"/>
+    <CheckItem name="狭长面检查" mode="16" enabled="true" applyTo="polygon" note="检测宽度小于阈值的狭长面" threshold="NarrowWidth"/>
+    <CheckItem name="小面积检查" mode="32" enabled="true" applyTo="polygon" note="检测面积小于阈值的小面" threshold="MinArea"/>
+    <CheckItem name="节点平均密度检查" mode="64" enabled="false" applyTo="polygon" note="顶点密度需在上下界范围内" threshold="AvgNodeDensity"/>
+    <CheckItem name="节点密度检查" mode="128" enabled="false" applyTo="polygon" note="相邻顶点间距需在上下界范围内" threshold="NodeDensity"/>
+    <CheckItem name="线自相交检查" mode="256" enabled="true" applyTo="line,polygon" note="线或面边界不能自相交"/>
+    <CheckItem name="节点最小距离检查" mode="512" enabled="true" applyTo="all" note="相邻节点距离不能小于阈值" threshold="MinNodeDistance"/>
+  </Mission>
+
+</MissionConfig>

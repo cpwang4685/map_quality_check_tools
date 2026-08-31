@@ -1,0 +1,1221 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <CustomBuild Include="ui_class\db_config_dialog.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_db_config_dialog.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui_class\db_config_dialog.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_db_config_dialog.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_db_config_dialog.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\login_dialog.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_login_dialog.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui_class\login_dialog.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_login_dialog.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_login_dialog.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\product_storage_dialog.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_product_storage_dialog.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui_class\product_storage_dialog.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_product_storage_dialog.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_product_storage_dialog.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\metadata_manager_dialog.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_metadata_manager_dialog.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui_class\metadata_manager_dialog.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_metadata_manager_dialog.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_metadata_manager_dialog.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\access_control_dialog.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_access_control_dialog.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui_class\access_control_dialog.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_access_control_dialog.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_access_control_dialog.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\gdb_layer_selector_dialog.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_gdb_layer_selector_dialog.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui_class\gdb_layer_selector_dialog.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_gdb_layer_selector_dialog.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_gdb_layer_selector_dialog.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\mapdata_download.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_mapdata_download.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui_class\mapdata_download.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_mapdata_download.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_mapdata_download.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="map_quality_check_tools.qrc" />
+    <CustomBuild Include="ui\vector_format_conversion.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_vector_format_conversion.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui\vector_format_conversion.ui
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Generating ui_vector_format_conversion.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_vector_format_conversion.h;%(Outputs)</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui\auto_quality_check.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_auto_quality_check.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui\auto_quality_check.ui
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_auto_quality_check.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_auto_quality_check.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui\scale_selector_dialog.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_scale_selector_dialog.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui\scale_selector_dialog.ui
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_scale_selector_dialog.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_scale_selector_dialog.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui\data_restore.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_data_restore.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui\data_restore.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_data_restore.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_data_restore.h;%%(Outputs)</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui\database_connection.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_database_connection.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui\database_connection.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_database_connection.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_database_connection.h;%%(Outputs)</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui\data_management.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_data_management.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui\data_management.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_data_management.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_data_management.h;%%(Outputs)</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui\data_export.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_data_export.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui\data_export.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_data_export.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_data_export.h;%%(Outputs)</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui\param_config.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_param_config.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui\param_config.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_param_config.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_param_config.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui\clip_dialog.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_clip_dialog.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui\clip_dialog.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_clip_dialog.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_clip_dialog.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui\merge_dialog.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_merge_dialog.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui\merge_dialog.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_merge_dialog.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_merge_dialog.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui\format_conversion.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_format_conversion.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui\format_conversion.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_format_conversion.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_format_conversion.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui\auto_edge_match.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_auto_edge_match.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui\auto_edge_match.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_auto_edge_match.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_auto_edge_match.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- ====== 已有源文件 ====== -->
+    <ClCompile Include="GeneratedFiles\Release\moc_map_quality_check_tools.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_geojson2shp.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_vector_format_conversion.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_generalization_config_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_layer_type_select_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_data_import.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_metadata_viewer.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_auto_quality_check.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_layer_mapping_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_map_check_backup_manager.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_backup_strategy_edit_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_data_restore.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_database_connection.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_data_management.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_data_export.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_data_list_export.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_map_tool_extent_picker.cpp" />
+    <ClCompile Include="map_quality_check_tools.cpp" />
+    <ClCompile Include="ui_class\se_vector_format_conversion.cpp" />
+    <ClCompile Include="ui_task\se_geojson2shp.cpp" />
+    <!-- ====== 表单化 UI 对话框 ====== -->
+    <ClCompile Include="ui_class\layer_type_select_dialog.cpp" />
+    <ClCompile Include="ui_class\generalization_config_dialog.cpp" />
+    <!-- ====== 数据导入 & 元数据管理 ====== -->
+    <ClCompile Include="ui_class\se_data_import.cpp" />
+    <ClCompile Include="ui_class\se_metadata_viewer.cpp" />
+    <!-- ====== 综合成果自动化质检 ====== -->
+    <ClCompile Include="ui_class\se_auto_quality_check.cpp" />
+    <ClCompile Include="ui_class\se_mission453_check.cpp" />
+    <ClCompile Include="ui_class\se_mission454_check.cpp" />
+    <ClCompile Include="ui_class\se_mission455_check.cpp" />
+    <ClCompile Include="ui_class\se_mission456_check.cpp" />
+    <ClCompile Include="ui_class\se_mission457_check.cpp" />
+    <ClCompile Include="ui_class\se_mission458_check.cpp" />
+    <ClCompile Include="ui_class\se_mission459_check.cpp" />
+    <ClCompile Include="ui_class\se_db_manager.cpp" />
+    <ClCompile Include="ui_class\se_layer_mapping_dialog.cpp" />
+    <!-- ====== 数据导出 & 备份恢复 ====== -->
+    <ClCompile Include="map_check_backup_manager.cpp" />
+    <ClCompile Include="ui_class\se_data_restore.cpp" />
+    <ClCompile Include="ui_class\se_database_connection.cpp" />
+    <ClCompile Include="ui_class\se_data_management.cpp" />
+    <ClCompile Include="ui_class\se_data_export.cpp" />
+    <ClCompile Include="ui_class\se_data_list_export.cpp" />
+    <ClCompile Include="ui_class\map_tool_extent_picker.cpp" />
+    <ClCompile Include="ui_class\backup_strategy_edit_dialog.cpp" />
+    <!-- ====== 参数配置/裁剪/合并/格式转换/要素自动接边 ====== -->
+    <ClCompile Include="GeneratedFiles\Release\moc_param_config_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_scale_selector_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_clip_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_merge_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_format_conversion_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_auto_edge_match_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_clip_merge_task.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_edge_match_task.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_format_convert_task.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_wuji_process_runner.cpp" />
+    <ClCompile Include="ui_class\param_config_dialog.cpp" />
+    <ClCompile Include="ui_class\scale_selector_dialog.cpp" />
+    <ClCompile Include="ui_class\clip_dialog.cpp" />
+    <ClCompile Include="ui_class\merge_dialog.cpp" />
+    <ClCompile Include="ui_class\format_conversion_dialog.cpp" />
+    <ClCompile Include="ui_class\auto_edge_match_dialog.cpp" />
+    <ClCompile Include="ui_task\se_clip_merge_task.cpp" />
+    <ClCompile Include="ui_task\se_edge_match_task.cpp" />
+    <ClCompile Include="ui_task\se_format_convert_task.cpp" />
+    <ClCompile Include="ui_task\se_wuji_xml_generator.cpp" />
+    <ClCompile Include="ui_task\se_nmo_sdk_bridge.cpp" />
+    <ClCompile Include="ui_task\se_wuji_process_runner.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_gdb_layer_selector_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_calendar_helper.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_data_importer.cpp" />
+    <ClCompile Include="ui_class\gdb_layer_selector_dialog.cpp" />
+    <ClCompile Include="core\calendar_helper.cpp" />
+    <ClCompile Include="core\data_importer.cpp" />
+    <!-- ====== 地图成果管理 MOC ====== -->
+    <ClCompile Include="GeneratedFiles\Release\moc_db_config_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_login_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_product_storage_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_postgis_connector.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_metadata_manager_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_access_control_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_product_dao.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_schema_manager.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_metadata_extractor.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_file_storage_manager.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_data_import_wizard.cpp" />
+    <!-- ====== 地图成果管理源文件 ====== -->
+    <ClCompile Include="ui_class\db_config_dialog.cpp" />
+    <ClCompile Include="ui_class\login_dialog.cpp" />
+    <ClCompile Include="ui_class\product_storage_dialog.cpp" />
+    <ClCompile Include="ui_class\metadata_manager_dialog.cpp" />
+    <ClCompile Include="ui_class\access_control_dialog.cpp" />
+    <ClCompile Include="database\postgis_connector.cpp" />
+    <ClCompile Include="database\product_metadata.cpp" />
+    <ClCompile Include="database\product_dao.cpp" />
+    <ClCompile Include="database\schema_manager.cpp" />
+    <ClCompile Include="core\metadata_extractor.cpp" />
+    <ClCompile Include="core\file_storage_manager.cpp" />
+    <ClCompile Include="ui_class\data_import_wizard.cpp" />
+    <ClCompile Include="ui_class\mapdata_download.cpp" />
+    <!-- ====== Phase 5: 综合缩编管线 ====== -->
+    <ClCompile Include="..\..\..\geo_algorithm_h\vector\cse_generalization.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="map_quality_check_tools.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="ui_class\layer_type_select_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\generalization_config_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\se_data_import.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\se_metadata_viewer.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\se_auto_quality_check.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\param_config_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\scale_selector_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\clip_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\merge_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\format_conversion_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\auto_edge_match_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_task\se_clip_merge_task.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_task\se_edge_match_task.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_task\se_format_convert_task.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="GeneratedFiles\Release\ui_vector_format_conversion.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_auto_quality_check.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_data_restore.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_database_connection.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_data_management.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_data_export.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_param_config.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_clip_dialog.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_merge_dialog.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_format_conversion.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_auto_edge_match.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_scale_selector_dialog.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_mapdata_download.h" />
+    <!-- 已有 MOC 头文件 -->
+    <CustomBuild Include="ui_class\se_vector_format_conversion.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_task\se_wuji_process_runner.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+
+    <CustomBuild Include="ui_task\se_geojson2shp.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\db_config_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\login_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\product_storage_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\metadata_manager_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\access_control_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="database\postgis_connector.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="database\product_dao.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="database\schema_manager.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="core\metadata_extractor.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="core\file_storage_manager.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\gdb_layer_selector_dialog.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="core\calendar_helper.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="core\data_importer.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+	if %errorlevel% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %1
+	:cmDone
+	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{C69159F5-4369-4F5B-AF0A-F2BD31496240}</ProjectGuid>
+    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
+    <Keyword>Win32Proj</Keyword>
+    <Platform>x64</Platform>
+    <ProjectName>map_quality_check_tools</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\qgis-3.22.5\_build\output\plugins\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">map_quality_check_tools.dir\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">map_quality_check_tools</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.dll</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\LTZK\plugins\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\garmap_release\winx64_vc16\obj\plugins\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">plugin_map_quality_check_tools</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.dll</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">D:\qgis-3.22.5\_build\output\plugins\MinSizeRel\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">map_quality_check_tools.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">map_quality_check_tools</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.dll</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">D:\qgis-3.22.5\_build\output\plugins\RelWithDebInfo\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">map_quality_check_tools.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">map_quality_check_tools</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.dll</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</GenerateManifest>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\gitdir\qgis\include;D:\qgis-3.22.5\_build;D:\qgis-3.22.5\src\plugins;D:\qgis-3.22.5\src\core;D:\qgis-3.22.5\_build\src\core;D:\qgis-3.22.5\src\core\3d;D:\qgis-3.22.5\src\core\annotations;D:\qgis-3.22.5\src\core\auth;D:\qgis-3.22.5\src\core\browser;D:\qgis-3.22.5\src\core\callouts;D:\qgis-3.22.5\src\core\classification;D:\qgis-3.22.5\src\core\diagram;D:\qgis-3.22.5\src\core\dxf;D:\qgis-3.22.5\src\core\editform;D:\qgis-3.22.5\src\core\effects;D:\qgis-3.22.5\src\core\expression;D:\qgis-3.22.5\src\core\externalstorage;D:\qgis-3.22.5\src\core\fieldformatter;D:\qgis-3.22.5\src\core\geometry;D:\qgis-3.22.5\src\core\geocms;D:\qgis-3.22.5\src\core\geocms\geonode;D:\qgis-3.22.5\src\core\geocoding;D:\qgis-3.22.5\src\core\gps;D:\qgis-3.22.5\src\core\labeling;D:\qgis-3.22.5\src\core\layertree;D:\qgis-3.22.5\src\core\layout;D:\qgis-3.22.5\src\core\locator;D:\qgis-3.22.5\src\core\maprenderer;D:\qgis-3.22.5\src\core\mesh;D:\qgis-3.22.5\src\core\metadata;D:\qgis-3.22.5\src\core\network;D:\qgis-3.22.5\src\core\numericformats;D:\qgis-3.22.5\src\core\pal;D:\qgis-3.22.5\src\core\pointcloud;D:\qgis-3.22.5\src\core\processing;D:\qgis-3.22.5\src\core\processing\models;D:\qgis-3.22.5\src\core\proj;D:\qgis-3.22.5\src\core\project;D:\qgis-3.22.5\src\core\providers;D:\qgis-3.22.5\src\core\providers\arcgis;D:\qgis-3.22.5\src\core\providers\memory;D:\qgis-3.22.5\src\core\providers\gdal;D:\qgis-3.22.5\src\core\providers\ogr;D:\qgis-3.22.5\src\core\providers\meshmemory;D:\qgis-3.22.5\src\core\raster;D:\qgis-3.22.5\src\core\renderer;D:\qgis-3.22.5\src\core\scalebar;D:\qgis-3.22.5\src\core\settings;D:\qgis-3.22.5\src\core\symbology;D:\qgis-3.22.5\src\core\textrenderer;D:\qgis-3.22.5\src\core\validity;D:\qgis-3.22.5\src\core\vector;D:\qgis-3.22.5\src\core\vectortile;D:\qgis-3.22.5\external;D:\qgis-3.22.5\external\nlohmann;D:\qgis-3.22.5\external\kdbush\include;D:\qgis-3.22.5\external\nmea;D:\qgis-3.22.5\external\rtree\include;D:\qgis-3.22.5\external\meshOptimizer;D:\qgis-3.22.5\src\gui;D:\qgis-3.22.5\src\gui\annotations;D:\qgis-3.22.5\src\gui\attributeformconfig;D:\qgis-3.22.5\src\gui\symbology;D:\qgis-3.22.5\src\gui\attributetable;D:\qgis-3.22.5\src\gui\auth;D:\qgis-3.22.5\src\gui\callouts;D:\qgis-3.22.5\src\gui\codeeditors;D:\qgis-3.22.5\src\gui\devtools;D:\qgis-3.22.5\src\gui\editorwidgets;D:\qgis-3.22.5\src\gui\editorwidgets\core;D:\qgis-3.22.5\src\gui\effects;D:\qgis-3.22.5\src\gui\labeling;D:\qgis-3.22.5\src\gui\layertree;D:\qgis-3.22.5\src\gui\layout;D:\qgis-3.22.5\src\gui\locator;D:\qgis-3.22.5\src\gui\mesh;D:\qgis-3.22.5\src\gui\numericformats;D:\qgis-3.22.5\src\gui\ogr;D:\qgis-3.22.5\src\gui\processing;D:\qgis-3.22.5\src\gui\processing\models;D:\qgis-3.22.5\src\gui\providers;D:\qgis-3.22.5\src\gui\providers\gdal;D:\qgis-3.22.5\src\gui\providers\ogr;D:\qgis-3.22.5\src\gui\pointcloud;D:\qgis-3.22.5\src\gui\raster;D:\qgis-3.22.5\src\gui\settings;D:\qgis-3.22.5\src\gui\tableeditor;D:\qgis-3.22.5\src\gui\vector;D:\qgis-3.22.5\src\gui\vectortile;D:\qgis-3.22.5\_build\src\gui;D:\qgis-3.22.5\_build\src\ui;D:\qgis-3.22.5\src\native;D:\qgis-3.22.5\_build\src\native;D:\OSGeo4W\include;D:\Qt\5.15.2\msvc2019_64\include;D:\Qt\5.15.2\msvc2019_64\include\QtCore;D:\Qt\5.15.2\msvc2019_64\.\mkspecs\win32-msvc;D:\Qt\5.15.2\msvc2019_64\include\QtGui;D:\Qt\5.15.2\msvc2019_64\include\QtANGLE;D:\Qt\5.15.2\msvc2019_64\include\QtXml;D:\Qt\5.15.2\msvc2019_64\include\QtWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtSvg;D:\Qt\5.15.2\msvc2019_64\include\QtPrintSupport;D:\Qt\5.15.2\msvc2019_64\include\QtNetwork;D:\Qt\5.15.2\msvc2019_64\include\QtSql;D:\Qt\5.15.2\msvc2019_64\include\QtConcurrent;D:\dependencies\libzip\include;D:\dependencies\qca\include\Qca-qt5\QtCrypto;D:\dependencies\qtkeychain\include\qt5keychain;D:\Qt\5.15.2\msvc2019_64\include\QtSerialPort;D:\dependencies\protobuf\include;D:\dependencies\zlib\include;D:\OSGeo4W\include\exiv2;D:\Qt\5.15.2\msvc2019_64\include\QtPositioning;D:\dependencies\qwt\include;D:\dependencies\qscintilla\include;D:\qgis-3.22.5\src\native\..\..\external\wintoast\src;D:\Qt\5.15.2\msvc2019_64\include\QtWinExtras;D:\Qt\5.15.2\msvc2019_64\include\QtUiTools;D:\Qt\5.15.2\msvc2019_64\include\QtQuickWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtQuick;D:\Qt\5.15.2\msvc2019_64\include\QtQmlModels;D:\Qt\5.15.2\msvc2019_64\include\QtQml;D:\qgis-3.22.5\src\app\georeferencer;D:\qgis-3.22.5\_build\src\app;D:\gitdir\geo_algorithm_h;D:\qgis-3.22.5\_build\src\plugins\geodataprocess;$(SE_OSGEO4W_DIR)\include\libxml2;D:\GarMap\qgis_plugins\cplusplus\SupportLibraries\newmapcore\headers;D:\GarMap\qgis_plugins\cplusplus\SupportLibraries\newmaplib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4091;4100;4127;4190;4231;4244;4251;4267;4275;4290;4456;4457;4458;4505;4510;4512;4610;4706;4714;4800;4996;4828</DisableSpecificWarnings>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;QT_NO_CAST_TO_ASCII;NOMINMAX;QT_DEPRECATED_WARNINGS;QT_DISABLE_DEPRECATED_BEFORE=0x050800;QT_USE_QSTRINGBUILDER;_USE_MATH_DEFINES;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;SIP_VERSION=0x060101;_HAS_AUTO_PTR_ETC=1;QT_CORE_LIB;QT_GUI_LIB;QT_XML_LIB;QT_WIDGETS_LIB;QT_SVG_LIB;QT_NETWORK_LIB;QT_SQL_LIB;QT_CONCURRENT_LIB;QT_PRINTSUPPORT_LIB;QT_SERIALPORT_LIB;QT_POSITIONING_LIB;QT_WINEXTRAS_LIB;QT_UITOOLS_LIB;QT_QUICKWIDGETS_LIB;QT_QUICK_LIB;QT_QMLMODELS_LIB;QT_QML_LIB;CMAKE_INTDIR="Debug";map_quality_check_tools_EXPORTS;_HAS_STD_BYTE=0</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;QT_NO_CAST_TO_ASCII;NOMINMAX;QT_DEPRECATED_WARNINGS;QT_DISABLE_DEPRECATED_BEFORE=0x050800;QT_USE_QSTRINGBUILDER;_USE_MATH_DEFINES;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;SIP_VERSION=0x060101;_HAS_AUTO_PTR_ETC=1;QT_CORE_LIB;QT_GUI_LIB;QT_XML_LIB;QT_WIDGETS_LIB;QT_SVG_LIB;QT_NETWORK_LIB;QT_SQL_LIB;QT_CONCURRENT_LIB;QT_PRINTSUPPORT_LIB;QT_SERIALPORT_LIB;QT_POSITIONING_LIB;QT_WINEXTRAS_LIB;QT_UITOOLS_LIB;QT_QUICKWIDGETS_LIB;QT_QUICK_LIB;QT_QMLMODELS_LIB;QT_QML_LIB;CMAKE_INTDIR=\"Debug\";map_quality_check_tools_EXPORTS</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\qgis-3.22.5\_build\src\plugins\offline_editing\map_quality_check_tools_autogen\include_Debug;D:\qgis-3.22.5\_build;D:\qgis-3.22.5\src\plugins;D:\qgis-3.22.5\_build\src\plugins\offline_editing;D:\qgis-3.22.5\src\core;D:\qgis-3.22.5\_build\src\core;D:\qgis-3.22.5\src\core\3d;D:\qgis-3.22.5\src\core\annotations;D:\qgis-3.22.5\src\core\auth;D:\qgis-3.22.5\src\core\browser;D:\qgis-3.22.5\src\core\callouts;D:\qgis-3.22.5\src\core\classification;D:\qgis-3.22.5\src\core\diagram;D:\qgis-3.22.5\src\core\dxf;D:\qgis-3.22.5\src\core\editform;D:\qgis-3.22.5\src\core\effects;D:\qgis-3.22.5\src\core\expression;D:\qgis-3.22.5\src\core\externalstorage;D:\qgis-3.22.5\src\core\fieldformatter;D:\qgis-3.22.5\src\core\geometry;D:\qgis-3.22.5\src\core\geocms;D:\qgis-3.22.5\src\core\geocms\geonode;D:\qgis-3.22.5\src\core\geocoding;D:\qgis-3.22.5\src\core\gps;D:\qgis-3.22.5\src\core\labeling;D:\qgis-3.22.5\src\core\layertree;D:\qgis-3.22.5\src\core\layout;D:\qgis-3.22.5\src\core\locator;D:\qgis-3.22.5\src\core\maprenderer;D:\qgis-3.22.5\src\core\mesh;D:\qgis-3.22.5\src\core\metadata;D:\qgis-3.22.5\src\core\network;D:\qgis-3.22.5\src\core\numericformats;D:\qgis-3.22.5\src\core\pal;D:\qgis-3.22.5\src\core\pointcloud;D:\qgis-3.22.5\src\core\processing;D:\qgis-3.22.5\src\core\processing\models;D:\qgis-3.22.5\src\core\proj;D:\qgis-3.22.5\src\core\project;D:\qgis-3.22.5\src\core\providers;D:\qgis-3.22.5\src\core\providers\arcgis;D:\qgis-3.22.5\src\core\providers\memory;D:\qgis-3.22.5\src\core\providers\gdal;D:\qgis-3.22.5\src\core\providers\ogr;D:\qgis-3.22.5\src\core\providers\meshmemory;D:\qgis-3.22.5\src\core\raster;D:\qgis-3.22.5\src\core\renderer;D:\qgis-3.22.5\src\core\scalebar;D:\qgis-3.22.5\src\core\settings;D:\qgis-3.22.5\src\core\symbology;D:\qgis-3.22.5\src\core\textrenderer;D:\qgis-3.22.5\src\core\validity;D:\qgis-3.22.5\src\core\vector;D:\qgis-3.22.5\src\core\vectortile;D:\qgis-3.22.5\external;D:\qgis-3.22.5\external\nlohmann;D:\qgis-3.22.5\external\kdbush\include;D:\qgis-3.22.5\external\nmea;D:\qgis-3.22.5\external\rtree\include;D:\qgis-3.22.5\external\meshOptimizer;D:\qgis-3.22.5\src\gui;D:\qgis-3.22.5\src\gui\annotations;D:\qgis-3.22.5\src\gui\attributeformconfig;D:\qgis-3.22.5\src\gui\symbology;D:\qgis-3.22.5\src\gui\attributetable;D:\qgis-3.22.5\src\gui\auth;D:\qgis-3.22.5\src\gui\callouts;D:\qgis-3.22.5\src\gui\codeeditors;D:\qgis-3.22.5\src\gui\devtools;D:\qgis-3.22.5\src\gui\editorwidgets;D:\qgis-3.22.5\src\gui\editorwidgets\core;D:\qgis-3.22.5\src\gui\effects;D:\qgis-3.22.5\src\gui\labeling;D:\qgis-3.22.5\src\gui\layertree;D:\qgis-3.22.5\src\gui\layout;D:\qgis-3.22.5\src\gui\locator;D:\qgis-3.22.5\src\gui\mesh;D:\qgis-3.22.5\src\gui\numericformats;D:\qgis-3.22.5\src\gui\ogr;D:\qgis-3.22.5\src\gui\processing;D:\qgis-3.22.5\src\gui\processing\models;D:\qgis-3.22.5\src\gui\providers;D:\qgis-3.22.5\src\gui\providers\gdal;D:\qgis-3.22.5\src\gui\providers\ogr;D:\qgis-3.22.5\src\gui\pointcloud;D:\qgis-3.22.5\src\gui\raster;D:\qgis-3.22.5\src\gui\settings;D:\qgis-3.22.5\src\gui\tableeditor;D:\qgis-3.22.5\src\gui\vector;D:\qgis-3.22.5\src\gui\vectortile;D:\qgis-3.22.5\_build\src\gui;D:\qgis-3.22.5\_build\src\ui;D:\qgis-3.22.5\src\native;D:\qgis-3.22.5\_build\src\native;D:\OSGeo4W\include;D:\Qt\5.15.2\msvc2019_64\include;D:\Qt\5.15.2\msvc2019_64\include\QtCore;D:\Qt\5.15.2\msvc2019_64\.\mkspecs\win32-msvc;D:\Qt\5.15.2\msvc2019_64\include\QtGui;D:\Qt\5.15.2\msvc2019_64\include\QtANGLE;D:\Qt\5.15.2\msvc2019_64\include\QtXml;D:\Qt\5.15.2\msvc2019_64\include\QtWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtSvg;D:\Qt\5.15.2\msvc2019_64\include\QtPrintSupport;D:\Qt\5.15.2\msvc2019_64\include\QtNetwork;D:\Qt\5.15.2\msvc2019_64\include\QtSql;D:\Qt\5.15.2\msvc2019_64\include\QtConcurrent;D:\dependencies\libzip\include;D:\dependencies\qca\include\Qca-qt5\QtCrypto;D:\dependencies\qtkeychain\include\qt5keychain;D:\Qt\5.15.2\msvc2019_64\include\QtSerialPort;D:\dependencies\protobuf\include;D:\dependencies\zlib\include;D:\OSGeo4W\include\exiv2;D:\Qt\5.15.2\msvc2019_64\include\QtPositioning;D:\dependencies\qwt\include;D:\dependencies\qscintilla\include;D:\qgis-3.22.5\src\native\..\..\external\wintoast\src;D:\Qt\5.15.2\msvc2019_64\include\QtWinExtras;D:\Qt\5.15.2\msvc2019_64\include\QtUiTools;D:\Qt\5.15.2\msvc2019_64\include\QtQuickWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtQuick;D:\Qt\5.15.2\msvc2019_64\include\QtQmlModels;D:\Qt\5.15.2\msvc2019_64\include\QtQml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\qgis-3.22.5\_build\src\plugins\offline_editing\map_quality_check_tools_autogen\include_Debug;D:\qgis-3.22.5\_build;D:\qgis-3.22.5\src\plugins;D:\qgis-3.22.5\_build\src\plugins\offline_editing;D:\qgis-3.22.5\src\core;D:\qgis-3.22.5\_build\src\core;D:\qgis-3.22.5\src\core\3d;D:\qgis-3.22.5\src\core\annotations;D:\qgis-3.22.5\src\core\auth;D:\qgis-3.22.5\src\core\browser;D:\qgis-3.22.5\src\core\callouts;D:\qgis-3.22.5\src\core\classification;D:\qgis-3.22.5\src\core\diagram;D:\qgis-3.22.5\src\core\dxf;D:\qgis-3.22.5\src\core\editform;D:\qgis-3.22.5\src\core\effects;D:\qgis-3.22.5\src\core\expression;D:\qgis-3.22.5\src\core\externalstorage;D:\qgis-3.22.5\src\core\fieldformatter;D:\qgis-3.22.5\src\core\geometry;D:\qgis-3.22.5\src\core\geocms;D:\qgis-3.22.5\src\core\geocms\geonode;D:\qgis-3.22.5\src\core\geocoding;D:\qgis-3.22.5\src\core\gps;D:\qgis-3.22.5\src\core\labeling;D:\qgis-3.22.5\src\core\layertree;D:\qgis-3.22.5\src\core\layout;D:\qgis-3.22.5\src\core\locator;D:\qgis-3.22.5\src\core\maprenderer;D:\qgis-3.22.5\src\core\mesh;D:\qgis-3.22.5\src\core\metadata;D:\qgis-3.22.5\src\core\network;D:\qgis-3.22.5\src\core\numericformats;D:\qgis-3.22.5\src\core\pal;D:\qgis-3.22.5\src\core\pointcloud;D:\qgis-3.22.5\src\core\processing;D:\qgis-3.22.5\src\core\processing\models;D:\qgis-3.22.5\src\core\proj;D:\qgis-3.22.5\src\core\project;D:\qgis-3.22.5\src\core\providers;D:\qgis-3.22.5\src\core\providers\arcgis;D:\qgis-3.22.5\src\core\providers\memory;D:\qgis-3.22.5\src\core\providers\gdal;D:\qgis-3.22.5\src\core\providers\ogr;D:\qgis-3.22.5\src\core\providers\meshmemory;D:\qgis-3.22.5\src\core\raster;D:\qgis-3.22.5\src\core\renderer;D:\qgis-3.22.5\src\core\scalebar;D:\qgis-3.22.5\src\core\settings;D:\qgis-3.22.5\src\core\symbology;D:\qgis-3.22.5\src\core\textrenderer;D:\qgis-3.22.5\src\core\validity;D:\qgis-3.22.5\src\core\vector;D:\qgis-3.22.5\src\core\vectortile;D:\qgis-3.22.5\external;D:\qgis-3.22.5\external\nlohmann;D:\qgis-3.22.5\external\kdbush\include;D:\qgis-3.22.5\external\nmea;D:\qgis-3.22.5\external\rtree\include;D:\qgis-3.22.5\external\meshOptimizer;D:\qgis-3.22.5\src\gui;D:\qgis-3.22.5\src\gui\annotations;D:\qgis-3.22.5\src\gui\attributeformconfig;D:\qgis-3.22.5\src\gui\symbology;D:\qgis-3.22.5\src\gui\attributetable;D:\qgis-3.22.5\src\gui\auth;D:\qgis-3.22.5\src\gui\callouts;D:\qgis-3.22.5\src\gui\codeeditors;D:\qgis-3.22.5\src\gui\devtools;D:\qgis-3.22.5\src\gui\editorwidgets;D:\qgis-3.22.5\src\gui\editorwidgets\core;D:\qgis-3.22.5\src\gui\effects;D:\qgis-3.22.5\src\gui\labeling;D:\qgis-3.22.5\src\gui\layertree;D:\qgis-3.22.5\src\gui\layout;D:\qgis-3.22.5\src\gui\locator;D:\qgis-3.22.5\src\gui\mesh;D:\qgis-3.22.5\src\gui\numericformats;D:\qgis-3.22.5\src\gui\ogr;D:\qgis-3.22.5\src\gui\processing;D:\qgis-3.22.5\src\gui\processing\models;D:\qgis-3.22.5\src\gui\providers;D:\qgis-3.22.5\src\gui\providers\gdal;D:\qgis-3.22.5\src\gui\providers\ogr;D:\qgis-3.22.5\src\gui\pointcloud;D:\qgis-3.22.5\src\gui\raster;D:\qgis-3.22.5\src\gui\settings;D:\qgis-3.22.5\src\gui\tableeditor;D:\qgis-3.22.5\src\gui\vector;D:\qgis-3.22.5\src\gui\vectortile;D:\qgis-3.22.5\_build\src\gui;D:\qgis-3.22.5\_build\src\ui;D:\qgis-3.22.5\src\native;D:\qgis-3.22.5\_build\src\native;D:\OSGeo4W\include;D:\Qt\5.15.2\msvc2019_64\include;D:\Qt\5.15.2\msvc2019_64\include\QtCore;D:\Qt\5.15.2\msvc2019_64\.\mkspecs\win32-msvc;D:\Qt\5.15.2\msvc2019_64\include\QtGui;D:\Qt\5.15.2\msvc2019_64\include\QtANGLE;D:\Qt\5.15.2\msvc2019_64\include\QtXml;D:\Qt\5.15.2\msvc2019_64\include\QtWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtSvg;D:\Qt\5.15.2\msvc2019_64\include\QtPrintSupport;D:\Qt\5.15.2\msvc2019_64\include\QtNetwork;D:\Qt\5.15.2\msvc2019_64\include\QtSql;D:\Qt\5.15.2\msvc2019_64\include\QtConcurrent;D:\dependencies\libzip\include;D:\dependencies\qca\include\Qca-qt5\QtCrypto;D:\dependencies\qtkeychain\include\qt5keychain;D:\Qt\5.15.2\msvc2019_64\include\QtSerialPort;D:\dependencies\protobuf\include;D:\dependencies\zlib\include;D:\OSGeo4W\include\exiv2;D:\Qt\5.15.2\msvc2019_64\include\QtPositioning;D:\dependencies\qwt\include;D:\dependencies\qscintilla\include;D:\qgis-3.22.5\src\native\..\..\external\wintoast\src;D:\Qt\5.15.2\msvc2019_64\include\QtWinExtras;D:\Qt\5.15.2\msvc2019_64\include\QtUiTools;D:\Qt\5.15.2\msvc2019_64\include\QtQuickWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtQuick;D:\Qt\5.15.2\msvc2019_64\include\QtQmlModels;D:\Qt\5.15.2\msvc2019_64\include\QtQml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PreBuildEvent>
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message>
+      </Message>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <Link>
+      <AdditionalDependencies>D:\qgis-3.22.5\_build\src\gui\Debug\qgis_gui.lib;D:\OSGeo4W\lib\spatialite_i.lib;D:\qgis-3.22.5\_build\src\core\Debug\qgis_core.lib;wsock32.lib;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\um\x64\SetupAPI.Lib;dbghelp.lib;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\um\x64\Version.Lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Xmld.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Svgd.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Sqld.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Concurrentd.lib;D:\dependencies\qca\lib\qca-qt5d.lib;D:\dependencies\qtkeychain\lib\qt5keychaind.lib;D:\OSGeo4W\lib\proj.lib;D:\OSGeo4W\lib\geos_c.lib;D:\OSGeo4W\lib\gdal_i.lib;D:\OSGeo4W\lib\spatialindex-64.lib;D:\OSGeo4W\lib\libexpat.lib;D:\OSGeo4W\lib\sqlite3_i.lib;D:\dependencies\libzip\lib\zip.lib;D:\dependencies\protobuf\lib\libprotobuf-lited.lib;D:\dependencies\zlib\lib\zlibd.lib;D:\OSGeo4W\lib\exiv2.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5PrintSupportd.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5SerialPortd.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Positioningd.lib;..\..\native\Debug\qgis_native.lib;shell32.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5WinExtrasd.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5UiToolsd.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Widgetsd.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Guid.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Cored.lib;D:\dependencies\qwt\lib\qwtd.lib;D:\dependencies\qscintilla\lib\qscintilla2_qt5d.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5QuickWidgetsd.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Widgetsd.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Quickd.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Guid.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5QmlModelsd.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Qmld.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Networkd.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Cored.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib;libmapboom_base_lib_1.52.lib;se_vector_format_conversion.lib;libxml2.lib;D:\GarMap\qgis_plugins\cplusplus\SupportLibraries\newmapcore\lib_x64\IO.lib;D:\GarMap\qgis_plugins\cplusplus\SupportLibraries\newmaplib\lib_x64\MapBatchProcessing.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:/qgis-3.22.5/_build/src/core;D:/qgis-3.22.5/_build/src/core/$(Configuration);D:/qgis-3.22.5/_build/src/gui;D:/qgis-3.22.5/_build/src/gui/$(Configuration);D:/Qt/5.15.2/msvc2019_64/lib;D:/OSGeo4W/lib;D:/qgis-3.22.5/_build/output/bin/Debug;D:/gitdir/qgis/extern/geo_algorithm/lib;D:/temp/mapscloud_release/winx64_vc16/lib/debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>D:\qgis-3.22.5\_build\output\plugins\Debug\map_quality_check_tools.lib</ImportLibrary>
+      <ProgramDataBaseFile>D:/qgis-3.22.5/_build/output/plugins/Debug/map_quality_check_tools.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools;D:\LTZK\OSGeo4W_32815\include;D:\LTZK\OSGeo4W_32815\apps\Qt5\include;D:\LTZK\OSGeo4W_32815\apps\Qt5\include\QtCore;D:\LTZK\OSGeo4W_32815\apps\Qt5\include\QtGui;D:\LTZK\OSGeo4W_32815\apps\Qt5\include\QtXml;D:\LTZK\OSGeo4W_32815\apps\Qt5\include\QtWidgets;D:\LTZK\OSGeo4W_32815\apps\Qt5\include\QtSvg;D:\LTZK\QGIS_32815\include;D:\LTZK\QGIS_32815;D:\GarMap\geo_algorithm_h;D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release;D:\LTZK\OSGeo4W_32815\include\libxml2;D:\GarMap\extern\spdlog-1.x\include;D:\GarMap\extern\nmo_sdk\include;D:\LTZK\OSGeo4W_32815\apps\Qt5\include\QtNetwork;D:\LTZK\OSGeo4W_32815\apps\Qt5\include\QtSql;D:\LTZK\OSGeo4W_32815\apps\Qt5\include\QtCrypto;D:\LTZK\OSGeo4W_32815\apps\Qt5\include\qt5keychain;D:\LTZK\OSGeo4W_32815\apps\Qt5\include\QtPrintSupport;D:\GarMap\qgis_plugins\cplusplus\SupportLibraries\newmapcore\headers;D:\GarMap\qgis_plugins\cplusplus\SupportLibraries\newmaplib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <DisableSpecificWarnings>4091;4100;4127;4190;4231;4244;4251;4267;4275;4290;4456;4457;4458;4505;4510;4512;4610;4706;4714;4800;4996;4828;4819;4474</DisableSpecificWarnings>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;QT_NO_CAST_TO_ASCII;NOMINMAX;QT_DEPRECATED_WARNINGS;QT_DISABLE_DEPRECATED_BEFORE=0x050800;QT_USE_QSTRINGBUILDER;_USE_MATH_DEFINES;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;SIP_VERSION=0x060101;_HAS_AUTO_PTR_ETC=1;QT_CORE_LIB;QT_NO_DEBUG;QT_GUI_LIB;QT_XML_LIB;QT_WIDGETS_LIB;QT_SVG_LIB;QT_NETWORK_LIB;QT_SQL_LIB;QT_CONCURRENT_LIB;QT_PRINTSUPPORT_LIB;QT_SERIALPORT_LIB;QT_POSITIONING_LIB;QT_WINEXTRAS_LIB;QT_UITOOLS_LIB;QT_QUICKWIDGETS_LIB;QT_QUICK_LIB;QT_QMLMODELS_LIB;QT_QML_LIB;CMAKE_INTDIR="Release";map_quality_check_tools_EXPORTS</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;QT_NO_CAST_TO_ASCII;NOMINMAX;QT_DEPRECATED_WARNINGS;QT_DISABLE_DEPRECATED_BEFORE=0x050800;QT_USE_QSTRINGBUILDER;_USE_MATH_DEFINES;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;SIP_VERSION=0x060101;_HAS_AUTO_PTR_ETC=1;QT_CORE_LIB;QT_NO_DEBUG;QT_GUI_LIB;QT_XML_LIB;QT_WIDGETS_LIB;QT_SVG_LIB;QT_NETWORK_LIB;QT_SQL_LIB;QT_CONCURRENT_LIB;QT_PRINTSUPPORT_LIB;QT_SERIALPORT_LIB;QT_POSITIONING_LIB;QT_WINEXTRAS_LIB;QT_UITOOLS_LIB;QT_QUICKWIDGETS_LIB;QT_QUICK_LIB;QT_QMLMODELS_LIB;QT_QML_LIB;CMAKE_INTDIR=\"Release\";map_quality_check_tools_EXPORTS</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\qgis-3.22.5\_build\src\plugins\offline_editing\map_quality_check_tools_autogen\include_Release;D:\qgis-3.22.5\_build;D:\qgis-3.22.5\src\plugins;D:\qgis-3.22.5\_build\src\plugins\offline_editing;D:\qgis-3.22.5\src\core;D:\qgis-3.22.5\_build\src\core;D:\qgis-3.22.5\src\core\3d;D:\qgis-3.22.5\src\core\annotations;D:\qgis-3.22.5\src\core\auth;D:\qgis-3.22.5\src\core\browser;D:\qgis-3.22.5\src\core\callouts;D:\qgis-3.22.5\src\core\classification;D:\qgis-3.22.5\src\core\diagram;D:\qgis-3.22.5\src\core\dxf;D:\qgis-3.22.5\src\core\editform;D:\qgis-3.22.5\src\core\effects;D:\qgis-3.22.5\src\core\expression;D:\qgis-3.22.5\src\core\externalstorage;D:\qgis-3.22.5\src\core\fieldformatter;D:\qgis-3.22.5\src\core\geometry;D:\qgis-3.22.5\src\core\geocms;D:\qgis-3.22.5\src\core\geocms\geonode;D:\qgis-3.22.5\src\core\geocoding;D:\qgis-3.22.5\src\core\gps;D:\qgis-3.22.5\src\core\labeling;D:\qgis-3.22.5\src\core\layertree;D:\qgis-3.22.5\src\core\layout;D:\qgis-3.22.5\src\core\locator;D:\qgis-3.22.5\src\core\maprenderer;D:\qgis-3.22.5\src\core\mesh;D:\qgis-3.22.5\src\core\metadata;D:\qgis-3.22.5\src\core\network;D:\qgis-3.22.5\src\core\numericformats;D:\qgis-3.22.5\src\core\pal;D:\qgis-3.22.5\src\core\pointcloud;D:\qgis-3.22.5\src\core\processing;D:\qgis-3.22.5\src\core\processing\models;D:\qgis-3.22.5\src\core\proj;D:\qgis-3.22.5\src\core\project;D:\qgis-3.22.5\src\core\providers;D:\qgis-3.22.5\src\core\providers\arcgis;D:\qgis-3.22.5\src\core\providers\memory;D:\qgis-3.22.5\src\core\providers\gdal;D:\qgis-3.22.5\src\core\providers\ogr;D:\qgis-3.22.5\src\core\providers\meshmemory;D:\qgis-3.22.5\src\core\raster;D:\qgis-3.22.5\src\core\renderer;D:\qgis-3.22.5\src\core\scalebar;D:\qgis-3.22.5\src\core\settings;D:\qgis-3.22.5\src\core\symbology;D:\qgis-3.22.5\src\core\textrenderer;D:\qgis-3.22.5\src\core\validity;D:\qgis-3.22.5\src\core\vector;D:\qgis-3.22.5\src\core\vectortile;D:\qgis-3.22.5\external;D:\qgis-3.22.5\external\nlohmann;D:\qgis-3.22.5\external\kdbush\include;D:\qgis-3.22.5\external\nmea;D:\qgis-3.22.5\external\rtree\include;D:\qgis-3.22.5\external\meshOptimizer;D:\qgis-3.22.5\src\gui;D:\qgis-3.22.5\src\gui\annotations;D:\qgis-3.22.5\src\gui\attributeformconfig;D:\qgis-3.22.5\src\gui\symbology;D:\qgis-3.22.5\src\gui\attributetable;D:\qgis-3.22.5\src\gui\auth;D:\qgis-3.22.5\src\gui\callouts;D:\qgis-3.22.5\src\gui\codeeditors;D:\qgis-3.22.5\src\gui\devtools;D:\qgis-3.22.5\src\gui\editorwidgets;D:\qgis-3.22.5\src\gui\editorwidgets\core;D:\qgis-3.22.5\src\gui\effects;D:\qgis-3.22.5\src\gui\labeling;D:\qgis-3.22.5\src\gui\layertree;D:\qgis-3.22.5\src\gui\layout;D:\qgis-3.22.5\src\gui\locator;D:\qgis-3.22.5\src\gui\mesh;D:\qgis-3.22.5\src\gui\numericformats;D:\qgis-3.22.5\src\gui\ogr;D:\qgis-3.22.5\src\gui\processing;D:\qgis-3.22.5\src\gui\processing\models;D:\qgis-3.22.5\src\gui\providers;D:\qgis-3.22.5\src\gui\providers\gdal;D:\qgis-3.22.5\src\gui\providers\ogr;D:\qgis-3.22.5\src\gui\pointcloud;D:\qgis-3.22.5\src\gui\raster;D:\qgis-3.22.5\src\gui\settings;D:\qgis-3.22.5\src\gui\tableeditor;D:\qgis-3.22.5\src\gui\vector;D:\qgis-3.22.5\src\gui\vectortile;D:\qgis-3.22.5\_build\src\gui;D:\qgis-3.22.5\_build\src\ui;D:\qgis-3.22.5\src\native;D:\qgis-3.22.5\_build\src\native;D:\OSGeo4W\include;D:\Qt\5.15.2\msvc2019_64\include;D:\Qt\5.15.2\msvc2019_64\include\QtCore;D:\Qt\5.15.2\msvc2019_64\.\mkspecs\win32-msvc;D:\Qt\5.15.2\msvc2019_64\include\QtGui;D:\Qt\5.15.2\msvc2019_64\include\QtANGLE;D:\Qt\5.15.2\msvc2019_64\include\QtXml;D:\Qt\5.15.2\msvc2019_64\include\QtWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtSvg;D:\Qt\5.15.2\msvc2019_64\include\QtPrintSupport;D:\Qt\5.15.2\msvc2019_64\include\QtNetwork;D:\Qt\5.15.2\msvc2019_64\include\QtSql;D:\Qt\5.15.2\msvc2019_64\include\QtConcurrent;D:\dependencies\libzip\include;D:\dependencies\qca\include\Qca-qt5\QtCrypto;D:\dependencies\qtkeychain\include\qt5keychain;D:\Qt\5.15.2\msvc2019_64\include\QtSerialPort;D:\dependencies\protobuf\include;D:\dependencies\zlib\include;D:\OSGeo4W\include\exiv2;D:\Qt\5.15.2\msvc2019_64\include\QtPositioning;D:\dependencies\qwt\include;D:\dependencies\qscintilla\include;D:\qgis-3.22.5\src\native\..\..\external\wintoast\src;D:\Qt\5.15.2\msvc2019_64\include\QtWinExtras;D:\Qt\5.15.2\msvc2019_64\include\QtUiTools;D:\Qt\5.15.2\msvc2019_64\include\QtQuickWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtQuick;D:\Qt\5.15.2\msvc2019_64\include\QtQmlModels;D:\Qt\5.15.2\msvc2019_64\include\QtQml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\qgis-3.22.5\_build\src\plugins\offline_editing\map_quality_check_tools_autogen\include_Release;D:\qgis-3.22.5\_build;D:\qgis-3.22.5\src\plugins;D:\qgis-3.22.5\_build\src\plugins\offline_editing;D:\qgis-3.22.5\src\core;D:\qgis-3.22.5\_build\src\core;D:\qgis-3.22.5\src\core\3d;D:\qgis-3.22.5\src\core\annotations;D:\qgis-3.22.5\src\core\auth;D:\qgis-3.22.5\src\core\browser;D:\qgis-3.22.5\src\core\callouts;D:\qgis-3.22.5\src\core\classification;D:\qgis-3.22.5\src\core\diagram;D:\qgis-3.22.5\src\core\dxf;D:\qgis-3.22.5\src\core\editform;D:\qgis-3.22.5\src\core\effects;D:\qgis-3.22.5\src\core\expression;D:\qgis-3.22.5\src\core\externalstorage;D:\qgis-3.22.5\src\core\fieldformatter;D:\qgis-3.22.5\src\core\geometry;D:\qgis-3.22.5\src\core\geocms;D:\qgis-3.22.5\src\core\geocms\geonode;D:\qgis-3.22.5\src\core\geocoding;D:\qgis-3.22.5\src\core\gps;D:\qgis-3.22.5\src\core\labeling;D:\qgis-3.22.5\src\core\layertree;D:\qgis-3.22.5\src\core\layout;D:\qgis-3.22.5\src\core\locator;D:\qgis-3.22.5\src\core\maprenderer;D:\qgis-3.22.5\src\core\mesh;D:\qgis-3.22.5\src\core\metadata;D:\qgis-3.22.5\src\core\network;D:\qgis-3.22.5\src\core\numericformats;D:\qgis-3.22.5\src\core\pal;D:\qgis-3.22.5\src\core\pointcloud;D:\qgis-3.22.5\src\core\processing;D:\qgis-3.22.5\src\core\processing\models;D:\qgis-3.22.5\src\core\proj;D:\qgis-3.22.5\src\core\project;D:\qgis-3.22.5\src\core\providers;D:\qgis-3.22.5\src\core\providers\arcgis;D:\qgis-3.22.5\src\core\providers\memory;D:\qgis-3.22.5\src\core\providers\gdal;D:\qgis-3.22.5\src\core\providers\ogr;D:\qgis-3.22.5\src\core\providers\meshmemory;D:\qgis-3.22.5\src\core\raster;D:\qgis-3.22.5\src\core\renderer;D:\qgis-3.22.5\src\core\scalebar;D:\qgis-3.22.5\src\core\settings;D:\qgis-3.22.5\src\core\symbology;D:\qgis-3.22.5\src\core\textrenderer;D:\qgis-3.22.5\src\core\validity;D:\qgis-3.22.5\src\core\vector;D:\qgis-3.22.5\src\core\vectortile;D:\qgis-3.22.5\external;D:\qgis-3.22.5\external\nlohmann;D:\qgis-3.22.5\external\kdbush\include;D:\qgis-3.22.5\external\nmea;D:\qgis-3.22.5\external\rtree\include;D:\qgis-3.22.5\external\meshOptimizer;D:\qgis-3.22.5\src\gui;D:\qgis-3.22.5\src\gui\annotations;D:\qgis-3.22.5\src\gui\attributeformconfig;D:\qgis-3.22.5\src\gui\symbology;D:\qgis-3.22.5\src\gui\attributetable;D:\qgis-3.22.5\src\gui\auth;D:\qgis-3.22.5\src\gui\callouts;D:\qgis-3.22.5\src\gui\codeeditors;D:\qgis-3.22.5\src\gui\devtools;D:\qgis-3.22.5\src\gui\editorwidgets;D:\qgis-3.22.5\src\gui\editorwidgets\core;D:\qgis-3.22.5\src\gui\effects;D:\qgis-3.22.5\src\gui\labeling;D:\qgis-3.22.5\src\gui\layertree;D:\qgis-3.22.5\src\gui\layout;D:\qgis-3.22.5\src\gui\locator;D:\qgis-3.22.5\src\gui\mesh;D:\qgis-3.22.5\src\gui\numericformats;D:\qgis-3.22.5\src\gui\ogr;D:\qgis-3.22.5\src\gui\processing;D:\qgis-3.22.5\src\gui\processing\models;D:\qgis-3.22.5\src\gui\providers;D:\qgis-3.22.5\src\gui\providers\gdal;D:\qgis-3.22.5\src\gui\providers\ogr;D:\qgis-3.22.5\src\gui\pointcloud;D:\qgis-3.22.5\src\gui\raster;D:\qgis-3.22.5\src\gui\settings;D:\qgis-3.22.5\src\gui\tableeditor;D:\qgis-3.22.5\src\gui\vector;D:\qgis-3.22.5\src\gui\vectortile;D:\qgis-3.22.5\_build\src\gui;D:\qgis-3.22.5\_build\src\ui;D:\qgis-3.22.5\src\native;D:\qgis-3.22.5\_build\src\native;D:\OSGeo4W\include;D:\Qt\5.15.2\msvc2019_64\include;D:\Qt\5.15.2\msvc2019_64\include\QtCore;D:\Qt\5.15.2\msvc2019_64\.\mkspecs\win32-msvc;D:\Qt\5.15.2\msvc2019_64\include\QtGui;D:\Qt\5.15.2\msvc2019_64\include\QtANGLE;D:\Qt\5.15.2\msvc2019_64\include\QtXml;D:\Qt\5.15.2\msvc2019_64\include\QtWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtSvg;D:\Qt\5.15.2\msvc2019_64\include\QtPrintSupport;D:\Qt\5.15.2\msvc2019_64\include\QtNetwork;D:\Qt\5.15.2\msvc2019_64\include\QtSql;D:\Qt\5.15.2\msvc2019_64\include\QtConcurrent;D:\dependencies\libzip\include;D:\dependencies\qca\include\Qca-qt5\QtCrypto;D:\dependencies\qtkeychain\include\qt5keychain;D:\Qt\5.15.2\msvc2019_64\include\QtSerialPort;D:\dependencies\protobuf\include;D:\dependencies\zlib\include;D:\OSGeo4W\include\exiv2;D:\Qt\5.15.2\msvc2019_64\include\QtPositioning;D:\dependencies\qwt\include;D:\dependencies\qscintilla\include;D:\qgis-3.22.5\src\native\..\..\external\wintoast\src;D:\Qt\5.15.2\msvc2019_64\include\QtWinExtras;D:\Qt\5.15.2\msvc2019_64\include\QtUiTools;D:\Qt\5.15.2\msvc2019_64\include\QtQuickWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtQuick;D:\Qt\5.15.2\msvc2019_64\include\QtQmlModels;D:\Qt\5.15.2\msvc2019_64\include\QtQml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PreBuildEvent>
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message>Generate MOC/UIC files for LTZK</Message>
+      <Command>D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\gen_moc_uic.bat</Command>
+    </PreBuildEvent>
+    <Link>
+      <AdditionalDependencies>qgis_core.lib;qgis_gui.lib;D:\Windows Kits\10\Lib\10.0.19041.0\um\x64\SetupAPI.Lib;D:\Windows Kits\10\Lib\10.0.19041.0\um\x64\Version.Lib;Qt5Xml.lib;Qt5Svg.lib;Qt5Sql.lib;qgis_native.lib;Qt5Gui.lib;Qt5Core.lib;Qt5Widgets.lib;Qt5Quick.lib;gdal_i.lib;sqlite3_i.lib;libxml2.lib;libpq.lib;ws2_32.lib;se_project.lib;geos_c.lib;DelayImp.lib;D:\GarMap\qgis_plugins\cplusplus\SupportLibraries\newmapcore\lib_x64\IO.lib;D:\GarMap\qgis_plugins\cplusplus\SupportLibraries\newmaplib\lib_x64\MapBatchProcessing.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:\LTZK\OSGeo4W_32815\lib;D:\LTZK\OSGeo4W_32815\apps\Qt5\lib;D:\LTZK\QGIS_32815\lib;D:\GarMap\mapscloud_release\winx64_vc16\lib\release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64 /DELAYLOAD:MapBatchProcessing.dll /DELAYLOAD:IO.dll /DELAYLOAD:libpq.dll</AdditionalOptions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>D:\LTZK\plugins\plugin_map_quality_check_tools.lib</ImportLibrary>
+      <ProgramDataBaseFile>D:\LTZK\plugins\plugin_map_quality_check_tools.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+      <StackReserveSize>1073741824</StackReserveSize>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+    <PostBuildEvent>
+      <Command>copy  $(OutDir)$(TargetName)$(TargetExt)  D:\GarMap\garmap_release\starmap\plugins</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\qgis-3.22.5\_build\src\plugins\offline_editing\map_quality_check_tools_autogen\include_MinSizeRel;D:\qgis-3.22.5\_build;D:\qgis-3.22.5\src\plugins;D:\qgis-3.22.5\_build\src\plugins\offline_editing;D:\qgis-3.22.5\src\core;D:\qgis-3.22.5\_build\src\core;D:\qgis-3.22.5\src\core\3d;D:\qgis-3.22.5\src\core\annotations;D:\qgis-3.22.5\src\core\auth;D:\qgis-3.22.5\src\core\browser;D:\qgis-3.22.5\src\core\callouts;D:\qgis-3.22.5\src\core\classification;D:\qgis-3.22.5\src\core\diagram;D:\qgis-3.22.5\src\core\dxf;D:\qgis-3.22.5\src\core\editform;D:\qgis-3.22.5\src\core\effects;D:\qgis-3.22.5\src\core\expression;D:\qgis-3.22.5\src\core\externalstorage;D:\qgis-3.22.5\src\core\fieldformatter;D:\qgis-3.22.5\src\core\geometry;D:\qgis-3.22.5\src\core\geocms;D:\qgis-3.22.5\src\core\geocms\geonode;D:\qgis-3.22.5\src\core\geocoding;D:\qgis-3.22.5\src\core\gps;D:\qgis-3.22.5\src\core\labeling;D:\qgis-3.22.5\src\core\layertree;D:\qgis-3.22.5\src\core\layout;D:\qgis-3.22.5\src\core\locator;D:\qgis-3.22.5\src\core\maprenderer;D:\qgis-3.22.5\src\core\mesh;D:\qgis-3.22.5\src\core\metadata;D:\qgis-3.22.5\src\core\network;D:\qgis-3.22.5\src\core\numericformats;D:\qgis-3.22.5\src\core\pal;D:\qgis-3.22.5\src\core\pointcloud;D:\qgis-3.22.5\src\core\processing;D:\qgis-3.22.5\src\core\processing\models;D:\qgis-3.22.5\src\core\proj;D:\qgis-3.22.5\src\core\project;D:\qgis-3.22.5\src\core\providers;D:\qgis-3.22.5\src\core\providers\arcgis;D:\qgis-3.22.5\src\core\providers\memory;D:\qgis-3.22.5\src\core\providers\gdal;D:\qgis-3.22.5\src\core\providers\ogr;D:\qgis-3.22.5\src\core\providers\meshmemory;D:\qgis-3.22.5\src\core\raster;D:\qgis-3.22.5\src\core\renderer;D:\qgis-3.22.5\src\core\scalebar;D:\qgis-3.22.5\src\core\settings;D:\qgis-3.22.5\src\core\symbology;D:\qgis-3.22.5\src\core\textrenderer;D:\qgis-3.22.5\src\core\validity;D:\qgis-3.22.5\src\core\vector;D:\qgis-3.22.5\src\core\vectortile;D:\qgis-3.22.5\external;D:\qgis-3.22.5\external\nlohmann;D:\qgis-3.22.5\external\kdbush\include;D:\qgis-3.22.5\external\nmea;D:\qgis-3.22.5\external\rtree\include;D:\qgis-3.22.5\external\meshOptimizer;D:\qgis-3.22.5\src\gui;D:\qgis-3.22.5\src\gui\annotations;D:\qgis-3.22.5\src\gui\attributeformconfig;D:\qgis-3.22.5\src\gui\symbology;D:\qgis-3.22.5\src\gui\attributetable;D:\qgis-3.22.5\src\gui\auth;D:\qgis-3.22.5\src\gui\callouts;D:\qgis-3.22.5\src\gui\codeeditors;D:\qgis-3.22.5\src\gui\devtools;D:\qgis-3.22.5\src\gui\editorwidgets;D:\qgis-3.22.5\src\gui\editorwidgets\core;D:\qgis-3.22.5\src\gui\effects;D:\qgis-3.22.5\src\gui\labeling;D:\qgis-3.22.5\src\gui\layertree;D:\qgis-3.22.5\src\gui\layout;D:\qgis-3.22.5\src\gui\locator;D:\qgis-3.22.5\src\gui\mesh;D:\qgis-3.22.5\src\gui\numericformats;D:\qgis-3.22.5\src\gui\ogr;D:\qgis-3.22.5\src\gui\processing;D:\qgis-3.22.5\src\gui\processing\models;D:\qgis-3.22.5\src\gui\providers;D:\qgis-3.22.5\src\gui\providers\gdal;D:\qgis-3.22.5\src\gui\providers\ogr;D:\qgis-3.22.5\src\gui\pointcloud;D:\qgis-3.22.5\src\gui\raster;D:\qgis-3.22.5\src\gui\settings;D:\qgis-3.22.5\src\gui\tableeditor;D:\qgis-3.22.5\src\gui\vector;D:\qgis-3.22.5\src\gui\vectortile;D:\qgis-3.22.5\_build\src\gui;D:\qgis-3.22.5\_build\src\ui;D:\qgis-3.22.5\src\native;D:\qgis-3.22.5\_build\src\native;D:\OSGeo4W\include;D:\Qt\5.15.2\msvc2019_64\include;D:\Qt\5.15.2\msvc2019_64\include\QtCore;D:\Qt\5.15.2\msvc2019_64\.\mkspecs\win32-msvc;D:\Qt\5.15.2\msvc2019_64\include\QtGui;D:\Qt\5.15.2\msvc2019_64\include\QtANGLE;D:\Qt\5.15.2\msvc2019_64\include\QtXml;D:\Qt\5.15.2\msvc2019_64\include\QtWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtSvg;D:\Qt\5.15.2\msvc2019_64\include\QtPrintSupport;D:\Qt\5.15.2\msvc2019_64\include\QtNetwork;D:\Qt\5.15.2\msvc2019_64\include\QtSql;D:\Qt\5.15.2\msvc2019_64\include\QtConcurrent;D:\dependencies\libzip\include;D:\dependencies\qca\include\Qca-qt5\QtCrypto;D:\dependencies\qtkeychain\include\qt5keychain;D:\Qt\5.15.2\msvc2019_64\include\QtSerialPort;D:\dependencies\protobuf\include;D:\dependencies\zlib\include;D:\OSGeo4W\include\exiv2;D:\Qt\5.15.2\msvc2019_64\include\QtPositioning;D:\dependencies\qwt\include;D:\dependencies\qscintilla\include;D:\qgis-3.22.5\src\native\..\..\external\wintoast\src;D:\Qt\5.15.2\msvc2019_64\include\QtWinExtras;D:\Qt\5.15.2\msvc2019_64\include\QtUiTools;D:\Qt\5.15.2\msvc2019_64\include\QtQuickWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtQuick;D:\Qt\5.15.2\msvc2019_64\include\QtQmlModels;D:\Qt\5.15.2\msvc2019_64\include\QtQml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <DisableSpecificWarnings>4091;4100;4127;4190;4231;4244;4251;4267;4275;4290;4456;4457;4458;4505;4510;4512;4610;4706;4714;4800;4996</DisableSpecificWarnings>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <Optimization>MinSpace</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;QT_NO_CAST_TO_ASCII;NOMINMAX;QT_DEPRECATED_WARNINGS;QT_DISABLE_DEPRECATED_BEFORE=0x050800;QT_USE_QSTRINGBUILDER;_USE_MATH_DEFINES;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;SIP_VERSION=0x060101;_HAS_AUTO_PTR_ETC=1;QT_CORE_LIB;QT_NO_DEBUG;QT_GUI_LIB;QT_XML_LIB;QT_WIDGETS_LIB;QT_SVG_LIB;QT_NETWORK_LIB;QT_SQL_LIB;QT_CONCURRENT_LIB;QT_PRINTSUPPORT_LIB;QT_SERIALPORT_LIB;QT_POSITIONING_LIB;QT_WINEXTRAS_LIB;QT_UITOOLS_LIB;QT_QUICKWIDGETS_LIB;QT_QUICK_LIB;QT_QMLMODELS_LIB;QT_QML_LIB;CMAKE_INTDIR="MinSizeRel";map_quality_check_tools_EXPORTS</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;QT_NO_CAST_TO_ASCII;NOMINMAX;QT_DEPRECATED_WARNINGS;QT_DISABLE_DEPRECATED_BEFORE=0x050800;QT_USE_QSTRINGBUILDER;_USE_MATH_DEFINES;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;SIP_VERSION=0x060101;_HAS_AUTO_PTR_ETC=1;QT_CORE_LIB;QT_NO_DEBUG;QT_GUI_LIB;QT_XML_LIB;QT_WIDGETS_LIB;QT_SVG_LIB;QT_NETWORK_LIB;QT_SQL_LIB;QT_CONCURRENT_LIB;QT_PRINTSUPPORT_LIB;QT_SERIALPORT_LIB;QT_POSITIONING_LIB;QT_WINEXTRAS_LIB;QT_UITOOLS_LIB;QT_QUICKWIDGETS_LIB;QT_QUICK_LIB;QT_QMLMODELS_LIB;QT_QML_LIB;CMAKE_INTDIR=\"MinSizeRel\";map_quality_check_tools_EXPORTS</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\qgis-3.22.5\_build\src\plugins\offline_editing\map_quality_check_tools_autogen\include_MinSizeRel;D:\qgis-3.22.5\_build;D:\qgis-3.22.5\src\plugins;D:\qgis-3.22.5\_build\src\plugins\offline_editing;D:\qgis-3.22.5\src\core;D:\qgis-3.22.5\_build\src\core;D:\qgis-3.22.5\src\core\3d;D:\qgis-3.22.5\src\core\annotations;D:\qgis-3.22.5\src\core\auth;D:\qgis-3.22.5\src\core\browser;D:\qgis-3.22.5\src\core\callouts;D:\qgis-3.22.5\src\core\classification;D:\qgis-3.22.5\src\core\diagram;D:\qgis-3.22.5\src\core\dxf;D:\qgis-3.22.5\src\core\editform;D:\qgis-3.22.5\src\core\effects;D:\qgis-3.22.5\src\core\expression;D:\qgis-3.22.5\src\core\externalstorage;D:\qgis-3.22.5\src\core\fieldformatter;D:\qgis-3.22.5\src\core\geometry;D:\qgis-3.22.5\src\core\geocms;D:\qgis-3.22.5\src\core\geocms\geonode;D:\qgis-3.22.5\src\core\geocoding;D:\qgis-3.22.5\src\core\gps;D:\qgis-3.22.5\src\core\labeling;D:\qgis-3.22.5\src\core\layertree;D:\qgis-3.22.5\src\core\layout;D:\qgis-3.22.5\src\core\locator;D:\qgis-3.22.5\src\core\maprenderer;D:\qgis-3.22.5\src\core\mesh;D:\qgis-3.22.5\src\core\metadata;D:\qgis-3.22.5\src\core\network;D:\qgis-3.22.5\src\core\numericformats;D:\qgis-3.22.5\src\core\pal;D:\qgis-3.22.5\src\core\pointcloud;D:\qgis-3.22.5\src\core\processing;D:\qgis-3.22.5\src\core\processing\models;D:\qgis-3.22.5\src\core\proj;D:\qgis-3.22.5\src\core\project;D:\qgis-3.22.5\src\core\providers;D:\qgis-3.22.5\src\core\providers\arcgis;D:\qgis-3.22.5\src\core\providers\memory;D:\qgis-3.22.5\src\core\providers\gdal;D:\qgis-3.22.5\src\core\providers\ogr;D:\qgis-3.22.5\src\core\providers\meshmemory;D:\qgis-3.22.5\src\core\raster;D:\qgis-3.22.5\src\core\renderer;D:\qgis-3.22.5\src\core\scalebar;D:\qgis-3.22.5\src\core\settings;D:\qgis-3.22.5\src\core\symbology;D:\qgis-3.22.5\src\core\textrenderer;D:\qgis-3.22.5\src\core\validity;D:\qgis-3.22.5\src\core\vector;D:\qgis-3.22.5\src\core\vectortile;D:\qgis-3.22.5\external;D:\qgis-3.22.5\external\nlohmann;D:\qgis-3.22.5\external\kdbush\include;D:\qgis-3.22.5\external\nmea;D:\qgis-3.22.5\external\rtree\include;D:\qgis-3.22.5\external\meshOptimizer;D:\qgis-3.22.5\src\gui;D:\qgis-3.22.5\src\gui\annotations;D:\qgis-3.22.5\src\gui\attributeformconfig;D:\qgis-3.22.5\src\gui\symbology;D:\qgis-3.22.5\src\gui\attributetable;D:\qgis-3.22.5\src\gui\auth;D:\qgis-3.22.5\src\gui\callouts;D:\qgis-3.22.5\src\gui\codeeditors;D:\qgis-3.22.5\src\gui\devtools;D:\qgis-3.22.5\src\gui\editorwidgets;D:\qgis-3.22.5\src\gui\editorwidgets\core;D:\qgis-3.22.5\src\gui\effects;D:\qgis-3.22.5\src\gui\labeling;D:\qgis-3.22.5\src\gui\layertree;D:\qgis-3.22.5\src\gui\layout;D:\qgis-3.22.5\src\gui\locator;D:\qgis-3.22.5\src\gui\mesh;D:\qgis-3.22.5\src\gui\numericformats;D:\qgis-3.22.5\src\gui\ogr;D:\qgis-3.22.5\src\gui\processing;D:\qgis-3.22.5\src\gui\processing\models;D:\qgis-3.22.5\src\gui\providers;D:\qgis-3.22.5\src\gui\providers\gdal;D:\qgis-3.22.5\src\gui\providers\ogr;D:\qgis-3.22.5\src\gui\pointcloud;D:\qgis-3.22.5\src\gui\raster;D:\qgis-3.22.5\src\gui\settings;D:\qgis-3.22.5\src\gui\tableeditor;D:\qgis-3.22.5\src\gui\vector;D:\qgis-3.22.5\src\gui\vectortile;D:\qgis-3.22.5\_build\src\gui;D:\qgis-3.22.5\_build\src\ui;D:\qgis-3.22.5\src\native;D:\qgis-3.22.5\_build\src\native;D:\OSGeo4W\include;D:\Qt\5.15.2\msvc2019_64\include;D:\Qt\5.15.2\msvc2019_64\include\QtCore;D:\Qt\5.15.2\msvc2019_64\.\mkspecs\win32-msvc;D:\Qt\5.15.2\msvc2019_64\include\QtGui;D:\Qt\5.15.2\msvc2019_64\include\QtANGLE;D:\Qt\5.15.2\msvc2019_64\include\QtXml;D:\Qt\5.15.2\msvc2019_64\include\QtWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtSvg;D:\Qt\5.15.2\msvc2019_64\include\QtPrintSupport;D:\Qt\5.15.2\msvc2019_64\include\QtNetwork;D:\Qt\5.15.2\msvc2019_64\include\QtSql;D:\Qt\5.15.2\msvc2019_64\include\QtConcurrent;D:\dependencies\libzip\include;D:\dependencies\qca\include\Qca-qt5\QtCrypto;D:\dependencies\qtkeychain\include\qt5keychain;D:\Qt\5.15.2\msvc2019_64\include\QtSerialPort;D:\dependencies\protobuf\include;D:\dependencies\zlib\include;D:\OSGeo4W\include\exiv2;D:\Qt\5.15.2\msvc2019_64\include\QtPositioning;D:\dependencies\qwt\include;D:\dependencies\qscintilla\include;D:\qgis-3.22.5\src\native\..\..\external\wintoast\src;D:\Qt\5.15.2\msvc2019_64\include\QtWinExtras;D:\Qt\5.15.2\msvc2019_64\include\QtUiTools;D:\Qt\5.15.2\msvc2019_64\include\QtQuickWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtQuick;D:\Qt\5.15.2\msvc2019_64\include\QtQmlModels;D:\Qt\5.15.2\msvc2019_64\include\QtQml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\qgis-3.22.5\_build\src\plugins\offline_editing\map_quality_check_tools_autogen\include_MinSizeRel;D:\qgis-3.22.5\_build;D:\qgis-3.22.5\src\plugins;D:\qgis-3.22.5\_build\src\plugins\offline_editing;D:\qgis-3.22.5\src\core;D:\qgis-3.22.5\_build\src\core;D:\qgis-3.22.5\src\core\3d;D:\qgis-3.22.5\src\core\annotations;D:\qgis-3.22.5\src\core\auth;D:\qgis-3.22.5\src\core\browser;D:\qgis-3.22.5\src\core\callouts;D:\qgis-3.22.5\src\core\classification;D:\qgis-3.22.5\src\core\diagram;D:\qgis-3.22.5\src\core\dxf;D:\qgis-3.22.5\src\core\editform;D:\qgis-3.22.5\src\core\effects;D:\qgis-3.22.5\src\core\expression;D:\qgis-3.22.5\src\core\externalstorage;D:\qgis-3.22.5\src\core\fieldformatter;D:\qgis-3.22.5\src\core\geometry;D:\qgis-3.22.5\src\core\geocms;D:\qgis-3.22.5\src\core\geocms\geonode;D:\qgis-3.22.5\src\core\geocoding;D:\qgis-3.22.5\src\core\gps;D:\qgis-3.22.5\src\core\labeling;D:\qgis-3.22.5\src\core\layertree;D:\qgis-3.22.5\src\core\layout;D:\qgis-3.22.5\src\core\locator;D:\qgis-3.22.5\src\core\maprenderer;D:\qgis-3.22.5\src\core\mesh;D:\qgis-3.22.5\src\core\metadata;D:\qgis-3.22.5\src\core\network;D:\qgis-3.22.5\src\core\numericformats;D:\qgis-3.22.5\src\core\pal;D:\qgis-3.22.5\src\core\pointcloud;D:\qgis-3.22.5\src\core\processing;D:\qgis-3.22.5\src\core\processing\models;D:\qgis-3.22.5\src\core\proj;D:\qgis-3.22.5\src\core\project;D:\qgis-3.22.5\src\core\providers;D:\qgis-3.22.5\src\core\providers\arcgis;D:\qgis-3.22.5\src\core\providers\memory;D:\qgis-3.22.5\src\core\providers\gdal;D:\qgis-3.22.5\src\core\providers\ogr;D:\qgis-3.22.5\src\core\providers\meshmemory;D:\qgis-3.22.5\src\core\raster;D:\qgis-3.22.5\src\core\renderer;D:\qgis-3.22.5\src\core\scalebar;D:\qgis-3.22.5\src\core\settings;D:\qgis-3.22.5\src\core\symbology;D:\qgis-3.22.5\src\core\textrenderer;D:\qgis-3.22.5\src\core\validity;D:\qgis-3.22.5\src\core\vector;D:\qgis-3.22.5\src\core\vectortile;D:\qgis-3.22.5\external;D:\qgis-3.22.5\external\nlohmann;D:\qgis-3.22.5\external\kdbush\include;D:\qgis-3.22.5\external\nmea;D:\qgis-3.22.5\external\rtree\include;D:\qgis-3.22.5\external\meshOptimizer;D:\qgis-3.22.5\src\gui;D:\qgis-3.22.5\src\gui\annotations;D:\qgis-3.22.5\src\gui\attributeformconfig;D:\qgis-3.22.5\src\gui\symbology;D:\qgis-3.22.5\src\gui\attributetable;D:\qgis-3.22.5\src\gui\auth;D:\qgis-3.22.5\src\gui\callouts;D:\qgis-3.22.5\src\gui\codeeditors;D:\qgis-3.22.5\src\gui\devtools;D:\qgis-3.22.5\src\gui\editorwidgets;D:\qgis-3.22.5\src\gui\editorwidgets\core;D:\qgis-3.22.5\src\gui\effects;D:\qgis-3.22.5\src\gui\labeling;D:\qgis-3.22.5\src\gui\layertree;D:\qgis-3.22.5\src\gui\layout;D:\qgis-3.22.5\src\gui\locator;D:\qgis-3.22.5\src\gui\mesh;D:\qgis-3.22.5\src\gui\numericformats;D:\qgis-3.22.5\src\gui\ogr;D:\qgis-3.22.5\src\gui\processing;D:\qgis-3.22.5\src\gui\processing\models;D:\qgis-3.22.5\src\gui\providers;D:\qgis-3.22.5\src\gui\providers\gdal;D:\qgis-3.22.5\src\gui\providers\ogr;D:\qgis-3.22.5\src\gui\pointcloud;D:\qgis-3.22.5\src\gui\raster;D:\qgis-3.22.5\src\gui\settings;D:\qgis-3.22.5\src\gui\tableeditor;D:\qgis-3.22.5\src\gui\vector;D:\qgis-3.22.5\src\gui\vectortile;D:\qgis-3.22.5\_build\src\gui;D:\qgis-3.22.5\_build\src\ui;D:\qgis-3.22.5\src\native;D:\qgis-3.22.5\_build\src\native;D:\OSGeo4W\include;D:\Qt\5.15.2\msvc2019_64\include;D:\Qt\5.15.2\msvc2019_64\include\QtCore;D:\Qt\5.15.2\msvc2019_64\.\mkspecs\win32-msvc;D:\Qt\5.15.2\msvc2019_64\include\QtGui;D:\Qt\5.15.2\msvc2019_64\include\QtANGLE;D:\Qt\5.15.2\msvc2019_64\include\QtXml;D:\Qt\5.15.2\msvc2019_64\include\QtWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtSvg;D:\Qt\5.15.2\msvc2019_64\include\QtPrintSupport;D:\Qt\5.15.2\msvc2019_64\include\QtNetwork;D:\Qt\5.15.2\msvc2019_64\include\QtSql;D:\Qt\5.15.2\msvc2019_64\include\QtConcurrent;D:\dependencies\libzip\include;D:\dependencies\qca\include\Qca-qt5\QtCrypto;D:\dependencies\qtkeychain\include\qt5keychain;D:\Qt\5.15.2\msvc2019_64\include\QtSerialPort;D:\dependencies\protobuf\include;D:\dependencies\zlib\include;D:\OSGeo4W\include\exiv2;D:\Qt\5.15.2\msvc2019_64\include\QtPositioning;D:\dependencies\qwt\include;D:\dependencies\qscintilla\include;D:\qgis-3.22.5\src\native\..\..\external\wintoast\src;D:\Qt\5.15.2\msvc2019_64\include\QtWinExtras;D:\Qt\5.15.2\msvc2019_64\include\QtUiTools;D:\Qt\5.15.2\msvc2019_64\include\QtQuickWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtQuick;D:\Qt\5.15.2\msvc2019_64\include\QtQmlModels;D:\Qt\5.15.2\msvc2019_64\include\QtQml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PreBuildEvent>
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message>Automatic MOC for target map_quality_check_tools</Message>
+      <Command>setlocal
+cd D:\qgis-3.22.5\_build\src\plugins\offline_editing
+if %errorlevel% neq 0 goto :cmEnd
+D:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autogen D:/qgis-3.22.5/_build/src/plugins/offline_editing/CMakeFiles/map_quality_check_tools_autogen.dir/AutogenInfo.json MinSizeRel
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PreBuildEvent>
+    <Link>
+      <AdditionalDependencies>..\..\gui\MinSizeRel\qgis_gui.lib;D:\OSGeo4W\lib\spatialite_i.lib;..\..\core\MinSizeRel\qgis_core.lib;wsock32.lib;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\um\x64\SetupAPI.Lib;dbghelp.lib;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\um\x64\Version.Lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Xml.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Svg.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Sql.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Concurrent.lib;D:\dependencies\qca\lib\qca-qt5d.lib;D:\dependencies\qtkeychain\lib\qt5keychaind.lib;D:\OSGeo4W\lib\proj.lib;D:\OSGeo4W\lib\geos_c.lib;D:\OSGeo4W\lib\gdal_i.lib;D:\OSGeo4W\lib\spatialindex-64.lib;D:\OSGeo4W\lib\libexpat.lib;D:\OSGeo4W\lib\sqlite3_i.lib;D:\dependencies\libzip\lib\zip.lib;D:\dependencies\protobuf\lib\libprotobuf-lite.lib;D:\dependencies\zlib\lib\zlib.lib;D:\OSGeo4W\lib\exiv2.lib;D:\OSGeo4W\lib\spatialite_i.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5PrintSupport.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5SerialPort.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Positioning.lib;..\..\native\MinSizeRel\qgis_native.lib;shell32.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5WinExtras.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5UiTools.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Widgets.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Gui.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Core.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Widgets.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Gui.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Core.lib;D:\dependencies\qwt\lib\qwtd.lib;D:\dependencies\qscintilla\lib\qscintilla2_qt5d.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5QuickWidgets.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Widgets.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Quick.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Gui.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5QmlModels.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Qml.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Network.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Core.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:/qgis-3.22.5/_build/src/core;D:/qgis-3.22.5/_build/src/core/$(Configuration);D:/qgis-3.22.5/_build/src/gui;D:/qgis-3.22.5/_build/src/gui/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>D:/qgis-3.22.5/_build/src/plugins/offline_editing/MinSizeRel/map_quality_check_tools.lib</ImportLibrary>
+      <ProgramDataBaseFile>D:/qgis-3.22.5/_build/output/plugins/MinSizeRel/map_quality_check_tools.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\qgis-3.22.5\_build\src\plugins\offline_editing\map_quality_check_tools_autogen\include_RelWithDebInfo;D:\qgis-3.22.5\_build;D:\qgis-3.22.5\src\plugins;D:\qgis-3.22.5\_build\src\plugins\offline_editing;D:\qgis-3.22.5\src\core;D:\qgis-3.22.5\_build\src\core;D:\qgis-3.22.5\src\core\3d;D:\qgis-3.22.5\src\core\annotations;D:\qgis-3.22.5\src\core\auth;D:\qgis-3.22.5\src\core\browser;D:\qgis-3.22.5\src\core\callouts;D:\qgis-3.22.5\src\core\classification;D:\qgis-3.22.5\src\core\diagram;D:\qgis-3.22.5\src\core\dxf;D:\qgis-3.22.5\src\core\editform;D:\qgis-3.22.5\src\core\effects;D:\qgis-3.22.5\src\core\expression;D:\qgis-3.22.5\src\core\externalstorage;D:\qgis-3.22.5\src\core\fieldformatter;D:\qgis-3.22.5\src\core\geometry;D:\qgis-3.22.5\src\core\geocms;D:\qgis-3.22.5\src\core\geocms\geonode;D:\qgis-3.22.5\src\core\geocoding;D:\qgis-3.22.5\src\core\gps;D:\qgis-3.22.5\src\core\labeling;D:\qgis-3.22.5\src\core\layertree;D:\qgis-3.22.5\src\core\layout;D:\qgis-3.22.5\src\core\locator;D:\qgis-3.22.5\src\core\maprenderer;D:\qgis-3.22.5\src\core\mesh;D:\qgis-3.22.5\src\core\metadata;D:\qgis-3.22.5\src\core\network;D:\qgis-3.22.5\src\core\numericformats;D:\qgis-3.22.5\src\core\pal;D:\qgis-3.22.5\src\core\pointcloud;D:\qgis-3.22.5\src\core\processing;D:\qgis-3.22.5\src\core\processing\models;D:\qgis-3.22.5\src\core\proj;D:\qgis-3.22.5\src\core\project;D:\qgis-3.22.5\src\core\providers;D:\qgis-3.22.5\src\core\providers\arcgis;D:\qgis-3.22.5\src\core\providers\memory;D:\qgis-3.22.5\src\core\providers\gdal;D:\qgis-3.22.5\src\core\providers\ogr;D:\qgis-3.22.5\src\core\providers\meshmemory;D:\qgis-3.22.5\src\core\raster;D:\qgis-3.22.5\src\core\renderer;D:\qgis-3.22.5\src\core\scalebar;D:\qgis-3.22.5\src\core\settings;D:\qgis-3.22.5\src\core\symbology;D:\qgis-3.22.5\src\core\textrenderer;D:\qgis-3.22.5\src\core\validity;D:\qgis-3.22.5\src\core\vector;D:\qgis-3.22.5\src\core\vectortile;D:\qgis-3.22.5\external;D:\qgis-3.22.5\external\nlohmann;D:\qgis-3.22.5\external\kdbush\include;D:\qgis-3.22.5\external\nmea;D:\qgis-3.22.5\external\rtree\include;D:\qgis-3.22.5\external\meshOptimizer;D:\qgis-3.22.5\src\gui;D:\qgis-3.22.5\src\gui\annotations;D:\qgis-3.22.5\src\gui\attributeformconfig;D:\qgis-3.22.5\src\gui\symbology;D:\qgis-3.22.5\src\gui\attributetable;D:\qgis-3.22.5\src\gui\auth;D:\qgis-3.22.5\src\gui\callouts;D:\qgis-3.22.5\src\gui\codeeditors;D:\qgis-3.22.5\src\gui\devtools;D:\qgis-3.22.5\src\gui\editorwidgets;D:\qgis-3.22.5\src\gui\editorwidgets\core;D:\qgis-3.22.5\src\gui\effects;D:\qgis-3.22.5\src\gui\labeling;D:\qgis-3.22.5\src\gui\layertree;D:\qgis-3.22.5\src\gui\layout;D:\qgis-3.22.5\src\gui\locator;D:\qgis-3.22.5\src\gui\mesh;D:\qgis-3.22.5\src\gui\numericformats;D:\qgis-3.22.5\src\gui\ogr;D:\qgis-3.22.5\src\gui\processing;D:\qgis-3.22.5\src\gui\processing\models;D:\qgis-3.22.5\src\gui\providers;D:\qgis-3.22.5\src\gui\providers\gdal;D:\qgis-3.22.5\src\gui\providers\ogr;D:\qgis-3.22.5\src\gui\pointcloud;D:\qgis-3.22.5\src\gui\raster;D:\qgis-3.22.5\src\gui\settings;D:\qgis-3.22.5\src\gui\tableeditor;D:\qgis-3.22.5\src\gui\vector;D:\qgis-3.22.5\src\gui\vectortile;D:\qgis-3.22.5\_build\src\gui;D:\qgis-3.22.5\_build\src\ui;D:\qgis-3.22.5\src\native;D:\qgis-3.22.5\_build\src\native;D:\OSGeo4W\include;D:\Qt\5.15.2\msvc2019_64\include;D:\Qt\5.15.2\msvc2019_64\include\QtCore;D:\Qt\5.15.2\msvc2019_64\.\mkspecs\win32-msvc;D:\Qt\5.15.2\msvc2019_64\include\QtGui;D:\Qt\5.15.2\msvc2019_64\include\QtANGLE;D:\Qt\5.15.2\msvc2019_64\include\QtXml;D:\Qt\5.15.2\msvc2019_64\include\QtWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtSvg;D:\Qt\5.15.2\msvc2019_64\include\QtPrintSupport;D:\Qt\5.15.2\msvc2019_64\include\QtNetwork;D:\Qt\5.15.2\msvc2019_64\include\QtSql;D:\Qt\5.15.2\msvc2019_64\include\QtConcurrent;D:\dependencies\libzip\include;D:\dependencies\qca\include\Qca-qt5\QtCrypto;D:\dependencies\qtkeychain\include\qt5keychain;D:\Qt\5.15.2\msvc2019_64\include\QtSerialPort;D:\dependencies\protobuf\include;D:\dependencies\zlib\include;D:\OSGeo4W\include\exiv2;D:\Qt\5.15.2\msvc2019_64\include\QtPositioning;D:\dependencies\qwt\include;D:\dependencies\qscintilla\include;D:\qgis-3.22.5\src\native\..\..\external\wintoast\src;D:\Qt\5.15.2\msvc2019_64\include\QtWinExtras;D:\Qt\5.15.2\msvc2019_64\include\QtUiTools;D:\Qt\5.15.2\msvc2019_64\include\QtQuickWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtQuick;D:\Qt\5.15.2\msvc2019_64\include\QtQmlModels;D:\Qt\5.15.2\msvc2019_64\include\QtQml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4091;4100;4127;4190;4231;4244;4251;4267;4275;4290;4456;4457;4458;4505;4510;4512;4610;4706;4714;4800;4996</DisableSpecificWarnings>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;QT_NO_CAST_TO_ASCII;NOMINMAX;QT_DEPRECATED_WARNINGS;QT_DISABLE_DEPRECATED_BEFORE=0x050800;QT_USE_QSTRINGBUILDER;_USE_MATH_DEFINES;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;SIP_VERSION=0x060101;_HAS_AUTO_PTR_ETC=1;QT_CORE_LIB;QT_NO_DEBUG;QT_GUI_LIB;QT_XML_LIB;QT_WIDGETS_LIB;QT_SVG_LIB;QT_NETWORK_LIB;QT_SQL_LIB;QT_CONCURRENT_LIB;QT_PRINTSUPPORT_LIB;QT_SERIALPORT_LIB;QT_POSITIONING_LIB;QT_WINEXTRAS_LIB;QT_UITOOLS_LIB;QT_QUICKWIDGETS_LIB;QT_QUICK_LIB;QT_QMLMODELS_LIB;QT_QML_LIB;CMAKE_INTDIR="RelWithDebInfo";map_quality_check_tools_EXPORTS</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;QT_NO_CAST_TO_ASCII;NOMINMAX;QT_DEPRECATED_WARNINGS;QT_DISABLE_DEPRECATED_BEFORE=0x050800;QT_USE_QSTRINGBUILDER;_USE_MATH_DEFINES;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;SIP_VERSION=0x060101;_HAS_AUTO_PTR_ETC=1;QT_CORE_LIB;QT_NO_DEBUG;QT_GUI_LIB;QT_XML_LIB;QT_WIDGETS_LIB;QT_SVG_LIB;QT_NETWORK_LIB;QT_SQL_LIB;QT_CONCURRENT_LIB;QT_PRINTSUPPORT_LIB;QT_SERIALPORT_LIB;QT_POSITIONING_LIB;QT_WINEXTRAS_LIB;QT_UITOOLS_LIB;QT_QUICKWIDGETS_LIB;QT_QUICK_LIB;QT_QMLMODELS_LIB;QT_QML_LIB;CMAKE_INTDIR=\"RelWithDebInfo\";map_quality_check_tools_EXPORTS</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\qgis-3.22.5\_build\src\plugins\offline_editing\map_quality_check_tools_autogen\include_RelWithDebInfo;D:\qgis-3.22.5\_build;D:\qgis-3.22.5\src\plugins;D:\qgis-3.22.5\_build\src\plugins\offline_editing;D:\qgis-3.22.5\src\core;D:\qgis-3.22.5\_build\src\core;D:\qgis-3.22.5\src\core\3d;D:\qgis-3.22.5\src\core\annotations;D:\qgis-3.22.5\src\core\auth;D:\qgis-3.22.5\src\core\browser;D:\qgis-3.22.5\src\core\callouts;D:\qgis-3.22.5\src\core\classification;D:\qgis-3.22.5\src\core\diagram;D:\qgis-3.22.5\src\core\dxf;D:\qgis-3.22.5\src\core\editform;D:\qgis-3.22.5\src\core\effects;D:\qgis-3.22.5\src\core\expression;D:\qgis-3.22.5\src\core\externalstorage;D:\qgis-3.22.5\src\core\fieldformatter;D:\qgis-3.22.5\src\core\geometry;D:\qgis-3.22.5\src\core\geocms;D:\qgis-3.22.5\src\core\geocms\geonode;D:\qgis-3.22.5\src\core\geocoding;D:\qgis-3.22.5\src\core\gps;D:\qgis-3.22.5\src\core\labeling;D:\qgis-3.22.5\src\core\layertree;D:\qgis-3.22.5\src\core\layout;D:\qgis-3.22.5\src\core\locator;D:\qgis-3.22.5\src\core\maprenderer;D:\qgis-3.22.5\src\core\mesh;D:\qgis-3.22.5\src\core\metadata;D:\qgis-3.22.5\src\core\network;D:\qgis-3.22.5\src\core\numericformats;D:\qgis-3.22.5\src\core\pal;D:\qgis-3.22.5\src\core\pointcloud;D:\qgis-3.22.5\src\core\processing;D:\qgis-3.22.5\src\core\processing\models;D:\qgis-3.22.5\src\core\proj;D:\qgis-3.22.5\src\core\project;D:\qgis-3.22.5\src\core\providers;D:\qgis-3.22.5\src\core\providers\arcgis;D:\qgis-3.22.5\src\core\providers\memory;D:\qgis-3.22.5\src\core\providers\gdal;D:\qgis-3.22.5\src\core\providers\ogr;D:\qgis-3.22.5\src\core\providers\meshmemory;D:\qgis-3.22.5\src\core\raster;D:\qgis-3.22.5\src\core\renderer;D:\qgis-3.22.5\src\core\scalebar;D:\qgis-3.22.5\src\core\settings;D:\qgis-3.22.5\src\core\symbology;D:\qgis-3.22.5\src\core\textrenderer;D:\qgis-3.22.5\src\core\validity;D:\qgis-3.22.5\src\core\vector;D:\qgis-3.22.5\src\core\vectortile;D:\qgis-3.22.5\external;D:\qgis-3.22.5\external\nlohmann;D:\qgis-3.22.5\external\kdbush\include;D:\qgis-3.22.5\external\nmea;D:\qgis-3.22.5\external\rtree\include;D:\qgis-3.22.5\external\meshOptimizer;D:\qgis-3.22.5\src\gui;D:\qgis-3.22.5\src\gui\annotations;D:\qgis-3.22.5\src\gui\attributeformconfig;D:\qgis-3.22.5\src\gui\symbology;D:\qgis-3.22.5\src\gui\attributetable;D:\qgis-3.22.5\src\gui\auth;D:\qgis-3.22.5\src\gui\callouts;D:\qgis-3.22.5\src\gui\codeeditors;D:\qgis-3.22.5\src\gui\devtools;D:\qgis-3.22.5\src\gui\editorwidgets;D:\qgis-3.22.5\src\gui\editorwidgets\core;D:\qgis-3.22.5\src\gui\effects;D:\qgis-3.22.5\src\gui\labeling;D:\qgis-3.22.5\src\gui\layertree;D:\qgis-3.22.5\src\gui\layout;D:\qgis-3.22.5\src\gui\locator;D:\qgis-3.22.5\src\gui\mesh;D:\qgis-3.22.5\src\gui\numericformats;D:\qgis-3.22.5\src\gui\ogr;D:\qgis-3.22.5\src\gui\processing;D:\qgis-3.22.5\src\gui\processing\models;D:\qgis-3.22.5\src\gui\providers;D:\qgis-3.22.5\src\gui\providers\gdal;D:\qgis-3.22.5\src\gui\providers\ogr;D:\qgis-3.22.5\src\gui\pointcloud;D:\qgis-3.22.5\src\gui\raster;D:\qgis-3.22.5\src\gui\settings;D:\qgis-3.22.5\src\gui\tableeditor;D:\qgis-3.22.5\src\gui\vector;D:\qgis-3.22.5\src\gui\vectortile;D:\qgis-3.22.5\_build\src\gui;D:\qgis-3.22.5\_build\src\ui;D:\qgis-3.22.5\src\native;D:\qgis-3.22.5\_build\src\native;D:\OSGeo4W\include;D:\Qt\5.15.2\msvc2019_64\include;D:\Qt\5.15.2\msvc2019_64\include\QtCore;D:\Qt\5.15.2\msvc2019_64\.\mkspecs\win32-msvc;D:\Qt\5.15.2\msvc2019_64\include\QtGui;D:\Qt\5.15.2\msvc2019_64\include\QtANGLE;D:\Qt\5.15.2\msvc2019_64\include\QtXml;D:\Qt\5.15.2\msvc2019_64\include\QtWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtSvg;D:\Qt\5.15.2\msvc2019_64\include\QtPrintSupport;D:\Qt\5.15.2\msvc2019_64\include\QtNetwork;D:\Qt\5.15.2\msvc2019_64\include\QtSql;D:\Qt\5.15.2\msvc2019_64\include\QtConcurrent;D:\dependencies\libzip\include;D:\dependencies\qca\include\Qca-qt5\QtCrypto;D:\dependencies\qtkeychain\include\qt5keychain;D:\Qt\5.15.2\msvc2019_64\include\QtSerialPort;D:\dependencies\protobuf\include;D:\dependencies\zlib\include;D:\OSGeo4W\include\exiv2;D:\Qt\5.15.2\msvc2019_64\include\QtPositioning;D:\dependencies\qwt\include;D:\dependencies\qscintilla\include;D:\qgis-3.22.5\src\native\..\..\external\wintoast\src;D:\Qt\5.15.2\msvc2019_64\include\QtWinExtras;D:\Qt\5.15.2\msvc2019_64\include\QtUiTools;D:\Qt\5.15.2\msvc2019_64\include\QtQuickWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtQuick;D:\Qt\5.15.2\msvc2019_64\include\QtQmlModels;D:\Qt\5.15.2\msvc2019_64\include\QtQml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\qgis-3.22.5\_build\src\plugins\offline_editing\map_quality_check_tools_autogen\include_RelWithDebInfo;D:\qgis-3.22.5\_build;D:\qgis-3.22.5\src\plugins;D:\qgis-3.22.5\_build\src\plugins\offline_editing;D:\qgis-3.22.5\src\core;D:\qgis-3.22.5\_build\src\core;D:\qgis-3.22.5\src\core\3d;D:\qgis-3.22.5\src\core\annotations;D:\qgis-3.22.5\src\core\auth;D:\qgis-3.22.5\src\core\browser;D:\qgis-3.22.5\src\core\callouts;D:\qgis-3.22.5\src\core\classification;D:\qgis-3.22.5\src\core\diagram;D:\qgis-3.22.5\src\core\dxf;D:\qgis-3.22.5\src\core\editform;D:\qgis-3.22.5\src\core\effects;D:\qgis-3.22.5\src\core\expression;D:\qgis-3.22.5\src\core\externalstorage;D:\qgis-3.22.5\src\core\fieldformatter;D:\qgis-3.22.5\src\core\geometry;D:\qgis-3.22.5\src\core\geocms;D:\qgis-3.22.5\src\core\geocms\geonode;D:\qgis-3.22.5\src\core\geocoding;D:\qgis-3.22.5\src\core\gps;D:\qgis-3.22.5\src\core\labeling;D:\qgis-3.22.5\src\core\layertree;D:\qgis-3.22.5\src\core\layout;D:\qgis-3.22.5\src\core\locator;D:\qgis-3.22.5\src\core\maprenderer;D:\qgis-3.22.5\src\core\mesh;D:\qgis-3.22.5\src\core\metadata;D:\qgis-3.22.5\src\core\network;D:\qgis-3.22.5\src\core\numericformats;D:\qgis-3.22.5\src\core\pal;D:\qgis-3.22.5\src\core\pointcloud;D:\qgis-3.22.5\src\core\processing;D:\qgis-3.22.5\src\core\processing\models;D:\qgis-3.22.5\src\core\proj;D:\qgis-3.22.5\src\core\project;D:\qgis-3.22.5\src\core\providers;D:\qgis-3.22.5\src\core\providers\arcgis;D:\qgis-3.22.5\src\core\providers\memory;D:\qgis-3.22.5\src\core\providers\gdal;D:\qgis-3.22.5\src\core\providers\ogr;D:\qgis-3.22.5\src\core\providers\meshmemory;D:\qgis-3.22.5\src\core\raster;D:\qgis-3.22.5\src\core\renderer;D:\qgis-3.22.5\src\core\scalebar;D:\qgis-3.22.5\src\core\settings;D:\qgis-3.22.5\src\core\symbology;D:\qgis-3.22.5\src\core\textrenderer;D:\qgis-3.22.5\src\core\validity;D:\qgis-3.22.5\src\core\vector;D:\qgis-3.22.5\src\core\vectortile;D:\qgis-3.22.5\external;D:\qgis-3.22.5\external\nlohmann;D:\qgis-3.22.5\external\kdbush\include;D:\qgis-3.22.5\external\nmea;D:\qgis-3.22.5\external\rtree\include;D:\qgis-3.22.5\external\meshOptimizer;D:\qgis-3.22.5\src\gui;D:\qgis-3.22.5\src\gui\annotations;D:\qgis-3.22.5\src\gui\attributeformconfig;D:\qgis-3.22.5\src\gui\symbology;D:\qgis-3.22.5\src\gui\attributetable;D:\qgis-3.22.5\src\gui\auth;D:\qgis-3.22.5\src\gui\callouts;D:\qgis-3.22.5\src\gui\codeeditors;D:\qgis-3.22.5\src\gui\devtools;D:\qgis-3.22.5\src\gui\editorwidgets;D:\qgis-3.22.5\src\gui\editorwidgets\core;D:\qgis-3.22.5\src\gui\effects;D:\qgis-3.22.5\src\gui\labeling;D:\qgis-3.22.5\src\gui\layertree;D:\qgis-3.22.5\src\gui\layout;D:\qgis-3.22.5\src\gui\locator;D:\qgis-3.22.5\src\gui\mesh;D:\qgis-3.22.5\src\gui\numericformats;D:\qgis-3.22.5\src\gui\ogr;D:\qgis-3.22.5\src\gui\processing;D:\qgis-3.22.5\src\gui\processing\models;D:\qgis-3.22.5\src\gui\providers;D:\qgis-3.22.5\src\gui\providers\gdal;D:\qgis-3.22.5\src\gui\providers\ogr;D:\qgis-3.22.5\src\gui\pointcloud;D:\qgis-3.22.5\src\gui\raster;D:\qgis-3.22.5\src\gui\settings;D:\qgis-3.22.5\src\gui\tableeditor;D:\qgis-3.22.5\src\gui\vector;D:\qgis-3.22.5\src\gui\vectortile;D:\qgis-3.22.5\_build\src\gui;D:\qgis-3.22.5\_build\src\ui;D:\qgis-3.22.5\src\native;D:\qgis-3.22.5\_build\src\native;D:\OSGeo4W\include;D:\Qt\5.15.2\msvc2019_64\include;D:\Qt\5.15.2\msvc2019_64\include\QtCore;D:\Qt\5.15.2\msvc2019_64\.\mkspecs\win32-msvc;D:\Qt\5.15.2\msvc2019_64\include\QtGui;D:\Qt\5.15.2\msvc2019_64\include\QtANGLE;D:\Qt\5.15.2\msvc2019_64\include\QtXml;D:\Qt\5.15.2\msvc2019_64\include\QtWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtSvg;D:\Qt\5.15.2\msvc2019_64\include\QtPrintSupport;D:\Qt\5.15.2\msvc2019_64\include\QtNetwork;D:\Qt\5.15.2\msvc2019_64\include\QtSql;D:\Qt\5.15.2\msvc2019_64\include\QtConcurrent;D:\dependencies\libzip\include;D:\dependencies\qca\include\Qca-qt5\QtCrypto;D:\dependencies\qtkeychain\include\qt5keychain;D:\Qt\5.15.2\msvc2019_64\include\QtSerialPort;D:\dependencies\protobuf\include;D:\dependencies\zlib\include;D:\OSGeo4W\include\exiv2;D:\Qt\5.15.2\msvc2019_64\include\QtPositioning;D:\dependencies\qwt\include;D:\dependencies\qscintilla\include;D:\qgis-3.22.5\src\native\..\..\external\wintoast\src;D:\Qt\5.15.2\msvc2019_64\include\QtWinExtras;D:\Qt\5.15.2\msvc2019_64\include\QtUiTools;D:\Qt\5.15.2\msvc2019_64\include\QtQuickWidgets;D:\Qt\5.15.2\msvc2019_64\include\QtQuick;D:\Qt\5.15.2\msvc2019_64\include\QtQmlModels;D:\Qt\5.15.2\msvc2019_64\include\QtQml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PreBuildEvent>
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message>Automatic MOC for target map_quality_check_tools</Message>
+      <Command>setlocal
+cd D:\qgis-3.22.5\_build\src\plugins\offline_editing
+if %errorlevel% neq 0 goto :cmEnd
+D:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autogen D:/qgis-3.22.5/_build/src/plugins/offline_editing/CMakeFiles/map_quality_check_tools_autogen.dir/AutogenInfo.json RelWithDebInfo
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PreBuildEvent>
+    <Link>
+      <AdditionalDependencies>..\..\gui\RelWithDebInfo\qgis_gui.lib;D:\OSGeo4W\lib\spatialite_i.lib;..\..\core\RelWithDebInfo\qgis_core.lib;wsock32.lib;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\um\x64\SetupAPI.Lib;dbghelp.lib;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\um\x64\Version.Lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Xml.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Svg.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Sql.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Concurrent.lib;D:\dependencies\qca\lib\qca-qt5d.lib;D:\dependencies\qtkeychain\lib\qt5keychaind.lib;D:\OSGeo4W\lib\proj.lib;D:\OSGeo4W\lib\geos_c.lib;D:\OSGeo4W\lib\gdal_i.lib;D:\OSGeo4W\lib\spatialindex-64.lib;D:\OSGeo4W\lib\libexpat.lib;D:\OSGeo4W\lib\sqlite3_i.lib;D:\dependencies\libzip\lib\zip.lib;D:\dependencies\protobuf\lib\libprotobuf-lite.lib;D:\dependencies\zlib\lib\zlib.lib;D:\OSGeo4W\lib\exiv2.lib;D:\OSGeo4W\lib\spatialite_i.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5PrintSupport.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5SerialPort.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Positioning.lib;..\..\native\RelWithDebInfo\qgis_native.lib;shell32.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5WinExtras.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5UiTools.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Widgets.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Gui.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Core.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Widgets.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Gui.lib;D:\Qt\5.15.2\msvc2019_64\lib\\Qt5Core.lib;D:\dependencies\qwt\lib\qwtd.lib;D:\dependencies\qscintilla\lib\qscintilla2_qt5d.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5QuickWidgets.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Widgets.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Quick.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Gui.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5QmlModels.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Qml.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Network.lib;D:\Qt\5.15.2\msvc2019_64\lib\Qt5Core.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:/qgis-3.22.5/_build/src/core;D:/qgis-3.22.5/_build/src/core/$(Configuration);D:/qgis-3.22.5/_build/src/gui;D:/qgis-3.22.5/_build/src/gui/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImportLibrary>D:/qgis-3.22.5/_build/src/plugins/offline_editing/RelWithDebInfo/map_quality_check_tools.lib</ImportLibrary>
+      <ProgramDataBaseFile>D:/qgis-3.22.5/_build/output/plugins/RelWithDebInfo/map_quality_check_tools.pdb</ProgramDataBaseFile>
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ProductStorageDialog</class>
+ <widget class="QDialog" name="ProductStorageDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1000</width>
+    <height>807</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>成果存储与管理</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QGroupBox" name="fileGroup">
+     <property name="title">
+      <string>文件上传</string>
+     </property>
+     <layout class="QHBoxLayout" name="fileLayout">
+      <item>
+       <widget class="QLineEdit" name="mFilePathEdit">
+        <property name="readOnly">
+         <bool>true</bool>
+        </property>
+        <property name="placeholderText">
+         <string>请选择要上传的制图成果文件...</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="mBrowseBtn">
+        <property name="text">
+         <string>浏览...</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="mBrowseFolderBtn">
+        <property name="text">
+         <string>选择文件夹</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="mUploadBtn">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>上传</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QSplitter" name="splitter">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <widget class="QGroupBox" name="listGroup">
+      <property name="title">
+       <string>已有成果列表</string>
+      </property>
+      <layout class="QVBoxLayout" name="listLayout">
+       <item>
+        <widget class="QTableWidget" name="mProductTable">
+         <property name="editTriggers">
+          <set>QAbstractItemView::NoEditTriggers</set>
+         </property>
+         <property name="selectionMode">
+          <enum>QAbstractItemView::SingleSelection</enum>
+         </property>
+         <property name="selectionBehavior">
+          <enum>QAbstractItemView::SelectRows</enum>
+         </property>
+         <attribute name="horizontalHeaderStretchLastSection">
+          <bool>true</bool>
+         </attribute>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="listBtnLayout">
+         <item>
+          <widget class="QPushButton" name="mRefreshBtn">
+           <property name="text">
+            <string>刷新列表</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="mDeleteBtn">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="text">
+            <string>删除选中</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="mAddToMapBtn">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="text">
+            <string>添加到地图</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="listBtnSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QGroupBox" name="detailGroup">
+      <property name="title">
+       <string>产品详情</string>
+      </property>
+      <layout class="QVBoxLayout" name="detailLayout">
+       <item>
+        <widget class="QScrollArea" name="infoScrollArea">
+         <property name="widgetResizable">
+          <bool>true</bool>
+         </property>
+         <widget class="QWidget" name="infoWidget">
+          <property name="geometry">
+           <rect>
+            <x>0</x>
+            <y>-52</y>
+            <width>943</width>
+            <height>420</height>
+           </rect>
+          </property>
+          <layout class="QFormLayout" name="infoLayout">
+           <item row="0" column="0">
+            <widget class="QLabel" name="productNameLabel">
+             <property name="text">
+              <string>产品名称:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QLineEdit" name="mProductNameEdit"/>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="productTypeLabel">
+             <property name="text">
+              <string>产品类型:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QComboBox" name="mProductTypeCombo">
+             <item>
+              <property name="text">
+               <string>矢量数据</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>栅格数据</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>CAD</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>AI</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>CDR</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>PDF</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>Other</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="fileFormatLabel">
+             <property name="text">
+              <string>文件格式:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QLineEdit" name="mFileFormatEdit">
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="0">
+            <widget class="QLabel" name="fileSizeTextLabel">
+             <property name="text">
+              <string>文件大小:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QLabel" name="mFileSizeLabel">
+             <property name="text">
+              <string/>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="0">
+            <widget class="QLabel" name="fileHashTextLabel">
+             <property name="text">
+              <string>SHA256:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="1">
+            <widget class="QLabel" name="mFileHashLabel">
+             <property name="text">
+              <string/>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0" colspan="2">
+            <widget class="QGroupBox" name="spatialGroup">
+             <property name="title">
+              <string>空间元数据（自动提取）</string>
+             </property>
+             <layout class="QFormLayout" name="spatialLayout">
+              <item row="0" column="0">
+               <widget class="QLabel" name="extentLabel">
+                <property name="text">
+                 <string>空间范围:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <layout class="QHBoxLayout" name="extentLayout">
+                <item>
+                 <widget class="QLabel" name="minXLabel">
+                  <property name="text">
+                   <string>左边界坐标：</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="mMinXEdit">
+                  <property name="readOnly">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="minYLabel">
+                  <property name="text">
+                   <string>下边界坐标：</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="mMinYEdit">
+                  <property name="readOnly">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="maxXLabel">
+                  <property name="text">
+                   <string>右边界坐标：</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="mMaxXEdit">
+                  <property name="readOnly">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="maxYLabel">
+                  <property name="text">
+                   <string>上边界坐标：</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="mMaxYEdit">
+                  <property name="readOnly">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="crsLabel">
+                <property name="text">
+                 <string>坐标参考系:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QLineEdit" name="mCRSEdit">
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="geometryTypeLabel">
+                <property name="text">
+                 <string>几何类型:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QLineEdit" name="mGeometryTypeEdit">
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="bandCountLabel">
+                <property name="text">
+                 <string>波段数:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <widget class="QLineEdit" name="mBandCountEdit">
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="0">
+               <widget class="QLabel" name="resolutionLabel">
+                <property name="text">
+                 <string>分辨率:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="1">
+               <widget class="QLineEdit" name="mResolutionEdit">
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item row="6" column="0" colspan="2">
+            <widget class="QGroupBox" name="versionGroup">
+             <property name="title">
+              <string>版本信息</string>
+             </property>
+             <layout class="QFormLayout" name="versionLayout">
+              <item row="0" column="0">
+               <widget class="QLabel" name="versionLabel">
+                <property name="text">
+                 <string>版本号:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+              <widget class="QLineEdit" name="mVersionEdit">
+               <property name="text">
+                <string>1</string>
+               </property>
+              </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="versionNoteLabel">
+                <property name="text">
+                 <string>版本说明:</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QTextEdit" name="mVersionNoteEdit">
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>80</height>
+                 </size>
+                </property>
+                <property name="placeholderText">
+                 <string>请输入版本说明...</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="QProgressBar" name="mProgressBar">
+     <property name="visible">
+      <bool>false</bool>
+     </property>
+     <property name="value">
+      <number>0</number>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="mProgressLabel">
+     <property name="visible">
+      <bool>false</bool>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

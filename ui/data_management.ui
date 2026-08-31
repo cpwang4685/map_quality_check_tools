@@ -1,0 +1,1877 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ui version="4.0">
+ <class>SeDataManagementDialog</class>
+ <widget class="QDialog" name="SeDataManagementDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>900</width>
+    <height>750</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>820</width>
+    <height>680</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>数据导出</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout_main">
+   <property name="spacing">
+    <number>8</number>
+   </property>
+   <property name="leftMargin">
+    <number>12</number>
+   </property>
+   <property name="topMargin">
+    <number>12</number>
+   </property>
+   <property name="rightMargin">
+    <number>12</number>
+   </property>
+   <property name="bottomMargin">
+    <number>12</number>
+   </property>
+   <item>
+    <widget class="QScrollArea" name="scrollArea_main">
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="scrollAreaWidgetContents">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>872</width>
+        <height>540</height>
+       </rect>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout_scroll">
+       <property name="spacing">
+        <number>8</number>
+       </property>
+       <property name="leftMargin">
+        <number>2</number>
+       </property>
+       <property name="topMargin">
+        <number>2</number>
+       </property>
+       <property name="rightMargin">
+        <number>2</number>
+       </property>
+       <property name="bottomMargin">
+        <number>2</number>
+       </property>
+       <item>
+        <widget class="QTabWidget" name="tabWidget_source">
+         <property name="currentIndex">
+          <number>0</number>
+         </property>
+         <!-- ============ Tab 0: 当前地图图层导出 ============ -->
+         <widget class="QWidget" name="tab_mapLayers">
+          <attribute name="title">
+           <string>当前地图图层导出</string>
+          </attribute>
+          <layout class="QVBoxLayout" name="verticalLayout_tab3">
+           <property name="spacing">
+            <number>6</number>
+           </property>
+           <property name="leftMargin">
+            <number>6</number>
+           </property>
+           <property name="topMargin">
+            <number>6</number>
+           </property>
+           <property name="rightMargin">
+            <number>6</number>
+           </property>
+           <property name="bottomMargin">
+            <number>6</number>
+           </property>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_tab3_hint">
+             <property name="spacing">
+              <number>12</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label_tab3_hint">
+               <property name="text">
+                <string>直接对当前地图界面中已加载的图层进行裁剪导出，无需手动选择文件</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_tab3_hint">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_tab3_buttons">
+             <property name="spacing">
+              <number>6</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="Button_UseMapLayers_Tab3">
+               <property name="text">
+                <string>获取当前地图图层</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>130</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="toolTip">
+                <string>获取当前地图窗口中已加载的所有矢量图层，并填充到下方图层列表</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_tab3_buttons">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+          </layout>
+         </widget>
+         <!-- ============ Tab 1: Shape/文件夹导出 ============ -->
+         <widget class="QWidget" name="tab_shape">
+          <attribute name="title">
+           <string>Shape/文件夹导出</string>
+          </attribute>
+          <layout class="QVBoxLayout" name="verticalLayout_tab0">
+           <property name="spacing">
+            <number>6</number>
+           </property>
+           <property name="leftMargin">
+            <number>6</number>
+           </property>
+           <property name="topMargin">
+            <number>6</number>
+           </property>
+           <property name="rightMargin">
+            <number>6</number>
+           </property>
+           <property name="bottomMargin">
+            <number>6</number>
+           </property>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_srcType">
+             <property name="spacing">
+              <number>12</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label_srcModeHint">
+               <property name="text">
+                <string>点击浏览可选择单个文件、多选文件或整个文件夹</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_srcType">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_srcPath">
+             <property name="spacing">
+              <number>6</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label_srcPath">
+               <property name="text">
+                <string>源路径：</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="lineEdit_srcPath">
+               <property name="placeholderText">
+                <string>选择 Shape 文件或矢量文件夹...</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="Button_BrowseSource">
+               <property name="text">
+                <string>浏览...</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="Button_LoadToMap_Shape">
+               <property name="text">
+                <string>加载到地图</string>
+               </property>
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>80</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="toolTip">
+                <string>将当前勾选的图层加载到主地图窗口预览</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_mapLayers">
+             <property name="spacing">
+              <number>6</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="Button_UseMapLayers">
+               <property name="text">
+                <string>使用地图已加载图层</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>130</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="toolTip">
+                <string>直接获取当前地图窗口中已加载的所有矢量图层</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_mapLayers">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+          </layout>
+         </widget>
+         <!-- ============ Tab 2: GDB 文件导出 ============ -->
+         <widget class="QWidget" name="tab_gdb">
+          <attribute name="title">
+           <string>GDB 文件导出</string>
+          </attribute>
+          <layout class="QVBoxLayout" name="verticalLayout_tab1">
+           <property name="spacing">
+            <number>6</number>
+           </property>
+           <property name="leftMargin">
+            <number>6</number>
+           </property>
+           <property name="topMargin">
+            <number>6</number>
+           </property>
+           <property name="rightMargin">
+            <number>6</number>
+           </property>
+           <property name="bottomMargin">
+            <number>6</number>
+           </property>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_gdbPath">
+             <property name="spacing">
+              <number>6</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label_gdbPath">
+               <property name="text">
+                <string>GDB 文件：</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="lineEdit_gdbPath">
+               <property name="placeholderText">
+                <string>选择 .gdb 目录...</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="Button_BrowseGdb">
+               <property name="text">
+                <string>浏览...</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="Button_LoadToMap_Gdb">
+               <property name="text">
+                <string>加载到地图</string>
+               </property>
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>80</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="toolTip">
+                <string>将当前勾选的图层加载到主地图窗口预览</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+          </layout>
+         </widget>
+         <!-- ============ Tab 3: 数据库图层导出 ============ -->
+         <widget class="QWidget" name="tab_db">
+          <attribute name="title">
+           <string>数据库图层导出</string>
+          </attribute>
+          <layout class="QVBoxLayout" name="verticalLayout_tab2">
+           <property name="spacing">
+            <number>6</number>
+           </property>
+           <property name="leftMargin">
+            <number>6</number>
+           </property>
+           <property name="topMargin">
+            <number>6</number>
+           </property>
+           <property name="rightMargin">
+            <number>6</number>
+           </property>
+           <property name="bottomMargin">
+            <number>6</number>
+           </property>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_dbConn">
+             <property name="spacing">
+              <number>6</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label_dbConn">
+               <property name="text">
+                <string>连接数据库：</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QComboBox" name="comboBox_connection">
+               <property name="minimumSize">
+                <size>
+                 <width>160</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="Button_NewConnection">
+               <property name="text">
+                <string>新建连接</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>75</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="Button_DeleteConnection">
+               <property name="text">
+                <string>删除连接</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>75</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="Button_Connect">
+               <property name="text">
+                <string>连接</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>55</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="Button_Disconnect">
+               <property name="text">
+                <string>断开</string>
+               </property>
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>55</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_dbFilter">
+             <property name="spacing">
+              <number>6</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label_dbFilter">
+               <property name="text">
+                <string>关键字过滤：</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="lineEdit_dbFilter">
+               <property name="placeholderText">
+                <string>输入关键字过滤图层名...</string>
+               </property>
+               <property name="clearButtonEnabled">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_connStatus">
+             <property name="text">
+              <string>状态：未连接</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">color:#e67e22; font-size:9pt;</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBox_layerList">
+         <property name="title">
+          <string>图层列表（可多选）</string>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>150</height>
+          </size>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_layerList">
+          <property name="spacing">
+           <number>6</number>
+          </property>
+          <item>
+           <widget class="QTreeWidget" name="treeWidget_layers">
+            <property name="alternatingRowColors">
+             <bool>true</bool>
+            </property>
+            <property name="selectionMode">
+             <enum>QAbstractItemView::ExtendedSelection</enum>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>100</height>
+             </size>
+            </property>
+            <column>
+             <property name="text">
+              <string>名称</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>几何类型</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>坐标系</string>
+             </property>
+            </column>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_layerBtns">
+            <property name="spacing">
+             <number>6</number>
+            </property>
+            <item>
+             <widget class="QPushButton" name="Button_SelectAll">
+              <property name="text">
+               <string>全选</string>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>60</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="Button_SelectNone">
+              <property name="text">
+               <string>清空</string>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>60</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="Button_RefreshLayers">
+              <property name="text">
+               <string>刷新图层</string>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="Button_LoadToMap_Db">
+              <property name="text">
+               <string>加载到地图</string>
+              </property>
+              <property name="enabled">
+               <bool>false</bool>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>0</height>
+               </size>
+              </property>
+              <property name="toolTip">
+               <string>将当前勾选的图层加载到主地图窗口预览</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_layerBtns">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <!-- ============ 启用裁剪复选框 ============ -->
+        <widget class="QCheckBox" name="checkBox_enableClip">
+         <property name="text">
+          <string>启用裁剪</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <!-- ============ 裁剪方式单选选项 ============ -->
+        <widget class="QWidget" name="widget_clipOptions">
+         <property name="visible">
+          <bool>false</bool>
+         </property>
+         <layout class="QHBoxLayout" name="horizontalLayout_clipOptions">
+          <property name="spacing">
+           <number>10</number>
+          </property>
+          <property name="leftMargin">
+           <number>20</number>
+          </property>
+          <item>
+           <widget class="QRadioButton" name="radioButton_useExtent">
+            <property name="text">
+             <string>空间范围裁剪</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QRadioButton" name="radioButton_useShp">
+            <property name="text">
+             <string>按Shape条件导出</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QRadioButton" name="radioButton_useMainArea">
+            <property name="text">
+             <string>按主区裁切导出</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_clipOptions">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <!-- ============ 裁剪参数动态面板（三选一）============ -->
+        <widget class="QStackedWidget" name="stackedWidget_clipParams">
+         <property name="visible">
+          <bool>false</bool>
+         </property>
+         <property name="currentIndex">
+          <number>0</number>
+         </property>
+         <widget class="QWidget" name="page_extent">
+          <layout class="QVBoxLayout" name="verticalLayout_pageExtent">
+           <property name="spacing">
+            <number>3</number>
+           </property>
+           <property name="leftMargin">
+            <number>20</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <item>
+            <layout class="QGridLayout" name="gridLayout_spatial">
+             <property name="spacing">
+              <number>6</number>
+             </property>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_minLon">
+               <property name="text">
+                <string>最小经度：</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QLineEdit" name="lineEdit_minLon">
+               <property name="placeholderText">
+                <string>经度 -180 ~ 180</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="2">
+              <widget class="QLabel" name="label_maxLon">
+               <property name="text">
+                <string>最大经度：</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="3">
+              <widget class="QLineEdit" name="lineEdit_maxLon">
+               <property name="placeholderText">
+                <string>经度 -180 ~ 180</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_minLat">
+               <property name="text">
+                <string>最小纬度：</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QLineEdit" name="lineEdit_minLat">
+               <property name="placeholderText">
+                <string>纬度 -90 ~ 90</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="2">
+              <widget class="QLabel" name="label_maxLat">
+               <property name="text">
+                <string>最大纬度：</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="3">
+              <widget class="QLineEdit" name="lineEdit_maxLat">
+               <property name="placeholderText">
+                <string>纬度 -90 ~ 90</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_spatialBtns">
+             <property name="spacing">
+              <number>6</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="Button_GetCanvasExtent">
+               <property name="text">
+                <string>获取当前地图范围</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="Button_ClearExtent">
+               <property name="text">
+                <string>清空范围</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="Button_PickExtentFromMap">
+               <property name="text">
+                <string>地图框选范围</string>
+               </property>
+               <property name="toolTip">
+                <string>在地图画布上拖拽绘制矩形范围，完成后自动填充经纬度坐标框</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_spatial">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_extentSummary">
+             <property name="text">
+              <string>已选范围：未选择</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">color:#2980b9;</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="groupBox_output_extent">
+             <property name="title">
+              <string>输出设置</string>
+             </property>
+             <layout class="QGridLayout" name="gridLayout_output_extent">
+              <property name="spacing">
+               <number>3</number>
+              </property>
+              <property name="leftMargin">
+               <number>3</number>
+              </property>
+              <property name="topMargin">
+               <number>3</number>
+              </property>
+              <property name="rightMargin">
+               <number>3</number>
+              </property>
+              <property name="bottomMargin">
+               <number>3</number>
+              </property>
+              <item row="0" column="0">
+               <widget class="QLabel" name="label_outputPath_extent">
+                <property name="text">
+                 <string>输出文件：</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1" colspan="2">
+               <widget class="QLineEdit" name="lineEdit_outputPath_extent">
+                <property name="placeholderText">
+                 <string>选择保存位置并输入文件名...</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="3">
+               <widget class="QPushButton" name="Button_BrowseOutput_extent">
+                <property name="text">
+                 <string>浏览...</string>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>70</width>
+                  <height>0</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="label_encoding_extent">
+                <property name="text">
+                 <string>编码：</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QComboBox" name="comboBox_encoding_extent">
+                <item>
+                 <property name="text">
+                  <string>UTF-8</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>GBK</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>GB2312</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>ISO-8859-1</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+           <item row="1" column="2" colspan="2">
+            <widget class="QCheckBox" name="checkBox_overwrite_extent">
+             <property name="text">
+              <string>覆盖已存在文件</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="label_dbFormat_extent">
+             <property name="text">
+              <string>导出格式：</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QComboBox" name="comboBox_dbFormat_extent">
+             <item>
+              <property name="text">
+               <string>ESRI Shapefile (.shp)</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>File Geodatabase (.gdb)</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>GeoPackage (.gpkg)</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="page_shp">
+          <layout class="QVBoxLayout" name="verticalLayout_pageShp">
+           <property name="spacing">
+            <number>3</number>
+           </property>
+           <property name="leftMargin">
+            <number>20</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_clipShpPath">
+             <property name="spacing">
+              <number>6</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label_clipShpPath">
+               <property name="text">
+                <string>裁剪 SHP 路径：</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="lineEdit_clipShpPath" />
+             </item>
+             <item>
+              <widget class="QPushButton" name="Button_BrowseClipShp">
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="text">
+                <string>浏览...</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="Button_LoadClipShpToMap">
+               <property name="text">
+                <string>加载到地图</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_clipAttr">
+             <property name="spacing">
+              <number>6</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label_clipAttrField">
+               <property name="text">
+                <string>过滤字段(可选)：</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QComboBox" name="comboBox_clipAttrField">
+               <property name="minimumSize">
+                <size>
+                 <width>140</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="label_clipAttrValue">
+               <property name="text">
+                <string>字段值：</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="lineEdit_clipAttrValue">
+               <property name="placeholderText">
+                <string>过滤字段值</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="groupBox_output_shp">
+             <property name="title">
+              <string>输出设置</string>
+             </property>
+             <layout class="QGridLayout" name="gridLayout_output_shp">
+              <property name="spacing">
+               <number>3</number>
+              </property>
+              <property name="leftMargin">
+               <number>3</number>
+              </property>
+              <property name="topMargin">
+               <number>3</number>
+              </property>
+              <property name="rightMargin">
+               <number>3</number>
+              </property>
+              <property name="bottomMargin">
+               <number>3</number>
+              </property>
+              <item row="0" column="0">
+               <widget class="QLabel" name="label_outputPath_shp">
+                <property name="text">
+                 <string>输出文件：</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1" colspan="2">
+               <widget class="QLineEdit" name="lineEdit_outputPath_shp">
+                <property name="placeholderText">
+                 <string>选择保存位置并输入文件名...</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="3">
+               <widget class="QPushButton" name="Button_BrowseOutput_shp">
+                <property name="text">
+                 <string>浏览...</string>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>70</width>
+                  <height>0</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="label_encoding_shp">
+                <property name="text">
+                 <string>编码：</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QComboBox" name="comboBox_encoding_shp">
+                <item>
+                 <property name="text">
+                  <string>UTF-8</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>GBK</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>GB2312</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>ISO-8859-1</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+           <item row="1" column="2" colspan="2">
+            <widget class="QCheckBox" name="checkBox_overwrite_shp">
+             <property name="text">
+              <string>覆盖已存在文件</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="label_dbFormat_shp">
+             <property name="text">
+              <string>导出格式：</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QComboBox" name="comboBox_dbFormat_shp">
+             <item>
+              <property name="text">
+               <string>ESRI Shapefile (.shp)</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>File Geodatabase (.gdb)</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>GeoPackage (.gpkg)</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="page_mainArea">
+          <layout class="QVBoxLayout" name="verticalLayout_pageMainArea">
+           <property name="spacing">
+            <number>3</number>
+           </property>
+           <property name="leftMargin">
+            <number>20</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <item>
+            <widget class="QWidget" name="widget_mainAreaPanel">
+             <layout class="QVBoxLayout" name="verticalLayout_mainArea">
+              <property name="spacing">
+               <number>6</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="QGroupBox" name="groupBox_mainAreaInput">
+                <property name="title">
+                 <string>主区输入数据</string>
+                </property>
+                <layout class="QVBoxLayout" name="verticalLayout_mainAreaInput">
+                 <property name="spacing">
+                  <number>6</number>
+                 </property>
+                 <item>
+                  <layout class="QHBoxLayout" name="horizontalLayout_mainAreaPath">
+                   <property name="spacing">
+                    <number>6</number>
+                   </property>
+                   <item>
+                    <widget class="QLabel" name="label_mainAreaPath">
+                     <property name="text">
+                      <string>主区数据：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QLineEdit" name="lineEdit_mainAreaPath">
+                     <property name="placeholderText">
+                      <string>选择市/县/乡面矢量数据...</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="Button_BrowseMainArea">
+                     <property name="minimumSize">
+                      <size>
+                       <width>70</width>
+                       <height>0</height>
+                      </size>
+                     </property>
+                     <property name="text">
+                      <string>浏览...</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                 <item>
+                  <layout class="QHBoxLayout" name="horizontalLayout_mainAreaField">
+                   <property name="spacing">
+                    <number>6</number>
+                   </property>
+                   <item>
+                    <widget class="QLabel" name="label_mainAreaField">
+                     <property name="text">
+                      <string>标识字段：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QComboBox" name="comboBox_mainAreaField">
+                     <property name="minimumSize">
+                      <size>
+                       <width>160</width>
+                       <height>0</height>
+                      </size>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <spacer name="horizontalSpacer_mainAreaField">
+                     <property name="orientation">
+                      <enum>Qt::Horizontal</enum>
+                     </property>
+                     <property name="sizeHint" stdset="0">
+                      <size>
+                       <width>40</width>
+                       <height>20</height>
+                      </size>
+                     </property>
+                    </spacer>
+                   </item>
+                  </layout>
+                 </item>
+                 <item>
+                  <layout class="QHBoxLayout" name="horizontalLayout_mainAreaFeatures">
+                   <property name="spacing">
+                    <number>6</number>
+                   </property>
+                   <item>
+                    <widget class="QLabel" name="label_mainAreaFeatures">
+                     <property name="text">
+                      <string>选择要素：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QListWidget" name="listWidget_mainAreaFeatures">
+                     <property name="minimumSize">
+                      <size>
+                       <width>0</width>
+                       <height>80</height>
+                      </size>
+                     </property>
+                     <property name="maximumSize">
+                      <size>
+                       <width>16777215</width>
+                       <height>120</height>
+                      </size>
+                     </property>
+                     <property name="selectionMode">
+                      <enum>QAbstractItemView::SingleSelection</enum>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item>
+               <widget class="QGroupBox" name="groupBox_mainAreaPaper">
+                <property name="title">
+                 <string>制图纸张</string>
+                </property>
+                <layout class="QHBoxLayout" name="horizontalLayout_mainAreaPaper">
+                 <property name="spacing">
+                  <number>6</number>
+                 </property>
+                 <item>
+                  <widget class="QLabel" name="label_paperOrientation">
+                   <property name="text">
+                    <string>纸张方向：</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QComboBox" name="comboBox_paperOrientation">
+                   <item>
+                    <property name="text">
+                     <string>自动</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>横向</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>纵向</string>
+                    </property>
+                   </item>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="label_paperSize">
+                   <property name="text">
+                    <string>纸张大小：</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QComboBox" name="comboBox_paperSize">
+                   <item>
+                    <property name="text">
+                     <string>A0</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>A1</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>A2</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>A3</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>自定义</string>
+                    </property>
+                   </item>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="label_customPaperWidth">
+                   <property name="text">
+                    <string>自定义宽(mm)：</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLineEdit" name="lineEdit_customPaperWidth">
+                   <property name="maximumSize">
+                    <size>
+                     <width>60</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="placeholderText">
+                    <string>宽</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="label_customPaperHeight">
+                   <property name="text">
+                    <string>高(mm)：</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLineEdit" name="lineEdit_customPaperHeight">
+                   <property name="maximumSize">
+                    <size>
+                     <width>60</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="placeholderText">
+                    <string>高</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <spacer name="horizontalSpacer_mainAreaPaper">
+                   <property name="orientation">
+                    <enum>Qt::Horizontal</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>40</width>
+                     <height>20</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item>
+               <widget class="QGroupBox" name="groupBox_mainAreaScale">
+                <property name="title">
+                 <string>制图比例尺</string>
+                </property>
+                <layout class="QHBoxLayout" name="horizontalLayout_mainAreaScale">
+                 <property name="spacing">
+                  <number>6</number>
+                 </property>
+                 <item>
+                  <widget class="QLabel" name="label_actualScale">
+                   <property name="text">
+                    <string>制图比例尺：</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLineEdit" name="lineEdit_actualScale">
+                   <property name="readOnly">
+                    <bool>false</bool>
+                   </property>
+                   <property name="placeholderText">
+                    <string>自动计算</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="label_standardScale">
+                   <property name="text">
+                    <string>标准比例尺：</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QComboBox" name="comboBox_standardScale">
+                   <property name="minimumSize">
+                    <size>
+                     <width>120</width>
+                     <height>0</height>
+                    </size>
+                   </property>
+                   <property name="editable">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="Button_CalculateScale">
+                   <property name="minimumSize">
+                    <size>
+                     <width>70</width>
+                     <height>0</height>
+                    </size>
+                   </property>
+                   <property name="text">
+                    <string>计算</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QCheckBox" name="checkBox_useCustomScale">
+                   <property name="text">
+                    <string>使用自定义比例尺</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <spacer name="horizontalSpacer_mainAreaScale">
+                   <property name="orientation">
+                    <enum>Qt::Horizontal</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>20</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item>
+               <widget class="QGroupBox" name="groupBox_innerClip">
+                <property name="title">
+                 <string>内图廓大小</string>
+                </property>
+                <layout class="QHBoxLayout" name="horizontalLayout_innerClip">
+                 <property name="spacing">
+                  <number>6</number>
+                 </property>
+                 <item>
+                  <widget class="QLabel" name="label_innerClipWidth">
+                   <property name="text">
+                    <string>内图廓宽(mm)：</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLineEdit" name="lineEdit_innerClipWidth">
+                   <property name="maximumSize">
+                    <size>
+                     <width>60</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="placeholderText">
+                    <string>0</string>
+                   </property>
+                   <property name="text">
+                    <string>0</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="label_innerClipHeight">
+                   <property name="text">
+                    <string>内图廓高(mm)：</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLineEdit" name="lineEdit_innerClipHeight">
+                   <property name="maximumSize">
+                    <size>
+                     <width>60</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="placeholderText">
+                    <string>0</string>
+                   </property>
+                   <property name="text">
+                    <string>0</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QCheckBox" name="checkBox_enableInnerClip">
+                   <property name="text">
+                    <string>启用内图廓</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <spacer name="horizontalSpacer_innerClip">
+                   <property name="orientation">
+                    <enum>Qt::Horizontal</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>40</width>
+                     <height>20</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="label_mainAreaExtentSummary">
+                <property name="styleSheet">
+                 <string notr="true">color:#2980b9;</string>
+                </property>
+                <property name="text">
+                 <string>已选主区范围：未选择</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="groupBox_output_mainArea">
+             <property name="title">
+              <string>输出设置</string>
+             </property>
+             <layout class="QGridLayout" name="gridLayout_output_mainArea">
+              <property name="spacing">
+               <number>3</number>
+              </property>
+              <property name="leftMargin">
+               <number>3</number>
+              </property>
+              <property name="topMargin">
+               <number>3</number>
+              </property>
+              <property name="rightMargin">
+               <number>3</number>
+              </property>
+              <property name="bottomMargin">
+               <number>3</number>
+              </property>
+              <item row="0" column="0">
+               <widget class="QLabel" name="label_outputPath_mainArea">
+                <property name="text">
+                 <string>输出文件：</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1" colspan="2">
+               <widget class="QLineEdit" name="lineEdit_outputPath_mainArea">
+                <property name="placeholderText">
+                 <string>选择保存位置并输入文件名...</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="3">
+               <widget class="QPushButton" name="Button_BrowseOutput_mainArea">
+                <property name="text">
+                 <string>浏览...</string>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>70</width>
+                  <height>0</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="label_encoding_mainArea">
+                <property name="text">
+                 <string>编码：</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QComboBox" name="comboBox_encoding_mainArea">
+                <item>
+                 <property name="text">
+                  <string>UTF-8</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>GBK</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>GB2312</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>ISO-8859-1</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+           <item row="1" column="2" colspan="2">
+            <widget class="QCheckBox" name="checkBox_overwrite_mainArea">
+             <property name="text">
+              <string>覆盖已存在文件</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="label_dbFormat_mainArea">
+             <property name="text">
+              <string>导出格式：</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QComboBox" name="comboBox_dbFormat_mainArea">
+             <item>
+              <property name="text">
+               <string>ESRI Shapefile (.shp)</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>File Geodatabase (.gdb)</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>GeoPackage (.gpkg)</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="checkBox_loadResultToMap">
+         <property name="text">
+          <string>导出完成后，自动将结果图层加载到当前地图</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_clipParams">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTextEdit" name="textEdit_log">
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>80</height>
+      </size>
+     </property>
+     <property name="placeholderText">
+      <string>导出日志信息</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QProgressBar" name="progressBar_export">
+     <property name="value">
+      <number>0</number>
+     </property>
+     <property name="textVisible">
+      <bool>true</bool>
+     </property>
+     <property name="format">
+      <string>%v / %m</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_bottom">
+     <property name="spacing">
+      <number>8</number>
+     </property>
+     <item>
+      <widget class="QLabel" name="label_summary">
+       <property name="text">
+        <string>已选择 0 个图层</string>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">color:#2980b9; font-weight:bold;</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_bottom">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="Button_Export">
+       <property name="minimumSize">
+        <size>
+         <width>100</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>导出</string>
+       </property>
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">font-weight:bold;</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="Button_Cancel">
+       <property name="minimumSize">
+        <size>
+         <width>100</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>取消</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <layoutdefault spacing="6" margin="11" />
+ <resources />
+ <connections />
+</ui>

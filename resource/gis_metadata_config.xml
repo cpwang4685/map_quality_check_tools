@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    GIS 元数据表字段配置文件
+    =========================
+    用途：定义 gis_metadata 元数据表的所有字段及自动填值规则。
+    修改此文件即可增删字段或调整填值逻辑，无需重新编译程序。
+
+    属性说明：
+      name        — 字段名
+      type        — PostgreSQL 数据类型
+      default     — 表结构的默认值（可选，直接写入 DDL）
+      not_null    — 是否 NOT NULL（可选）
+      primary_key — 是否主键（可选）
+      value       — 导入时自动填值的令牌（可选，不填则插入时跳过，留 NULL）
+
+    value 令牌说明：
+      ┌─────────────────────────────┬──────────────────────────────────┐
+      │ 令牌                        │ 取值来源                          │
+      ├─────────────────────────────┼──────────────────────────────────┤
+      │ {file_name}                 │ 源文件名（含扩展名）              │
+      │ {file_path}                 │ 源文件完整路径                    │
+      │ {file_size_mb}              │ 文件大小 (MB)                     │
+      │ {srid}                      │ UI 输入的坐标系 SRID              │
+      │ {encoding}                  │ UI 选择的字符编码                 │
+      │ {data_source}               │ UI 输入的数据来源                 │
+      │ {description}               │ UI 输入的数据描述                 │
+      │ {data_type}                 │ 数据格式标识 (SHP/GeoJSON/...)    │
+      │ {meta_data_type}            │ 元数据类型 (vector/raster)        │
+      │ {upload_user}               │ 当前操作系统用户名                │
+      │ {feature_count}             │ PostGIS 查询: COUNT(*)           │
+      │ {geom_type}                 │ PostGIS 查询: GeometryType()     │
+      │ {west_longitude}            │ PostGIS 查询: ST_Extent Xmin     │
+      │ {east_longitude}            │ PostGIS 查询: ST_Extent Xmax     │
+      │ {south_latitude}            │ PostGIS 查询: ST_Extent Ymin     │
+      │ {north_latitude}            │ PostGIS 查询: ST_Extent Ymax     │
+      │ {field_count}               │ PostGIS 查询: info_schema 字段数  │
+      │ {attribute_fields}          │ PostGIS 查询: 字段列表 JSON       │
+      │ {has_z_value}               │ PostGIS 查询: ST_NDims >= 3      │
+      │ {has_m_value}               │ PostGIS 查询: ST_NDims >= 4      │
+      │ {shp_type}                  │ 矢量: 从 geom_type + Z/M 推断    │
+      │ {band_count}                │ gdalinfo: 波段数                  │
+      │ {resolution_x}              │ gdalinfo: X 分辨率                │
+      │ {resolution_y}              │ gdalinfo: Y 分辨率                │
+      │ {col_count}                 │ gdalinfo: 列数 (Width)            │
+      │ {row_count}                 │ gdalinfo: 行数 (Height)           │
+      │ {pixel_type}                │ gdalinfo: 像素类型名              │
+      │ {pixel_depth}               │ gdalinfo: 像素位深                │
+      │ {compression_type}          │ gdalinfo: 压缩类型                │
+      │ {color_interpretation}      │ gdalinfo: 颜色解释                │
+      │ {no_data_value}             │ gdalinfo: NoData 值               │
+      │ {geotransform}              │ gdalinfo: 仿射变换 JSON           │
+      │ {projection_wkt}            │ gdalinfo: 坐标系 WKT              │
+      │ {band_info}                 │ gdalinfo: 波段信息 JSON           │
+      │ {has_overviews}             │ gdalinfo: 是否有概视图            │
+      │ NOW()                       │ SQL 函数: 当前时间                │
+      │ TRUE / FALSE / 其他字面量    │ 直接作为 SQL 值使用               │
+      └─────────────────────────────┴──────────────────────────────────┘
+
+    结构说明：
+      - <fields group="..."> : group 仅用于组织，不影响建表
+          common  — 通用字段
+          vector  — 矢量专用字段
+          raster  — 栅格专用字段
+          3d      — 三维专用字段（暂无自动填值，需手动补充）
+-->
+<gis_metadata_config>
+    <table_name>gis_metadata</table_name>
+
+    <!-- ================================================================ -->
+    <!-- 一、通用元数据字段                                               -->
+    <!-- ================================================================ -->
+    <fields group="common">
+
+        <!-- 基础标识 -->
+        <field name="data_id" type="UUID" default="gen_random_uuid()" primary_key="true"/>
+        <field name="data_name" type="VARCHAR(100)" not_null="true" value="{file_name}"/>
+        <field name="data_alias" type="VARCHAR(50)"/>
+        <field name="data_type" type="VARCHAR(10)" not_null="true" value="{meta_data_type}"/>
+        <field name="data_format" type="VARCHAR(20)" not_null="true" value="{data_type}"/>
+        <field name="data_version" type="VARCHAR(20)"/>
+
+        <!-- 空间范围 -->
+        <field name="west_longitude" type="DOUBLE PRECISION" value="{west_longitude}"/>
+        <field name="east_longitude" type="DOUBLE PRECISION" value="{east_longitude}"/>
+        <field name="south_latitude" type="DOUBLE PRECISION" value="{south_latitude}"/>
+        <field name="north_latitude" type="DOUBLE PRECISION" value="{north_latitude}"/>
+        <field name="min_altitude" type="DOUBLE PRECISION"/>
+        <field name="max_altitude" type="DOUBLE PRECISION"/>
+        <field name="coordinate_system" type="VARCHAR(50)" value="'EPSG:{srid}'"/>
+
+        <!-- 时间信息 -->
+        <field name="production_date" type="DATE"/>
+        <field name="production_organization" type="VARCHAR(100)"/>
+        <field name="import_date" type="TIMESTAMP" default="NOW()" value="NOW()"/>
+        <field name="update_date" type="TIMESTAMP" default="NOW()" value="NOW()"/>
+        <field name="validity_start" type="DATE"/>
+        <field name="validity_end" type="DATE"/>
+
+        <!-- 管理信息 -->
+        <field name="upload_user" type="VARCHAR(50)" value="{upload_user}"/>
+        <field name="upload_user_id" type="VARCHAR(20)"/>
+        <field name="department" type="VARCHAR(50)"/>
+        <field name="project_name" type="VARCHAR(100)"/>
+        <field name="data_source" type="VARCHAR(50)" value="{data_source}"/>
+        <field name="data_quality_desc" type="TEXT"/>
+        <field name="accuracy_level" type="VARCHAR(20)"/>
+        <field name="confidentiality_level" type="VARCHAR(20)"/>
+        <field name="tags" type="VARCHAR(200)"/>
+        <field name="description" type="TEXT" value="{description}"/>
+
+        <!-- 存储信息 -->
+        <field name="storage_path" type="VARCHAR(500)" value="{file_path}"/>
+        <field name="storage_type" type="VARCHAR(20)" value="'数据库'"/>
+        <field name="file_size_mb" type="NUMERIC(10,2)" value="{file_size_mb}"/>
+        <field name="table_name" type="VARCHAR(100)" value="{table_name}"/>
+
+        <!-- 状态信息 -->
+        <field name="data_status" type="VARCHAR(20)" default="'已入库'" value="'已入库'"/>
+        <field name="is_public" type="BOOLEAN" default="FALSE"/>
+        <field name="is_latest" type="BOOLEAN" default="TRUE" value="TRUE"/>
+        <field name="parent_data_id" type="UUID"/>
+
+        <!-- 操作审计 -->
+        <field name="created_at" type="TIMESTAMP" default="NOW()"/>
+        <field name="updated_at" type="TIMESTAMP" default="NOW()"/>
+        <field name="last_access_time" type="TIMESTAMP"/>
+        <field name="access_count" type="INTEGER" default="0"/>
+        <field name="remark" type="TEXT"/>
+
+    </fields>
+
+    <!-- ================================================================ -->
+    <!-- 二、矢量数据专用字段                                             -->
+    <!-- ================================================================ -->
+    <fields group="vector">
+        <field name="geom_type" type="VARCHAR(50)" value="{geom_type}"/>
+        <field name="feature_count" type="INTEGER" default="0" value="{feature_count}"/>
+        <field name="attribute_fields" type="JSONB" value="{attribute_fields}"/>
+        <field name="field_count" type="INTEGER" default="0" value="{field_count}"/>
+        <field name="topology_validity" type="BOOLEAN"/>
+        <field name="topology_errors" type="TEXT"/>
+        <field name="has_m_value" type="BOOLEAN" value="{has_m_value}"/>
+        <field name="has_z_value" type="BOOLEAN" value="{has_z_value}"/>
+        <field name="encoding" type="VARCHAR(20)" value="{encoding}"/>
+        <field name="shp_type" type="VARCHAR(20)" value="{shp_type}"/>
+    </fields>
+
+    <!-- ================================================================ -->
+    <!-- 三、栅格数据专用字段                                             -->
+    <!-- ================================================================ -->
+    <fields group="raster">
+        <field name="resolution_x" type="DOUBLE PRECISION" value="{resolution_x}"/>
+        <field name="resolution_y" type="DOUBLE PRECISION" value="{resolution_y}"/>
+        <field name="band_count" type="INTEGER" value="{band_count}"/>
+        <field name="band_info" type="JSONB" value="{band_info}"/>
+        <field name="pixel_type" type="VARCHAR(20)" value="{pixel_type}"/>
+        <field name="pixel_depth" type="INTEGER" value="{pixel_depth}"/>
+        <field name="col_count" type="INTEGER" value="{col_count}"/>
+        <field name="row_count" type="INTEGER" value="{row_count}"/>
+        <field name="has_pyramid" type="BOOLEAN"/>
+        <field name="pyramid_levels" type="INTEGER"/>
+        <field name="compression_type" type="VARCHAR(20)" value="{compression_type}"/>
+        <field name="has_overviews" type="BOOLEAN" value="{has_overviews}"/>
+        <field name="color_interpretation" type="VARCHAR(20)" value="{color_interpretation}"/>
+        <field name="no_data_value" type="DOUBLE PRECISION" value="{no_data_value}"/>
+        <field name="geotransform" type="JSONB" value="{geotransform}"/>
+        <field name="projection_wkt" type="TEXT" value="{projection_wkt}"/>
+        <field name="cloud_cover" type="DOUBLE PRECISION"/>
+        <field name="satellite_name" type="VARCHAR(30)"/>
+        <field name="acquisition_time" type="TIMESTAMP"/>
+        <field name="tile_format" type="VARCHAR(20)"/>
+    </fields>
+
+    <!-- ================================================================ -->
+    <!-- 四、三维数据专用字段（暂无自动填值逻辑，需手动补充）              -->
+    <!-- ================================================================ -->
+    <fields group="3d">
+        <field name="model_type" type="VARCHAR(20)"/>
+        <field name="model_subtype" type="VARCHAR(20)"/>
+        <field name="triangle_count" type="BIGINT"/>
+        <field name="vertex_count" type="BIGINT"/>
+        <field name="texture_count" type="INTEGER"/>
+        <field name="texture_format" type="VARCHAR(20)"/>
+        <field name="texture_resolution" type="VARCHAR(20)"/>
+        <field name="has_color" type="BOOLEAN"/>
+        <field name="has_normal" type="BOOLEAN"/>
+        <field name="has_uv" type="BOOLEAN"/>
+        <field name="animation_count" type="INTEGER" default="0"/>
+        <field name="file_count" type="INTEGER"/>
+        <field name="lod_levels" type="INTEGER"/>
+        <field name="model_center_x" type="DOUBLE PRECISION"/>
+        <field name="model_center_y" type="DOUBLE PRECISION"/>
+        <field name="model_center_z" type="DOUBLE PRECISION"/>
+        <field name="bounding_box" type="JSONB"/>
+        <field name="bounding_sphere_radius" type="DOUBLE PRECISION"/>
+        <field name="point_cloud_density" type="DOUBLE PRECISION"/>
+        <field name="point_cloud_count" type="BIGINT"/>
+        <field name="model_accuracy" type="VARCHAR(20)"/>
+        <field name="building_function" type="VARCHAR(50)"/>
+        <field name="floor_count" type="INTEGER"/>
+        <field name="structure_type" type="VARCHAR(30)"/>
+        <field name="export_tool" type="VARCHAR(50)"/>
+        <field name="coordinate_origin" type="VARCHAR(100)"/>
+    </fields>
+
+</gis_metadata_config>

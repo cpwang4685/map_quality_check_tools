@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>FormatConversionDialog</class>
+ <widget class="QDialog" name="FormatConversionDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>561</width>
+    <height>640</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>格式转换</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout_main">
+   <item row="0" column="0" colspan="3">
+    <widget class="QGroupBox" name="groupBox_main">
+     <property name="minimumSize">
+      <size><width>543</width><height>400</height></size>
+     </property>
+     <property name="title"><string/></property>
+     <layout class="QGridLayout" name="gridLayout_inner">
+      <item row="0" column="0">
+       <widget class="QGroupBox" name="groupBox_format">
+        <property name="minimumSize">
+         <size><width>0</width><height>130</height></size>
+        </property>
+        <property name="title"><string>转换设置</string></property>
+        <layout class="QGridLayout" name="gridLayout_format">
+         <item row="0" column="0">
+          <widget class="QRadioButton" name="radioButton_geojson2shp">
+           <property name="text"><string>geojson转shp</string></property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QRadioButton" name="radioButton_gpkg2shp">
+           <property name="text"><string>gpkg转shp</string></property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QRadioButton" name="radioButton_geojson2gpkg">
+           <property name="text"><string>geojson转gpkg</string></property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QRadioButton" name="radioButton_shp2gpkg">
+           <property name="text"><string>shp转gpkg</string></property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QRadioButton" name="radioButton_gdb2shp">
+           <property name="text"><string>gdb转shp</string></property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QRadioButton" name="radioButton_shp2gdb">
+           <property name="text"><string>shp转gdb</string></property>
+          </widget>
+         </item>
+         <item row="3" column="0">
+          <widget class="QRadioButton" name="radioButton_mdb2gdb">
+           <property name="text"><string>mdb转gdb</string></property>
+           <property name="toolTip"><string>个人地理数据库(MDB)转文件地理数据库(GDB)，需本机已安装 Microsoft Access Database Engine</string></property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QGroupBox" name="groupBox_io">
+        <property name="title"><string>输入输出设置</string></property>
+        <layout class="QGridLayout" name="gridLayout_io">
+         <item row="0" column="0" colspan="3">
+          <layout class="QHBoxLayout" name="horizontalLayout_mode">
+           <item>
+            <widget class="QLabel" name="label_mode">
+             <property name="text"><string>转换模式</string></property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QRadioButton" name="radioButton_SingleMode">
+             <property name="text"><string>单个转换</string></property>
+             <property name="checked"><bool>true</bool></property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QRadioButton" name="radioButton_BatchMode">
+             <property name="text"><string>批量转换</string></property>
+             <property name="toolTip"><string>可同时勾选多个文件和文件夹一次转换</string></property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_mode">
+             <property name="orientation"><enum>Qt::Horizontal</enum></property>
+             <property name="sizeHint" stdset="0">
+              <size><width>40</width><height>20</height></size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="label_input">
+           <property name="text"><string>输入数据路径</string></property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLineEdit" name="lineEdit_InputDataPath"/>
+         </item>
+         <item row="2" column="1">
+          <widget class="QPushButton" name="Button_Open">
+           <property name="text"><string>浏览</string></property>
+          </widget>
+         </item>
+         <item row="3" column="0" colspan="3">
+          <widget class="QWidget" name="widget_batchBtns" native="true">
+           <layout class="QHBoxLayout" name="horizontalLayout_batchBtns">
+            <item>
+             <widget class="QPushButton" name="Button_SelectData">
+              <property name="minimumSize">
+               <size><width>100</width><height>0</height></size>
+              </property>
+              <property name="text"><string>选择数据</string></property>
+              <property name="toolTip"><string>打开选择窗口，同时勾选要转换的文件和文件夹</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="Button_RemoveSelected">
+              <property name="enabled"><bool>false</bool></property>
+              <property name="minimumSize">
+               <size><width>100</width><height>0</height></size>
+              </property>
+              <property name="text"><string>移除选中</string></property>
+              <property name="toolTip"><string>从清单中移除选中的条目</string></property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_batchBtns">
+              <property name="orientation"><enum>Qt::Horizontal</enum></property>
+              <property name="sizeHint" stdset="0">
+               <size><width>40</width><height>20</height></size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item row="4" column="0" colspan="3">
+          <widget class="QListWidget" name="listWidget_SrcList">
+           <property name="minimumSize">
+            <size><width>0</width><height>110</height></size>
+           </property>
+           <property name="toolTip"><string>已选择的数据清单，勾选文件夹表示整个文件夹参与转换</string></property>
+          </widget>
+         </item>
+         <item row="5" column="0">
+          <widget class="QLabel" name="label_output">
+           <property name="text"><string>保存路径</string></property>
+          </widget>
+         </item>
+         <item row="6" column="0">
+          <widget class="QLineEdit" name="lineEdit_OutputPath"/>
+         </item>
+         <item row="6" column="1">
+          <widget class="QPushButton" name="Button_Save">
+           <property name="text"><string>浏览</string></property>
+          </widget>
+         </item>
+         <item row="7" column="0">
+          <widget class="QLabel" name="label_layerName">
+           <property name="text"><string>SHP图层名</string></property>
+          </widget>
+         </item>
+         <item row="8" column="0">
+          <widget class="QLineEdit" name="lineEdit_LayerName"/>
+         </item>
+         <item row="9" column="0">
+          <widget class="QLabel" name="label_gdbName">
+           <property name="text"><string>GDB库名</string></property>
+          </widget>
+         </item>
+         <item row="10" column="0">
+          <widget class="QLineEdit" name="lineEdit_GdbName"/>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QGroupBox" name="groupBox_log">
+        <property name="minimumSize">
+         <size><width>0</width><height>100</height></size>
+        </property>
+        <property name="title"><string>日志设置</string></property>
+        <layout class="QGridLayout" name="gridLayout_log">
+         <item row="0" column="0">
+          <widget class="QLabel" name="label_logLevel">
+           <property name="minimumSize">
+            <size><width>100</width><height>0</height></size>
+           </property>
+           <property name="text"><string>日志级别</string></property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QComboBox" name="comboBox_LogLevel">
+           <property name="maximumSize">
+            <size><width>120</width><height>16777215</height></size>
+           </property>
+           <item><property name="text"><string>错误</string></property></item>
+           <item><property name="text"><string>信息</string></property></item>
+           <item><property name="text"><string>调试</string></property></item>
+          </widget>
+         </item>
+         <item row="0" column="2" colspan="2">
+          <spacer name="horizontalSpacer_log">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+           <property name="sizeHint" stdset="0">
+            <size><width>238</width><height>20</height></size>
+           </property>
+          </spacer>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="label_logPath">
+           <property name="text"><string>保存路径</string></property>
+          </widget>
+         </item>
+         <item row="2" column="0" colspan="3">
+          <widget class="QLineEdit" name="lineEdit_OutputLogPath">
+           <property name="minimumSize">
+            <size><width>0</width><height>24</height></size>
+           </property>
+           <property name="toolTip"><string>设置日志文件保存路径</string></property>
+          </widget>
+         </item>
+         <item row="2" column="3">
+          <widget class="QPushButton" name="Button_SaveLogFilePath">
+           <property name="maximumSize">
+            <size><width>75</width><height>16777215</height></size>
+           </property>
+           <property name="text"><string>浏览</string></property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QProgressBar" name="progressBar">
+     <property name="value"><number>0</number></property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <widget class="QPushButton" name="Button_OK">
+     <property name="text"><string>开始转换</string></property>
+    </widget>
+   </item>
+   <item row="1" column="2">
+    <widget class="QPushButton" name="Button_Cancel">
+     <property name="text"><string>关闭</string></property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,0 +1,24 @@
+<RCC>
+    <qresource prefix="/theme_data_process_tools">
+        <file>images/add_layer.png</file>
+        <file>images/delete_layer.png</file>
+        <file>images/up_layer.png</file>
+        <file>images/up_to_top_layer.png</file>
+        <file>images/down_layer.png</file>
+        <file>images/down_to_bottom_layer.png</file>
+        <file>images/browse_ptp.png</file>
+        <file>images/merge_ptp.png</file>
+        <file>images/feature_extent_check.png</file>
+        <file>images/feature_geometry_check.png</file>
+        <file>images/feature_statistic.png</file>
+        <file>images/odata2shp.png</file>
+        <file>images/raster_format_conversion.png</file>
+        <file>images/unpack_ptp.png</file>
+        <file>images/feature_attribute_check.png</file>
+        <file>images/icon_db_config.svg</file>
+        <file>images/icon_login.svg</file>
+        <file>images/icon_product_storage.svg</file>
+        <file>images/icon_metadata.svg</file>
+        <file>images/icon_access_control.svg</file>
+    </qresource>
+</RCC>

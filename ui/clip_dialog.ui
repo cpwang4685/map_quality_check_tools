@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ClipDialog</class>
+ <widget class="QDialog" name="ClipDialog">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>560</width><height>620</height></rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Fixed" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy>
+  </property>
+  <property name="minimumSize"><size><width>560</width><height>620</height></size></property>
+  <property name="maximumSize"><size><width>560</width><height>620</height></size></property>
+  <property name="windowTitle"><string>裁剪</string></property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="spacing"><number>6</number></property>
+   <property name="leftMargin"><number>12</number></property>
+   <property name="topMargin"><number>12</number></property>
+   <property name="rightMargin"><number>12</number></property>
+   <property name="bottomMargin"><number>12</number></property>
+   <!-- 1. 输入设置 -->
+   <item>
+    <widget class="QGroupBox" name="groupBox_input">
+     <property name="title"><string>输入设置</string></property>
+     <layout class="QVBoxLayout" name="layout_inputGroup">
+      <property name="spacing"><number>4</number></property>
+      <item>
+       <layout class="QHBoxLayout" name="layout_input">
+        <item><widget class="QLabel" name="label_input"><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>70</width><height>0</height></size></property><property name="maximumSize"><size><width>70</width><height>16777215</height></size></property><property name="text"><string>输入要素</string></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignVCenter</set></property></widget></item>
+        <item><widget class="QLineEdit" name="lineEdit_input"/></item>
+        <item><widget class="QPushButton" name="pushButton_browseInput"><property name="text"><string notr="true">&#x1F4C2;</string></property><property name="maximumSize"><size><width>28</width><height>16777215</height></size></property></widget></item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QWidget" name="widget_batchGroup" native="true">
+        <layout class="QVBoxLayout" name="layout_batchGroup">
+         <property name="spacing"><number>2</number></property>
+         <property name="leftMargin"><number>0</number></property>
+         <property name="topMargin"><number>0</number></property>
+         <property name="rightMargin"><number>0</number></property>
+         <property name="bottomMargin"><number>0</number></property>
+         <item>
+          <layout class="QHBoxLayout" name="layout_batchCheck">
+           <item><widget class="QLabel" name="label_dummy"><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>70</width><height>0</height></size></property><property name="maximumSize"><size><width>70</width><height>16777215</height></size></property></widget></item>
+           <item><widget class="QCheckBox" name="checkBox_batch"><property name="text"><string>批量处理</string></property></widget></item>
+           <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QWidget" name="widget_batchRadio" native="true">
+           <layout class="QHBoxLayout" name="layout_batchRadio">
+            <property name="leftMargin"><number>70</number></property>
+            <property name="topMargin"><number>0</number></property>
+            <property name="rightMargin"><number>0</number></property>
+            <property name="bottomMargin"><number>0</number></property>
+            <item><widget class="QRadioButton" name="radioButton_multiFile"><property name="text"><string>多选文件</string></property><property name="checked"><bool>true</bool></property></widget></item>
+            <item><widget class="QRadioButton" name="radioButton_traverseDir"><property name="text"><string>遍历文件夹</string></property></widget></item>
+            <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <!-- 2. 裁剪参数 -->
+   <item>
+    <widget class="QGroupBox" name="groupBox_clip">
+     <property name="title"><string>裁剪参数</string></property>
+     <layout class="QVBoxLayout" name="layout_clipGroup">
+      <property name="spacing"><number>4</number></property>
+      <item>
+       <layout class="QHBoxLayout" name="layout_mode">
+        <item><widget class="QLabel" name="label_mode"><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>70</width><height>0</height></size></property><property name="maximumSize"><size><width>70</width><height>16777215</height></size></property><property name="text"><string>裁剪模式</string></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignVCenter</set></property></widget></item>
+        <item><widget class="QRadioButton" name="radioButton_featureClip"><property name="text"><string>要素裁剪</string></property><property name="checked"><bool>true</bool></property></widget></item>
+        <item><widget class="QRadioButton" name="radioButton_coordClip"><property name="text"><string>坐标范围裁剪</string></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="layout_clipFeature">
+        <item><widget class="QLabel" name="label_clipFeature"><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>70</width><height>0</height></size></property><property name="maximumSize"><size><width>70</width><height>16777215</height></size></property><property name="text"><string>裁剪要素</string></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignVCenter</set></property></widget></item>
+        <item><widget class="QLineEdit" name="lineEdit_clipFeature"/></item>
+        <item><widget class="QPushButton" name="pushButton_browseClip"><property name="text"><string notr="true">&#x1F4C2;</string></property><property name="maximumSize"><size><width>28</width><height>16777215</height></size></property></widget></item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QWidget" name="widget_extent" native="true">
+        <layout class="QVBoxLayout" name="layout_extent">
+         <property name="spacing"><number>1</number></property>
+         <property name="leftMargin"><number>0</number></property>
+         <property name="topMargin"><number>0</number></property>
+         <property name="rightMargin"><number>0</number></property>
+         <property name="bottomMargin"><number>0</number></property>
+         <item>
+          <layout class="QHBoxLayout" name="layout_extentTitle">
+           <item><widget class="QLabel" name="label_extentTitle"><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>70</width><height>0</height></size></property><property name="maximumSize"><size><width>70</width><height>16777215</height></size></property><property name="text"><string>坐标范围</string></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignVCenter</set></property></widget></item>
+           <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QWidget" name="widget_extentContent" native="true">
+           <layout class="QHBoxLayout" name="layout_extentContent">
+            <property name="leftMargin"><number>70</number></property>
+            <property name="topMargin"><number>0</number></property>
+            <property name="rightMargin"><number>0</number></property>
+            <property name="bottomMargin"><number>0</number></property>
+            <item>
+             <widget class="QGroupBox" name="groupBox_coordRange">
+              <property name="title"><string></string></property>
+              <layout class="QGridLayout" name="gridLayout_coord">
+               <item row="0" column="0"><widget class="QLabel" name="label_minX"><property name="text"><string>最小 X</string></property></widget></item>
+               <item row="0" column="1"><widget class="QDoubleSpinBox" name="doubleSpinBox_minX"><property name="decimals"><number>6</number></property><property name="minimum"><double>-180.0</double></property><property name="maximum"><double>180.0</double></property></widget></item>
+               <item row="0" column="2"><widget class="QLabel" name="label_maxX"><property name="text"><string>最大 X</string></property></widget></item>
+               <item row="0" column="3"><widget class="QDoubleSpinBox" name="doubleSpinBox_maxX"><property name="decimals"><number>6</number></property><property name="minimum"><double>-180.0</double></property><property name="maximum"><double>180.0</double></property></widget></item>
+               <item row="1" column="0"><widget class="QLabel" name="label_minY"><property name="text"><string>最小 Y</string></property></widget></item>
+               <item row="1" column="1"><widget class="QDoubleSpinBox" name="doubleSpinBox_minY"><property name="decimals"><number>6</number></property><property name="minimum"><double>-90.0</double></property><property name="maximum"><double>90.0</double></property></widget></item>
+               <item row="1" column="2"><widget class="QLabel" name="label_maxY"><property name="text"><string>最大 Y</string></property></widget></item>
+               <item row="1" column="3"><widget class="QDoubleSpinBox" name="doubleSpinBox_maxY"><property name="decimals"><number>6</number></property><property name="minimum"><double>-90.0</double></property><property name="maximum"><double>90.0</double></property></widget></item>
+              </layout>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="layout_tolerance">
+        <item><widget class="QLabel" name="label_tolerance"><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>70</width><height>0</height></size></property><property name="maximumSize"><size><width>70</width><height>16777215</height></size></property><property name="text"><string>XY 容差</string></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignVCenter</set></property></widget></item>
+        <item><widget class="QLineEdit" name="lineEdit_tolerance"><property name="placeholderText"><string>0.001</string></property></widget></item>
+        <item><widget class="QComboBox" name="comboBox_toleranceUnit"><property name="minimumSize"><size><width>56</width><height>0</height></size></property><item><property name="text"><string>米</string></property></item><item><property name="text"><string>度</string></property></item><item><property name="text"><string>英尺</string></property></item><item><property name="text"><string>千米</string></property></item></widget></item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <!-- 3. 输出设置 -->
+   <item>
+    <widget class="QGroupBox" name="groupBox_output">
+     <property name="title"><string>输出设置</string></property>
+     <layout class="QVBoxLayout" name="layout_outputGroup">
+      <property name="spacing"><number>4</number></property>
+      <item>
+       <layout class="QHBoxLayout" name="layout_output">
+        <item><widget class="QLabel" name="label_output"><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>70</width><height>0</height></size></property><property name="maximumSize"><size><width>70</width><height>16777215</height></size></property><property name="text"><string>输出目录</string></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignVCenter</set></property></widget></item>
+        <item><widget class="QLineEdit" name="lineEdit_output"/></item>
+        <item><widget class="QPushButton" name="pushButton_browseOutput"><property name="text"><string notr="true">&#x1F4C2;</string></property><property name="maximumSize"><size><width>28</width><height>16777215</height></size></property></widget></item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QWidget" name="widget_batchOutputGroup" native="true">
+        <layout class="QVBoxLayout" name="layout_batchOutputGroup">
+         <property name="spacing"><number>2</number></property>
+         <property name="leftMargin"><number>0</number></property>
+         <property name="topMargin"><number>0</number></property>
+         <property name="rightMargin"><number>0</number></property>
+         <property name="bottomMargin"><number>0</number></property>
+         <item>
+          <layout class="QHBoxLayout" name="layout_batchOutput">
+           <property name="leftMargin"><number>70</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+           <item><widget class="QLabel" name="label_batchOutput"><property name="text"><string>批量输出</string></property></widget></item>
+           <item><widget class="QRadioButton" name="radioButton_separate"><property name="text"><string>分层SHP文件</string></property><property name="checked"><bool>true</bool></property></widget></item>
+           <item><widget class="QRadioButton" name="radioButton_merge"><property name="text"><string>合并单GPKG</string></property></widget></item>
+           <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_hint">
+           <property name="text"><string>SHP 仅分层存储，合并成果统一生成 GPKG</string></property>
+           <property name="styleSheet"><string>color: #999999; font-size: 13px; margin-left: 70px;</string></property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="layout_log">
+        <item><widget class="QLabel" name="label_log"><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>70</width><height>0</height></size></property><property name="maximumSize"><size><width>70</width><height>16777215</height></size></property><property name="text"><string>日志路径</string></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignVCenter</set></property></widget></item>
+        <item><widget class="QLineEdit" name="lineEdit_logPath"/></item>
+        <item><widget class="QPushButton" name="pushButton_browseLog"><property name="text"><string notr="true">&#x1F4C2;</string></property><property name="maximumSize"><size><width>28</width><height>16777215</height></size></property></widget></item>
+        <item><widget class="QComboBox" name="comboBox_logLevel"><property name="minimumSize"><size><width>56</width><height>0</height></size></property><item><property name="text"><string>错误</string></property></item><item><property name="text"><string>信息</string></property></item><item><property name="text"><string>调试</string></property></item></widget></item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <!-- 4. 进度条 -->
+   <item><widget class="QProgressBar" name="progressBar"><property name="value"><number>0</number></property><property name="maximumHeight"><number>18</number></property></widget></item>
+   <!-- 5. 底部按钮 -->
+   <item>
+    <layout class="QHBoxLayout" name="layout_bottom">
+     <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+     <item><widget class="QPushButton" name="pushButton_ok"><property name="text"><string>确定</string></property><property name="minimumSize"><size><width>72</width><height>0</height></size></property></widget></item>
+     <item><widget class="QPushButton" name="pushButton_cancel"><property name="text"><string>取消</string></property><property name="minimumSize"><size><width>72</width><height>0</height></size></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

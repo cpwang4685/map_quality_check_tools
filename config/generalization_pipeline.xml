@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="UTF-8"?>
+  <!-- ================================================================
+    map_generalization_pipeline.xsd —综合缩编管线主控 XML Schema
+
+    运行方式:
+      主控程序读此 XML →按 stage 顺序逐阶段执行
+      每个 stage 包含若干 algorithm, 算法从上到下顺序执行
+      前一 stage 的输出是后一 stage 的输入
+
+    约定:
+      - 管线内所有中间文件用 GeoPackage(.gpkg) 传递, 避免 SHP 字段名截断
+      - 最终输出可同时导出 SHP + PostGIS
+  ================================================================ -->
+  <generalization_pipeline version="1.0">
+
+      <!-- ============================================================
+        global —全局参数（第一部分: 数据源 + 输出）
+        UI 对应: 数据源面板 + 输出面板
+      ============================================================ -->
+      <global>
+          <!-- ==== 数据源 (二选一, 对应 UI 第一部分的两种模式) ==== -->
+
+          <!-- 模式 A: 数据库 -->
+          <!-- <input_source type="database">
+              <connection host="localhost" port="5432" dbname="mpqis"
+                          user="mpqis_app" password="..." schema="mpqis"/>
+              <layer_types>    ←UI 中勾选的图层类型
+                  <type>A</type>
+                  <type>D</type>
+                  <type>F</type>
+                  <type>M</type>
+              </layer_types>
+          </input_source> -->
+
+          <!-- 模式 B: 本地文件夹 -->
+          <input_source type="filesystem">
+              <path>D:/硕士/城市级基础地理实体建设_shp</path>
+              <format>ESRI Shapefile</format>
+              <encoding>UTF-8</encoding>
+          </input_source>
+
+          <!-- ==== 输出设置 (对应 UI 第三部分) ==== -->
+          <output>
+              <directory>D:/output/generalization_20260714</directory>
+              <export>
+                  <format name="PostgreSQL">
+                      <connection host="localhost" port="5432" dbname="mpqis"
+                                  user="mpqis_app" password="..." schema="mpqis"/>
+                  </format>
+                  <format name="ESRI Shapefile" enabled="true"/>
+                  <format name="GeoPackage"    enabled="false"/>
+              </export>
+              <cleanup_temp>false</cleanup_temp>  <!-- 是否删除中间临时文件 -->
+          </output>
+
+          <!-- ==== 制图综合全局参数 ==== -->
+          <cartographic>
+              <source_scale>1:10000</source_scale>
+              <target_scale>1:50000</target_scale>
+              <coordinate_system>EPSG:4548</coordinate_system>
+              <area_of_interest>          <!-- 可选: 空间范围 -->
+                  <bbox xmin="512008" ymin="4342517" xmax="513517" ymax="4344132"/>
+              </area_of_interest>
+          </cartographic>
+
+          <!-- ==== 日志 ==== -->
+          <logging>
+              <level>INFO</level>         <!-- DEBUG | INFO | WARNING | ERROR -->
+              <output_dir>D:/output/logs</output_dir>
+          </logging>
+      </global>
+
+
+      <!-- ============================================================
+        pipeline —处理管线 (对应 UI 第二部分: 步骤列表)
+
+        每个 stage 对应一项"能力", 内部包含若干 algorithm
+        stage 按顺序执行, 同一 stage 内 algorithm 也按顺序执行
+      ============================================================ -->
+      <pipeline>
+
+          <!-- ========================================================
+            Stage 1: 综合缩编前置预处理与数据规范化 (能力2)
+
+            目的: 修复原始数据的拓扑/几何/属性问题,
+                  为后续缩编算法准备"干净"的输入
+          ======================================================== -->
+          <stage id="preprocess" name="预处理与数据规范化" enabled="true">
+              <description>拓扑修复、几何规范化、面封闭、环方向修正、重复节点清理</description>
+
+              <!-- 1a. 拓扑修复: 线段相交处打断, 建立节点-弧段拓扑 -->
+              <algorithm name="TopologyFix" class="TopologyFixAlgorithm">
+                  <param name="snap_tolerance" value="0.5" unit="m"/>
+                  <param name="min_segment_length" value="0.01" unit="m"/>
+                  <param name="intersection_split" value="true"/>
+                  <!-- 相交处自动打断为节点, 保证后续操作不会产生伪重叠 -->
+              </algorithm>
+
+              <!-- 1b. 几何规范化 -->
+              <algorithm name="GeometryNormalize" class="GeometryNormalizeAlgorithm">
+                  <param name="fix_ring_direction" value="true"/>
+                  <!-- 面要素外环逆时针, 内环顺时针 (OGC标准) -->
+                  <param name="close_rings" value="true"/>
+                  <!-- 自动闭合未封闭的面环 -->
+                  <param name="remove_duplicate_nodes" value="true"/>
+                  <!-- 删除连续重复坐标点 -->
+                  <param name="remove_spikes" value="true"/>
+                  <!-- 移除外凸尖刺 -->
+                  <param name="min_spike_angle" value="5.0" unit="degree"/>
+                  <param name="snap_to_grid" value="0.001" unit="m"/>
+                  <!-- 坐标对齐到网格, 消除浮点精度问题 -->
+              </algorithm>
+
+              <!-- 1c. 属性规范化 -->
+              <algorithm name="AttributeNormalize" class="AttributeNormalizeAlgorithm">
+                  <param name="trim_strings" value="true"/>
+                  <param name="null_fill_policy" value="skip"/>
+                  <!-- skip | default | error -->
+                  <param name="encoding_check" value="UTF-8"/>
+              </algorithm>
+          </stage>
+
+
+          <!-- ========================================================
+            Stage 2: 复杂图斑合并处理 (能力3)
+
+            目的: 将距离过近/共享边界的同类图斑合并,
+                  保持建筑群/道路网/水系的整体结构轮廓
+                  兼顾"结构轮廓保持 + 网状要素空间约束 + 多层级分类语义规则"
+          ======================================================== -->
+          <stage id="merge" name="图斑合并" enabled="true">
+              <description>基于邻近性+语义相似性的图斑聚合, 保持结构轮廓与网状约束</description>
+
+              <!-- 2a. 建筑图斑合并 -->
+              <algorithm name="BuildingMerge" class="BuildingMergeAlgorithm">
+                  <param name="merge_mode" value="aggregation"/>
+                  <!-- aggregation(聚合) | dilation(膨胀) | skeleton(骨架化) -->
+                  <param name="merge_distance" value="10.0" unit="m"/>
+                  <!-- 小于此距离的面要素合并 -->
+                  <param name="min_area" value="200.0" unit="m2"/>
+                  <!-- 合并后小于此面积的面要素删除 -->
+                  <param name="preserve_structure" value="true"/>
+                  <!-- 保持建筑群整体轮廓形状特征 -->
+                  <param name="structure_preserve_weight" value="0.7"/>
+                  <!-- 结构保持权重(0~1), 越大越保守 -->
+
+                  <!-- 语义规则: 按 ClassID 分类合并 -->
+                  <semantic_rules>
+                      <rule field="ClassID" value_prefix="2307" action="merge"/>
+                      <!-- 2307xx 类建筑物 →可以合并 -->
+                      <rule field="ClassID" value_prefix="2308" action="separate"/>
+                      <!-- 2308xx 类 →不参与合并, 保持边界 -->
+                      <rule field="Function" value="学校" action="protect"/>
+                      <!-- 学校 →保护, 不合并也不被覆盖 -->
+                  </semantic_rules>
+
+                  <!-- 网状约束: 道路网作为合并边界 -->
+                  <network_constraints>
+                      <constraint layer_type="a_tra" distance="5.0" unit="m"/>
+                      <!-- 道路(a_tra)要素 5m 内 →建筑不可跨越 -->
+                      <constraint layer_type="a_pip" distance="3.0" unit="m"/>
+                      <!-- 管线(a_pip)要素 3m 内 →不可跨越 -->
+                  </network_constraints>
+              </algorithm>
+
+              <!-- 2b. 水系图斑合并 -->
+              <algorithm name="WaterMerge" class="WaterMergeAlgorithm">
+                  <param name="merge_distance" value="20.0" unit="m"/>
+                  <param name="min_area" value="500.0" unit="m2"/>
+                  <param name="preserve_shoreline_detail" value="true"/>
+                  <param name="simplify_tolerance" value="50.0" unit="m"/>
+                  <!-- 合并后简化岸线, 删除小于此值的弯曲 -->
+              </algorithm>
+
+              <!-- 2c. 植被图斑合并 -->
+              <algorithm name="VegetationMerge" class="VegetationMergeAlgorithm">
+                  <param name="merge_distance" value="15.0" unit="m"/>
+                  <param name="min_area" value="1000.0" unit="m2"/>
+                  <semantic_rules>
+                      <rule field="ClassID" value_prefix="0612" action="merge"/>
+                      <rule field="ClassID" value_prefix="0613" action="separate"/>
+                  </semantic_rules>
+              </algorithm>
+          </stage>
+
+
+          <!-- ========================================================
+            Stage 3: 全要素协调化简 (能力4)
+
+            目的: 同时对点/线/面要素进行简化,
+                  保持不同要素类型之间的拓扑一致性
+                  (面之间不重叠/不留缝隙, 线与面边界对齐)
+          ======================================================== -->
+          <stage id="simplify" name="协调化简" enabled="true">
+              <description>Douglas-Peucker + Visvalingam + 拓扑约束联合化简</description>
+
+              <!-- 3a. 线要素简化 (道路/水系/境界线) -->
+              <algorithm name="LineSimplification" class="LineSimplificationAlgorithm">
+                  <param name="algorithm" value="douglas_peucker"/>
+                  <!-- douglas_peucker | visvalingam | wang_muller -->
+                  <param name="tolerance" value="5.0" unit="m"/>
+                  <!-- DP 算法的简化容差, 按目标比例尺换算 -->
+                  <param name="preserve_endpoints" value="true"/>
+                  <!-- 保持线要素端点 -->
+                  <param name="preserve_intersections" value="true"/>
+                  <!-- 保持与其他要素的交点 -->
+
+                  <!-- 按要素类型分别设置容差 -->
+                  <per_layer>
+                      <layer type="a_tra">
+                          <param name="tolerance" value="3.0" unit="m"/>
+                          <!-- 道路 →较保守, 保持弯曲 -->
+                      </layer>
+                      <layer type="a_pip">
+                          <param name="tolerance" value="8.0" unit="m"/>
+                          <!-- 管线 →较大容差 -->
+                      </layer>
+                  </per_layer>
+              </algorithm>
+
+              <!-- 3b. 面要素简化 + 拓扑保持 -->
+              <algorithm name="PolygonSimplification" class="PolygonSimplificationAlgorithm">
+                  <param name="algorithm" value="douglas_peucker"/>
+                  <param name="tolerance" value="5.0" unit="m"/>
+                  <param name="preserve_topology" value="true"/>
+                  <!-- 关键: 简化后保证面之间不重叠、不留缝隙 -->
+                  <param name="min_area" value="100.0" unit="m2"/>
+                  <!-- 简化后面积小于此值的面合并到相邻面 -->
+                  <param name="shared_boundary_align" value="true"/>
+                  <!-- 对齐共享边界 -->
+              </algorithm>
+
+              <!-- 3c. 点要素选取 -->
+              <algorithm name="PointSelection" class="PointSelectionAlgorithm">
+                  <param name="method" value="importance"/>
+                  <!-- importance(按重要性) | grid(按格网) | density(按密度) -->
+                  <param name="importance_field" value="AdminLevel"/>
+                  <param name="grid_size" value="200.0" unit="m"/>
+                  <param name="min_distance" value="50.0" unit="m"/>
+                  <!-- 点间最小间距 -->
+              </algorithm>
+          </stage>
+
+
+          <!-- ========================================================
+            Stage 4: 六大类要素分要素缩编 (能力1)
+
+            目的: 按要素大类 (A~F/J/L/M/N) 分别进行
+                  选取/化简/概括/移位, 各要素有独立的处理策略
+          ======================================================== -->
+          <stage id="select" name="分要素缩编" enabled="true">
+              <description>按要素大类独立处理: 选取—化简—概括—位移</description>
+
+              <!-- 4a. D类 (陆地交通/路网) 缩编 -->
+              <algorithm name="RoadNetworkThin" class="RoadNetworkThinAlgorithm">
+                  <param name="min_length" value="50.0" unit="m"/>
+                  <!-- 短于此值的支路删除 -->
+                  <param name="deadend_prune" value="true"/>
+                  <!-- 剪除死胡同 -->
+                  <param name="roundabout_collapse" value="true"/>
+                  <!-- 环岛简化为单节点 -->
+                  <param name="dual_carriageway_collapse" value="false"/>
+                  <!-- 双线路 →单线 (目标比例尺较大时开启) -->
+                  <param name="preserve_connectivity" value="true"/>
+                  <!-- 保持路网连通性 (关键!) -->
+                  <param name="importance_field" value="ClassID"/>
+                  <!-- 按等级选取: 国道>省道>县道>乡道>小路 -->
+                  <select_rules>
+                      <rule field="ClassID" value_prefix="4201" min_length="0"/>
+                      <!-- 国道 →全部保留 -->
+                      <rule field="ClassID" value_prefix="4203" min_length="200.0"/>
+                      <!-- 省道下限 200m -->
+                      <rule field="ClassID" value_prefix="4205" min_length="500.0"/>
+                      <!-- 县道下限 500m -->
+                  </select_rules>
+              </algorithm>
+
+              <!-- 4b. A类 (建筑) 缩编 -->
+              <algorithm name="BuildingSelect" class="BuildingSelectAlgorithm">
+                  <param name="method" value="importance_area"/>
+                  <param name="min_area" value="150.0" unit="m2"/>
+                  <param name="importance_field" value="ClassID"/>
+                  <param name="typification" value="true"/>
+                  <!-- 典型化: 删除个体建筑, 保留建筑群形状特征 -->
+                  <param name="typification_grid" value="100.0" unit="m"/>
+              </algorithm>
+
+              <!-- 4c. F类 (水系) 缩编 -->
+              <algorithm name="HydroNetworkSimplify" class="HydroNetworkSimplifyAlgorithm">
+                  <param name="min_river_length" value="100.0" unit="m"/>
+                  <param name="min_lake_area" value="2000.0" unit="m2"/>
+                  <param name="braided_stream_collapse" value="true"/>
+                  <!-- 辫状水系 →单一河道 -->
+                  <param name="preserve_flow_direction" value="true"/>
+              </algorithm>
+
+              <!-- 4d. C类 (居民地) 缩编 -->
+              <algorithm name="SettlementGeneralize" class="SettlementGeneralizeAlgorithm">
+                  <param name="min_area" value="500.0" unit="m2"/>
+                  <param name="merge_distance" value="30.0" unit="m"/>
+                  <param name="outer_boundary_simplify" value="true"/>
+              </algorithm>
+
+              <!-- 4e. J类 (地貌/土质) 缩编 -->
+              <algorithm name="LandformSimplify" class="LandformSimplifyAlgorithm">
+                  <param name="min_contour_interval" value="10.0" unit="m"/>
+                  <param name="min_area" value="5000.0" unit="m2"/>
+              </algorithm>
+
+              <!-- 4f. M类 (政区) / N类 (自然地物) 缩编 -->
+              <algorithm name="BoundarySimplify" class="BoundarySimplifyAlgorithm">
+                  <param name="tolerance" value="20.0" unit="m"/>
+              </algorithm>
+          </stage>
+
+
+          <!-- ========================================================
+            Stage 5: 综合缩编后冲突识别与处理 (能力5)
+
+            目的: 检测缩编后出现的空间冲突 (叠盖/压盖/间隙/
+                  位置冲突/符号冲突), 并通过位移/收缩/膨胀修复
+          ======================================================== -->
+          <stage id="conflict" name="冲突检测与处理" enabled="true">
+              <description>缩编后空间冲突自动识别 + 位移/压缩/膨胀修复</description>
+
+              <!-- 5a. 符号化冲突检测 (考虑线宽+注记占位) -->
+              <algorithm name="SymbolConflictDetect" class="SymbolConflictDetectAlgorithm">
+                  <param name="line_symbol_width" value="0.3" unit="mm"/>
+                  <!-- 线符号在目标比例尺下的宽度(mm) 换算到实地 -->
+                  <param name="label_buffer" value="2.0" unit="mm"/>
+                  <!-- 注记缓冲区 -->
+              </algorithm>
+
+              <!-- 5b. 几何冲突检测 -->
+              <algorithm name="GeometryConflictDetect" class="GeometryConflictDetectAlgorithm">
+                  <param name="min_gap" value="0.2" unit="mm"/>
+                  <!-- 目标比例尺下可辨识最小间距(图上mm) -->
+                  <param name="min_overlap_area" value="0.5" unit="mm2"/>
+                  <!-- 可容忍最小重叠面积 -->
+              </algorithm>
+
+              <!-- 5c. 位移解决 (道路/建筑冲突) -->
+              <algorithm name="DisplacementResolve" class="DisplacementResolveAlgorithm">
+                  <param name="method" value="least_squares"/>
+                  <!-- least_squares(最小二乘) | beam(梁弯曲模型) -->
+                  <param name="max_displacement" value="50.0" unit="m"/>
+                  <!-- 最大允许位移量 -->
+                  <param name="conflict_pairs">
+                      <pair aggressor="a_tra" victim="a_bld" buffer="5.0" unit="m"/>
+                      <!-- 道路(a_tra)扩展 →压盖建筑(a_bld) →建筑位移 -->
+                      <pair aggressor="a_pip" victim="a_bld" buffer="3.0" unit="m"/>
+                  </param>
+              </algorithm>
+
+              <!-- 5d. 面的膨胀/收缩 -->
+              <algorithm name="PolygonAdjust" class="PolygonAdjustAlgorithm">
+                  <param name="min_separation" value="0.3" unit="mm"/>
+                  <param name="edge_snap" value="true"/>
+                  <!-- 收缩后面边界吸附到道路/河流边界 -->
+              </algorithm>
+
+              <!-- 5e. 冲突报告输出 -->
+              <algorithm name="ConflictReport" class="ConflictReportAlgorithm">
+                  <param name="output_format" value="SHP"/>
+                  <param name="include_resolved" value="true"/>
+                  <!-- 是否输出已解决的冲突 -->
+              </algorithm>
+          </stage>
+
+      </pipeline>
+
+  </generalization_pipeline>

@@ -1,0 +1,28 @@
+# ===== Visual Studio / MSVC 构建 =====
+.vs/
+x64/
+Release/
+Debug/
+*.user
+*.suo
+*.bak
+ipch/
+
+# ===== Qt uic/moc 生成物（vcxproj 编译时自动重新生成）=====
+GeneratedFiles/
+
+# ===== 本地备份目录（历史快照，不入库）=====
+_backup_*/
+.backup_metadata_*/
+
+# ===== 内部文档（非代码，不建议公开）=====
+修改建议.txt
+
+# ===== 编译临时产物 =====
+*.obj
+*.pdb
+*.lib
+*.exp
+*.idb
+*.tlog
+*.log

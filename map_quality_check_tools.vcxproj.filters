@@ -1,0 +1,380 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="ui">
+      <UniqueIdentifier>{25892368-3649-44bc-88a6-71b518f4a5a6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{f7355d6c-0eb7-4db2-b77a-f1c1010dbfe8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{5ee82520-890a-4d8e-b4e3-21161da8af18}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ui_class">
+      <UniqueIdentifier>{b547eb9b-f15e-48fa-94f1-42a343e8d903}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Generated Files">
+      <UniqueIdentifier>{f4a0fcee-b3bb-4cd9-809a-935f680da54a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ui_task">
+      <UniqueIdentifier>{56e04bad-3399-48ec-b95e-19baf2144b94}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="config">
+      <UniqueIdentifier>{c1a2b3d4-e5f6-7890-abcd-ef1234567890}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <!-- ClCompile -->
+    <Filter Include="database">
+      <UniqueIdentifier>{a1b2c3d4-e5f6-7890-abcd-ef1234567891}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core">
+      <UniqueIdentifier>{b2c3d4e5-f6a7-8901-bcde-f12345678912}</UniqueIdentifier>
+    </Filter>
+
+  <ItemGroup>
+    <ClCompile Include="map_quality_check_tools.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_vector_format_conversion.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_task\se_geojson2shp.cpp">
+      <Filter>ui_task</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_map_quality_check_tools.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_se_geojson2shp.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_se_vector_format_conversion.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_generalization_config_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_layer_type_select_dialog.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_data_import.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_se_metadata_viewer.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_se_auto_quality_check.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\layer_type_select_dialog.cpp" />
+    <ClCompile Include="ui_class\generalization_config_dialog.cpp" />
+    <ClCompile Include="ui_class\se_data_import.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_metadata_viewer.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_auto_quality_check.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_mission453_check.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_mission454_check.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_mission455_check.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_mission456_check.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_mission457_check.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_mission458_check.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_mission459_check.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_db_manager.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\geo_algorithm_h\vector\cse_generalization.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_map_check_backup_manager.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_backup_strategy_edit_dialog.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_se_data_restore.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_se_database_connection.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_se_data_management.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_se_data_export.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_map_tool_extent_picker.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="map_check_backup_manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_data_restore.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_database_connection.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_data_management.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_data_export.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\map_tool_extent_picker.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\backup_strategy_edit_dialog.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <!-- 地图成果管理 MOC -->
+    <ClCompile Include="GeneratedFiles\Release\moc_db_config_dialog.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_login_dialog.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_product_storage_dialog.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_metadata_manager_dialog.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_access_control_dialog.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_product_dao.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_schema_manager.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_metadata_extractor.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_file_storage_manager.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <!-- 地图成果管理 UI -->
+    <ClCompile Include="ui_class\db_config_dialog.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\login_dialog.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\product_storage_dialog.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\metadata_manager_dialog.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\access_control_dialog.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="database\postgis_connector.cpp">
+      <Filter>database</Filter>
+    </ClCompile>
+    <ClCompile Include="database\product_metadata.cpp">
+      <Filter>database</Filter>
+    </ClCompile>
+    <ClCompile Include="database\product_dao.cpp">
+      <Filter>database</Filter>
+    </ClCompile>
+    <ClCompile Include="database\schema_manager.cpp">
+      <Filter>database</Filter>
+    </ClCompile>
+    <ClCompile Include="core\metadata_extractor.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="core\file_storage_manager.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_gdb_layer_selector_dialog.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_calendar_helper.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_data_importer.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\gdb_layer_selector_dialog.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="core\calendar_helper.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="core\data_importer.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <!-- QRC -->
+  <ItemGroup>
+    <None Include="map_quality_check_tools.qrc">
+      <Filter>Source Files</Filter>
+    </None>
+  </ItemGroup>
+  <!-- CustomBuild (MOC + UIC) -->
+  <ItemGroup>
+    <CustomBuild Include="map_quality_check_tools.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\se_vector_format_conversion.h">
+      <Filter>ui_class</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_task\se_geojson2shp.h">
+      <Filter>ui_task</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui\vector_format_conversion.ui">
+      <Filter>ui</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\layer_type_select_dialog.h" />
+    <CustomBuild Include="ui_class\generalization_config_dialog.h" />
+    <CustomBuild Include="ui_class\se_data_import.h">
+      <Filter>ui_class</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\se_metadata_viewer.h">
+      <Filter>ui_class</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\se_auto_quality_check.h">
+      <Filter>ui_class</Filter>
+    </CustomBuild>
+    
+    <CustomBuild Include="map_check_backup_manager.h" />
+    <CustomBuild Include="ui_class\backup_strategy_edit_dialog.h" />
+    <CustomBuild Include="ui_class\se_data_restore.h" />
+    <CustomBuild Include="ui_class\se_database_connection.h" />
+    <CustomBuild Include="ui_class\se_data_management.h" />
+    <CustomBuild Include="ui_class\se_data_export.h" />
+    <CustomBuild Include="ui_class\map_tool_extent_picker.h" />
+    <CustomBuild Include="ui\auto_quality_check.ui">
+      <Filter>ui</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui\data_restore.ui">
+      <Filter>ui</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui\database_connection.ui">
+      <Filter>ui</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui\data_management.ui">
+      <Filter>ui</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui\data_export.ui">
+      <Filter>ui</Filter>
+    </CustomBuild>
+    <!-- 地图成果管理 MOC -->
+    <CustomBuild Include="ui_class\db_config_dialog.h">
+      <Filter>ui_class</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\login_dialog.h">
+      <Filter>ui_class</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\product_storage_dialog.h">
+      <Filter>ui_class</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\metadata_manager_dialog.h">
+      <Filter>ui_class</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\access_control_dialog.h">
+      <Filter>ui_class</Filter>
+    </CustomBuild>
+    <CustomBuild Include="database\postgis_connector.h">
+      <Filter>database</Filter>
+    </CustomBuild>
+    <CustomBuild Include="database\product_dao.h">
+      <Filter>database</Filter>
+    </CustomBuild>
+    <CustomBuild Include="database\schema_manager.h">
+      <Filter>database</Filter>
+    </CustomBuild>
+    <CustomBuild Include="core\metadata_extractor.h">
+      <Filter>core</Filter>
+    </CustomBuild>
+    <CustomBuild Include="core\file_storage_manager.h">
+      <Filter>core</Filter>
+    </CustomBuild>
+    <!-- 地图成果管理 UIC -->
+    <CustomBuild Include="ui_class\db_config_dialog.ui">
+      <Filter>ui</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\login_dialog.ui">
+      <Filter>ui</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\product_storage_dialog.ui">
+      <Filter>ui</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\metadata_manager_dialog.ui">
+      <Filter>ui</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\access_control_dialog.ui">
+      <Filter>ui</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\gdb_layer_selector_dialog.h">
+      <Filter>ui_class</Filter>
+    </CustomBuild>
+    <CustomBuild Include="core\calendar_helper.h">
+      <Filter>core</Filter>
+    </CustomBuild>
+    <CustomBuild Include="core\data_importer.h">
+      <Filter>core</Filter>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\gdb_layer_selector_dialog.ui">
+      <Filter>ui</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <!-- ClInclude -->
+  <ItemGroup>
+    <ClInclude Include="GeneratedFiles\Release\ui_vector_format_conversion.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    
+    <ClInclude Include="GeneratedFiles\Release\ui_data_restore.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratedFiles\Release\ui_database_connection.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratedFiles\Release\ui_data_management.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratedFiles\Release\ui_data_export.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratedFiles\Release\ui_auto_quality_check.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <!-- 地图成果管理 UIC headers -->
+    <ClInclude Include="GeneratedFiles\Release\ui_db_config_dialog.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratedFiles\Release\ui_login_dialog.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratedFiles\Release\ui_product_storage_dialog.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratedFiles\Release\ui_metadata_manager_dialog.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratedFiles\Release\ui_access_control_dialog.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratedFiles\Release\ui_gdb_layer_selector_dialog.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

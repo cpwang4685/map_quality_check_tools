@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--检查矢量数据图层属性字段的正确性，以及几何有效性-->
+<data_attribute_check>
+	<!--数据标准-->
+	<data_spec>GJB 5068-2004</data_spec>
+
+	<!--数据格式-->
+	<data_format>SHP、GDB</data_format>
+
+	<!--
+	============================================================
+	属性字段检查：按图层逐一配置字段校验规则
+	每个 <layer_fields> 定义了一个图层的字段 schema
+	============================================================
+	-->
+	<!--
+	<layer_fields>
+		<layer_name>图层名（如 110000、JT_TL 等）</layer_name>
+		<fields>
+			<field_name>字段名</field_name>
+			<field_idx>字段序号（从0开始）</field_idx>
+			<field_type>字段类型（int / string / float）</field_type>
+			<field_desc>字段描述</field_desc>
+			<field_required>required（必填）或留空（非必填）</field_required>
+			<field_length>字段长度（如 10 或 10.2）</field_length>
+			<field_unit>单位（如 米）</field_unit>
+			<field_allow_Null>yes（允许NULL）或 no（不允许NULL）</field_allow_Null>
+			<default_value>默认值</default_value>
+			<field_enum_values_list_simple>
+				<field_enum_values>枚举值1</field_enum_values>
+				<field_enum_values>枚举值2</field_enum_values>
+			</field_enum_values_list_simple>
+			<field_enum_multiply>no</field_enum_multiply>
+			<field_split_list />
+		</fields>
+	</layer_fields>
+	-->
+
+	<!--
+	============================================================
+	几何有效性检查：空几何和无效几何由 XML 规则驱动
+	============================================================
+	-->
+	<geometry_check enabled="true">
+		<!-- 空几何检查：几何为 NULL 或 EMPTY -->
+		<rule name="empty_geometry" enabled="true">
+			<description>检查要素几何是否为空（NULL 或 EMPTY）</description>
+		</rule>
+		<!-- 无效几何检查：调用 QGIS validateGeometry 进行综合几何校验 -->
+		<rule name="invalid_geometry" enabled="true">
+			<description>检查要素几何是否有效（自相交、环方向错误、非法节点、非闭合环等）</description>
+		</rule>
+
+		<!-- ===== 后续扩展预留（暂不启用） ===== -->
+		<!--
+		<rule name="sliver_polygon" enabled="false">
+			<description>碎面检查（面积小于阈值的面要素）</description>
+			<param name="min_area" value="1.0" unit="平方米" />
+		</rule>
+		<rule name="dangle_node" enabled="false">
+			<description>悬挂点检查（线端点未连接到其他线要素）</description>
+			<param name="tolerance" value="0.01" unit="米" />
+		</rule>
+		<rule name="duplicate_geometry" enabled="false">
+			<description>重复几何检查（两个要素几何完全重合）</description>
+		</rule>
+		-->
+	</geometry_check>
+
+</data_attribute_check>
