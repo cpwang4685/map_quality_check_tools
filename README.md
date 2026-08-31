@@ -96,4 +96,4 @@ make
 
 ## License
 
-（请在此填写你的开源许可证，例如 MIT / Apache-2.0）
+MIT 
