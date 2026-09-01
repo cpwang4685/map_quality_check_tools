@@ -398,6 +398,7 @@ set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
     <ClCompile Include="ui_task\se_format_convert_task.cpp" />
     <ClCompile Include="ui_task\se_wuji_xml_generator.cpp" />
     <ClCompile Include="ui_task\se_nmo_sdk_bridge.cpp" />
+    <ClCompile Include="ui_task\se_edge_merge_bridge.cpp" />
     <ClCompile Include="ui_task\se_wuji_process_runner.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_gdb_layer_selector_dialog.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_calendar_helper.cpp" />
@@ -675,6 +676,8 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClInclude Include="GeneratedFiles\Release\ui_merge_dialog.h" />
     <ClInclude Include="GeneratedFiles\Release\ui_format_conversion.h" />
     <ClInclude Include="GeneratedFiles\Release\ui_auto_edge_match.h" />
+    <ClInclude Include="ui_class\src_select_dialog.h" />
+    <ClInclude Include="ui_task\se_edge_merge_bridge.h" />
     <ClInclude Include="GeneratedFiles\Release\ui_scale_selector_dialog.h" />
     <ClInclude Include="GeneratedFiles\Release\ui_mapdata_download.h" />
     <!-- 已有 MOC 头文件 -->

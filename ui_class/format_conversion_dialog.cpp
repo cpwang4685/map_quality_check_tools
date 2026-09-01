@@ -172,6 +172,10 @@ FormatConversionDialog::FormatConversionDialog(QWidget* parent, Qt::WindowFlags 
     mBtnResetName = new QPushButton(QStringLiteral("↺"), this);
     mBtnResetName->setMaximumWidth(28);
     mBtnResetName->setToolTip(tr("重置为默认名称"));
+    // 平台深色 QSS 给 QPushButton 加 padding(7px 16px)+min-height，28px 宽的符号按钮
+    // 内容区被压没导致 ↺ 图案截断；widget 级局部样式仅清内边距、定字号，
+    // 渐变背景/边框/悬停效果保持不变（与 merge_dialog 小符号按钮同款处理）。
+    mBtnResetName->setStyleSheet(QStringLiteral("QPushButton { padding: 0px; font-size: 15px; }"));
     ui.gridLayout_io->addWidget(mBtnResetName, 5, 1);
     connect(mBtnResetName, &QPushButton::clicked, this, &FormatConversionDialog::resetAllNames);
 

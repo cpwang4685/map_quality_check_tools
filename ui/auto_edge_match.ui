@@ -6,194 +6,231 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>780</width>
-    <height>500</height>
+    <width>1020</width>
+    <height>990</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>接边</string>
   </property>
-  <layout class="QVBoxLayout" name="mainLayout">
-   <property name="spacing"><number>8</number></property>
-   <!-- 输入数据集（无极模式） -->
+  <layout class="QVBoxLayout" name="verticalLayout_root">
    <item>
-    <layout class="QHBoxLayout" name="layout_inputHeader">
-     <item>
-      <widget class="QLabel" name="label_inputDatasets">
-       <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
-       <property name="text"><string>输入数据集</string></property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="lineEdit_inputDataset"/>
-     </item>
-     <item>
-      <widget class="QPushButton" name="pushButton_browseInput">
-       <property name="text"><string>...</string></property>
-       <property name="maximumSize"><size><width>32</width><height>16777215</height></size></property>
-       <property name="toolTip"><string>添加输入矢量文件</string></property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <!-- 数据集列表 + 操作按钮 -->
-   <item>
-    <layout class="QHBoxLayout" name="layout_datasetList">
-     <item>
-      <widget class="QListWidget" name="listWidget_datasets">
-       <property name="minimumSize"><size><width>0</width><height>100</height></size></property>
-       <property name="maximumSize"><size><width>16777215</width><height>160</height></size></property>
-       <property name="alternatingRowColors"><bool>true</bool></property>
-      </widget>
-     </item>
-     <item>
-      <layout class="QVBoxLayout" name="layout_datasetButtons">
-       <item>
-        <widget class="QPushButton" name="pushButton_addDataset">
-         <property name="text"><string>+</string></property>
-         <property name="minimumSize"><size><width>32</width><height>32</height></size></property>
-         <property name="maximumSize"><size><width>32</width><height>32</height></size></property>
-         <property name="toolTip"><string>新增图层</string></property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="pushButton_removeDataset">
-         <property name="text"><string>×</string></property>
-         <property name="minimumSize"><size><width>32</width><height>32</height></size></property>
-         <property name="maximumSize"><size><width>32</width><height>32</height></size></property>
-         <property name="toolTip"><string>删除选中图层</string></property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="pushButton_moveUp">
-         <property name="text"><string>↑</string></property>
-         <property name="minimumSize"><size><width>32</width><height>32</height></size></property>
-         <property name="maximumSize"><size><width>32</width><height>32</height></size></property>
-         <property name="toolTip"><string>上移选中图层</string></property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="pushButton_moveDown">
-         <property name="text"><string>↓</string></property>
-         <property name="minimumSize"><size><width>32</width><height>32</height></size></property>
-         <property name="maximumSize"><size><width>32</width><height>32</height></size></property>
-         <property name="toolTip"><string>下移选中图层</string></property>
-        </widget>
-       </item>
-       <item>
-        <spacer name="verticalSpacer_datasetBtns">
-         <property name="orientation"><enum>Qt::Vertical</enum></property>
-        </spacer>
-       </item>
-      </layout>
-     </item>
-    </layout>
-   </item>
-   <!-- 无极 EXE 路径 -->
-   <item>
-    <layout class="QHBoxLayout" name="layout_wujiExePath">
-     <item>
-      <widget class="QLabel" name="label_wujiExePath">
-       <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
-       <property name="text"><string>无极EXE路径</string></property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="lineEdit_wujiExePath"/>
-     </item>
-     <item>
-      <widget class="QPushButton" name="pushButton_browseExe">
-       <property name="text"><string>...</string></property>
-       <property name="maximumSize"><size><width>32</width><height>16777215</height></size></property>
-       <property name="toolTip"><string>选择 MapBatchProcessing.exe</string></property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <!-- 无极参数面板占位 -->
-   <item>
-    <widget class="QWidget" name="widget_paramPlaceholder">
-     <layout class="QVBoxLayout" name="layout_paramPlaceholder">
-      <property name="leftMargin"><number>0</number></property>
-      <property name="topMargin"><number>0</number></property>
-      <property name="rightMargin"><number>0</number></property>
-      <property name="bottomMargin"><number>0</number></property>
+    <widget class="QGroupBox" name="groupBox_input">
+     <property name="title">
+      <string>输入数据</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_input">
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_btns">
+        <item>
+         <widget class="QPushButton" name="pushButton_addData">
+          <property name="text">
+           <string>添加数据</string>
+          </property>
+          <property name="toolTip">
+           <string>打开选择窗口，同时勾选要添加的文件和文件夹（勾选文件夹＝整个文件夹递归参与）</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButton_removeDataset">
+          <property name="text">
+           <string>移除</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer_btns">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QListWidget" name="listWidget_datasets"/>
+      </item>
      </layout>
     </widget>
    </item>
-   <!-- 输出数据集 -->
    <item>
-    <layout class="QHBoxLayout" name="layout_outputDataset">
-     <item>
-      <widget class="QLabel" name="label_outputDataset">
-       <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
-       <property name="text"><string>输出数据集</string></property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="lineEdit_outputDataset"/>
-     </item>
-     <item>
-      <widget class="QPushButton" name="pushButton_browseOutput">
-       <property name="text"><string>...</string></property>
-       <property name="maximumSize"><size><width>32</width><height>16777215</height></size></property>
-       <property name="toolTip"><string>选择输出保存位置</string></property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <!-- 日志路径 -->
-   <item>
-    <layout class="QHBoxLayout" name="layout_logPath">
-     <item>
-      <widget class="QLabel" name="label_logPath">
-       <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
-       <property name="text"><string>日志路径</string></property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="lineEdit_logPath"/>
-     </item>
-     <item>
-      <widget class="QComboBox" name="comboBox_logLevel">
-       <property name="minimumSize"><size><width>60</width><height>0</height></size></property>
-       <item><property name="text"><string>错误</string></property></item>
-       <item><property name="text"><string>信息</string></property></item>
-       <item><property name="text"><string>调试</string></property></item>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="pushButton_browseLog">
-       <property name="text"><string>...</string></property>
-       <property name="maximumSize"><size><width>32</width><height>16777215</height></size></property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <!-- 进度条 -->
-   <item>
-    <widget class="QProgressBar" name="progressBar">
-     <property name="value"><number>0</number></property>
+    <widget class="QGroupBox" name="groupBox_param">
+     <property name="title">
+      <string>接边参数</string>
+     </property>
+     <layout class="QFormLayout" name="formLayout_param">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_field">
+        <property name="text">
+         <string>匹配字段:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="comboBox_field">
+        <property name="editable">
+         <bool>true</bool>
+        </property>
+        <property name="toolTip">
+         <string>两块数据中字段值相同的要素才会接边；选"（不按属性，空间邻近）"则不需要字段，边界带内几何相接的要素即可接边</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_distance">
+        <property name="text">
+         <string>缓冲距离:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QDoubleSpinBox" name="doubleSpinBox_distance">
+        <property name="suffix">
+         <string> 米</string>
+        </property>
+        <property name="decimals">
+         <number>1</number>
+        </property>
+        <property name="minimum">
+         <double>0.100000000000000</double>
+        </property>
+        <property name="maximum">
+         <double>100000.000000000000000</double>
+        </property>
+        <property name="value">
+         <double>50.000000000000000</double>
+        </property>
+        <property name="toolTip">
+         <string>边界两侧在此距离内的同名要素才会接边（默认50米；1:25万及以上大图幅输入自动采用250米）</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
-   <!-- 底部按钮栏 -->
    <item>
-    <layout class="QHBoxLayout" name="layout_bottomButtons">
+    <widget class="QGroupBox" name="groupBox_output">
+     <property name="title">
+      <string>输出</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_output">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_resultPath">
+        <property name="text">
+         <string>结果保存路径:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLineEdit" name="lineEdit_resultPath">
+        <property name="toolTip">
+         <string>接边结果库与检测报告将保存到此目录（默认第一个数据所在目录），日志默认跟随此目录</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="2">
+       <widget class="QPushButton" name="pushButton_browseResult">
+        <property name="text">
+         <string>浏览</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_logPath">
+        <property name="text">
+         <string>日志保存路径:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLineEdit" name="lineEdit_logPath">
+        <property name="toolTip">
+         <string>默认与结果保存路径一致，可单独修改（手动修改后不再跟随）</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="2">
+       <widget class="QPushButton" name="pushButton_browseLog">
+        <property name="text">
+         <string>浏览</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QProgressBar" name="progressBar">
+     <property name="value">
+      <number>0</number>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupBox_report">
+     <property name="title">
+      <string>接边检测报告</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_report">
+      <item>
+       <widget class="QLabel" name="label_reportSummary">
+        <property name="text">
+         <string>尚未执行接边</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QTableWidget" name="tableWidget_report"/>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_bottom">
      <item>
       <spacer name="horizontalSpacer_bottom">
-       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="pushButton_ok">
-       <property name="text"><string>执行接边</string></property>
-       <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
+      <widget class="QPushButton" name="pushButton_run">
+       <property name="autoDefault">
+        <bool>false</bool>
+       </property>
+       <property name="default">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>执行接边</string>
+       </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="pushButton_cancel">
-       <property name="text"><string>关闭</string></property>
-       <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
+      <widget class="QPushButton" name="pushButton_close">
+       <property name="autoDefault">
+        <bool>false</bool>
+       </property>
+       <property name="default">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>关闭</string>
+       </property>
       </widget>
      </item>
     </layout>
