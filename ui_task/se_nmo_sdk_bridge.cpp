@@ -8,6 +8,8 @@
 #include <QDateTime>
 #include <QSettings>
 #include <QTextStream>
+#include <QTextCodec>
+#include <QVector>
 
 #include <gdal_priv.h>
 #include <ogrsf_frmts.h>
@@ -502,129 +504,129 @@ static bool dbfRawIsUtf8(const QString& shpPath)
     return cjk >= nonCjk;
 }
 
+// DBF 字节级重编码：把字段名与字符字段值从 UTF-8 重编码为 GBK，就地改写 DBF 文件。
+// 不依赖 GDAL 运行时重编码——GDAL 的 ENCODING=GBK 在 LTZK 进程内实测不可靠
+// （normalizeOutputToGbk 的 _cp936 中间产物仍是 UTF-8 字节原样透传，独立进程
+// 却正常，属进程级 GDAL 编码环境差异）。字节级转码用 Qt 完成，进程无关、确定可靠。
+// UTF-8→GBK 每个汉字 3 字节→2 字节，只变短或等长，就地改写安全；字符字段值
+// 多余长度以空格补齐，字段名剩余以 \0 补齐。
+static bool dbfReencodeUtf8ToGbk(const QString& shpPath)
+{
+    QFileInfo fi(shpPath);
+    QString dbfPath = fi.absolutePath() + QStringLiteral("/") + fi.completeBaseName()
+                      + QStringLiteral(".dbf");
+    QFile f(dbfPath);
+    if (!f.open(QIODevice::ReadOnly)) {
+        log() << "  dbf open READ FAILED: " << dbfPath << "\n";
+        return false;
+    }
+    QByteArray d = f.readAll();
+    f.close();
+    if (d.size() < 33) {
+        log() << "  dbf too small: " << d.size() << "\n";
+        return false;
+    }
+
+    int headerLen = (unsigned char)d[8] | ((unsigned char)d[9] << 8);
+    int recLen    = (unsigned char)d[10] | ((unsigned char)d[11] << 8);
+    if (headerLen < 33 || headerLen > d.size() || recLen < 1) {
+        log() << "  dbf header invalid: headerLen=" << headerLen << " recLen=" << recLen << "\n";
+        return false;
+    }
+    int nFields = (headerLen - 33) / 32;
+    if (nFields < 1) {
+        log() << "  no fields\n";
+        return true;
+    }
+
+    QTextCodec* gbk = QTextCodec::codecForName("GBK");
+    if (!gbk) {
+        log() << "  no GBK QTextCodec\n";
+        return false;
+    }
+
+    struct Fld { int nameOff; int valOff; int len; bool isChar; };
+    QVector<Fld> flds;
+    int off = 32, valOff = 1;   // 记录首字节是删除标记，值从偏移 1 起
+    for (int k = 0; k < nFields; ++k, off += 32) {
+        int len = (unsigned char)d[off + 16];
+        char typ = (char)d[off + 11];
+        flds.push_back({ off, valOff, len, (typ == 'C' || typ == 'M') });
+        valOff += len;
+    }
+
+    bool changed = false;
+
+    // 1) 字段名 UTF-8 → GBK（11 字节定长，剩余补 \0）
+    for (auto& fd : flds) {
+        int i = 0;
+        while (i < 11 && d.at(fd.nameOff + i) != '\0') ++i;
+        if (i == 0) continue;
+        QByteArray name = d.mid(fd.nameOff, i);
+        QByteArray g = gbk->fromUnicode(QString::fromUtf8(name));
+        if (g.size() > 11) g = g.left(11);
+        QByteArray out = g + QByteArray(11 - g.size(), '\0');
+        if (out != d.mid(fd.nameOff, 11)) {
+            d.replace(fd.nameOff, 11, out);
+            changed = true;
+        }
+    }
+
+    // 2) 每条记录的字符字段值 UTF-8 → GBK（右补空格；非合法 UTF-8 值保持原样）
+    int nrec = (d.size() - headerLen) / recLen;
+    for (int r = 0; r < nrec; ++r) {
+        int base = headerLen + r * recLen;
+        for (auto& fd : flds) {
+            if (!fd.isChar) continue;
+            int p = base + fd.valOff;
+            int e = fd.len;
+            while (e > 0 && d[p + e - 1] == ' ') --e;
+            if (e == 0) continue;
+            QByteArray v = d.mid(p, e);
+            QString s = QString::fromUtf8(v);
+            if (s.contains(QChar(0xFFFD))) continue;   // 非法 UTF-8（如 GBK 值），不动
+            QByteArray g = gbk->fromUnicode(s);
+            if (g.size() > fd.len) g = g.left(fd.len);
+            QByteArray out = g + QByteArray(fd.len - g.size(), ' ');
+            if (out != v) {
+                d.replace(p, fd.len, out);
+                changed = true;
+            }
+        }
+    }
+
+    if (changed) {
+        QFile w(dbfPath);
+        if (!w.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            log() << "  dbf open WRITE FAILED\n";
+            return false;
+        }
+        w.write(d);
+        w.close();
+        log() << "  dbf byte re-encode UTF-8->GBK done\n";
+    } else {
+        log() << "  dbf byte re-encode: no change\n";
+    }
+    return true;
+}
+
 bool SeNmoSdkBridge::normalizeOutputToGbk(const QString& shpPath)
 {
     if (!QFileInfo::exists(shpPath))
         return false;
 
-    // SDK 输出编码不稳定：首次可能 GBK、后续 UTF-8。这里统一转成 GBK(CP936)。
+    // SDK 输出编码不稳定（镜像输入：GBK 或 UTF-8）。这里统一规范化为 GBK(CP936)。
     // GBK 是中文 Windows 下 QGIS 与 ArcGIS 都能正确识别的编码；ArcGIS 对 UTF-8
     // shapefile 支持差，且输出 DBF 的 LDID=0x57 会使其按 ANSI/GBK 误解码 UTF-8 字节。
+    // 转码用 DBF 字节级重编码（见 dbfReencodeUtf8ToGbk），不依赖 GDAL 运行时
+    // ENCODING=GBK（该机制在 LTZK 进程内实测失效）。
     bool srcIsUtf8 = dbfRawIsUtf8(shpPath);
     log() << "normalizeOutputToGbk: " << shpPath
           << " detected as " << (srcIsUtf8 ? "UTF-8" : "GBK") << "\n";
     logDbfSample(shpPath, "  src");
 
-    QFileInfo fi(shpPath);
-    QString dir = fi.absolutePath();
-    QString base = fi.completeBaseName();
-    QString tmpPath = dir + QStringLiteral("/") + base + QStringLiteral("_cp936.shp");
-
-    QDir d(dir);
-    QStringList stale = d.entryList(
-        QStringList() << (base + QStringLiteral("_cp936.*")), QDir::Files);
-    for (const QString& s : stale)
-        QFile::remove(dir + QStringLiteral("/") + s);
-
-    // 手工重编码：SDK 输出没有 .cpg 声明，若不强制编码，GDAL 会按系统 ANSI/GBK
-    // 误读 UTF-8 字节（UTF-8 字节被当 GBK 解→写回 GBK 后仍还原成原 UTF-8 字节，
-    // 表现为"没有重编码"）。这里按检测到的实际字节编码强制打开源，再用 ENCODING=GBK
-    // 新建目标并逐字段/逐要素拷贝，让 shapefile 驱动完成 UTF-8→GBK 重编码。
-    // （GDALVectorTranslate 的 "-oo/-lco" 参数形式在进程内调用时，因把源放在选项
-    // 位置参数里、目标放在 pszDest 参数里，会被当成"缺源"而报 "hSrcDS == NULL"；
-    // 手工 Copy 路径与 ogr2ogr -lco ENCODING=GBK 的行为一致，实测能正确重编码。）
-    const char* apszOpenOpts[2] = { nullptr, nullptr };
-    apszOpenOpts[0] = srcIsUtf8 ? "ENCODING=UTF-8" : "ENCODING=GBK";
-
-    GDALDataset* poSrc = (GDALDataset*)GDALOpenEx(
-        shpPath.toUtf8().constData(), GDAL_OF_VECTOR,
-        nullptr, apszOpenOpts, nullptr);
-    if (!poSrc) {
-        log() << "  GDALOpenEx src FAILED: " << CPLGetLastErrorMsg() << "\n";
-        return false;
-    }
-
-    OGRLayer* poSrcLayer = poSrc->GetLayer(0);
-    if (!poSrcLayer) {
-        log() << "  no layer in src\n";
-        GDALClose(poSrc);
-        return false;
-    }
-
-    GDALDriver* poDriver = GetGDALDriverManager()->GetDriverByName("ESRI Shapefile");
-    if (!poDriver) {
-        GDALClose(poSrc);
-        return false;
-    }
-
-    char* papszOpts[] = { (char*)"ENCODING=GBK", nullptr };
-    GDALDataset* poDst = poDriver->Create(
-        tmpPath.toUtf8().constData(), 0, 0, 0, GDT_Unknown, papszOpts);
-    if (!poDst) {
-        log() << "  Create dst FAILED: " << CPLGetLastErrorMsg() << "\n";
-        GDALClose(poSrc);
-        return false;
-    }
-
-    OGRLayer* poDstLayer = poDst->CreateLayer(
-        poSrcLayer->GetName(), poSrcLayer->GetSpatialRef(),
-        poSrcLayer->GetGeomType(), papszOpts);
-    if (!poDstLayer) {
-        log() << "  CreateLayer FAILED: " << CPLGetLastErrorMsg() << "\n";
-        GDALClose(poDst);
-        GDALClose(poSrc);
-        return false;
-    }
-
-    OGRFeatureDefn* poSrcDefn = poSrcLayer->GetLayerDefn();
-    int nFields = poSrcDefn->GetFieldCount();
-    for (int f = 0; f < nFields; ++f)
-        poDstLayer->CreateField(poSrcDefn->GetFieldDefn(f));
-
-    poSrcLayer->ResetReading();
-    OGRFeature* poSrcFeat;
-    while ((poSrcFeat = poSrcLayer->GetNextFeature()) != nullptr) {
-        OGRFeature* poDstFeat = OGRFeature::CreateFeature(
-            poDstLayer->GetLayerDefn());
-        if (poSrcFeat->GetGeometryRef())
-            poDstFeat->SetGeometry(poSrcFeat->GetGeometryRef());
-        for (int f = 0; f < nFields; ++f) {
-            if (!poSrcFeat->IsFieldSetAndNotNull(f)) {
-                if (poSrcDefn->GetFieldDefn(f)->GetType() == OFTString)
-                    poDstFeat->SetField(f, "");
-                continue;
-            }
-            if (poSrcDefn->GetFieldDefn(f)->GetType() == OFTString)
-                poDstFeat->SetField(f, poSrcFeat->GetFieldAsString(f));
-            else
-                poDstFeat->SetField(f, poSrcFeat->GetRawFieldRef(f));
-        }
-        poDstLayer->CreateFeature(poDstFeat);
-        OGRFeature::DestroyFeature(poDstFeat);
-        OGRFeature::DestroyFeature(poSrcFeat);
-    }
-
-    GDALClose(poDst);
-    GDALClose(poSrc);
-
-    // 诊断：重编码产物 _cp936 的原始字节（确认 GDALVectorTranslate 是否真的把
-    // UTF-8 转成了 GBK，还是原样拷贝）。
-    logDbfSample(tmpPath, "  tmp");
-
-    // 用 GBK 版本替换原文件（.shp/.shx/.dbf/.prj/.cpg）
-    deleteShapefile(shpPath);
-    log() << "  after deleteShapefile, base.dbf exists="
-          << QFileInfo::exists(dir + QStringLiteral("/") + base + QStringLiteral(".dbf")) << "\n";
-    QString baseCp936 = base + QStringLiteral("_cp936");
-    QStringList files = d.entryList(
-        QStringList() << (baseCp936 + QStringLiteral(".*")), QDir::Files);
-    for (const QString& f : files) {
-        QString suffix = f.mid(baseCp936.length());
-        bool ok = QFile::rename(dir + QStringLiteral("/") + f,
-                                dir + QStringLiteral("/") + base + suffix);
-        log() << "  rename " << f << " -> " << (base + suffix)
-              << " ok=" << ok << "\n";
-    }
+    if (srcIsUtf8)
+        dbfReencodeUtf8ToGbk(shpPath);
 
     // 写 .cpg="936"（GDAL 与 ArcGIS 都认的 CP936 代码页号）+ LDID=0x4D（GBK），
     // 二者一致声明 GBK，保证 QGIS/LTZK 与 ArcGIS 都能正确显示中文。

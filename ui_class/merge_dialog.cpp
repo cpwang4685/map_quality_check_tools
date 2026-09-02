@@ -642,6 +642,13 @@ void MergeDialog::onOk()
         }
 
         writeLog(resultTail, filesToLoad, mergedSingle ? outputPaths : QStringList());
+
+        // SDK 输出字段名可能是 UTF-8 字节 + LDID=0x57 且无 .cpg 声明，ArcGIS/LTZK
+        // 属性表会按本地代码页(GBK)误读而乱码。统一规范化为 GBK(CP936)，并写
+        // .cpg=936 + LDID=0x4D，保证 QGIS/LTZK 与 ArcGIS 都能正确显示中文。
+        for (const QString& f : filesToLoad)
+            SeNmoSdkBridge::normalizeOutputToGbk(f);
+
         ui.progressBar->setValue(100);
         QString msg = QStringLiteral("合并完成!\n输出文件:\n%1\n\n是否将结果加载到地图？");
         msg = msg.arg(filesToLoad.join(QStringLiteral("\n")));
