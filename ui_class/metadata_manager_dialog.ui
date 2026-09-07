@@ -84,6 +84,12 @@
               </property>
               <item>
                <widget class="QTreeWidget" name="mResultDirTree">
+                <property name="font">
+                 <font>
+                  <family>微软雅黑</family>
+                  <pointsize>9</pointsize>
+                 </font>
+                </property>
                 <property name="rootIsDecorated">
                  <bool>true</bool>
                 </property>
@@ -115,6 +121,12 @@
               </property>
               <item>
                <widget class="QTreeWidget" name="mDirectoryTree">
+                <property name="font">
+                 <font>
+                  <family>微软雅黑</family>
+                  <pointsize>9</pointsize>
+                 </font>
+                </property>
                 <property name="minimumSize">
                  <size>
                   <width>0</width>
@@ -152,6 +164,12 @@
               </property>
               <item>
                <widget class="QTreeWidget" name="mTagTreeWidget">
+                <property name="font">
+                 <font>
+                  <family>微软雅黑</family>
+                  <pointsize>9</pointsize>
+                 </font>
+                </property>
                 <property name="rootIsDecorated">
                  <bool>true</bool>
                 </property>
@@ -209,6 +227,12 @@
            </property>
            <item>
             <widget class="QTableWidget" name="mProductTable">
+             <property name="font">
+              <font>
+               <family>微软雅黑</family>
+               <pointsize>9</pointsize>
+              </font>
+             </property>
              <property name="editTriggers">
               <set>QAbstractItemView::NoEditTriggers</set>
              </property>
@@ -385,7 +409,14 @@
                   </layout>
                  </item>
                  <item>
-                  <widget class="QListWidget" name="mTagList"/>
+                  <widget class="QListWidget" name="mTagList">
+                   <property name="font">
+                    <font>
+                     <family>微软雅黑</family>
+                     <pointsize>9</pointsize>
+                    </font>
+                   </property>
+                  </widget>
                  </item>
                 </layout>
                </item>
@@ -443,7 +474,14 @@
                   </widget>
                  </item>
                  <item>
-                  <widget class="QListWidget" name="mProductTagList"/>
+                  <widget class="QListWidget" name="mProductTagList">
+                   <property name="font">
+                    <font>
+                     <family>微软雅黑</family>
+                     <pointsize>9</pointsize>
+                    </font>
+                   </property>
+                  </widget>
                  </item>
                 </layout>
                </item>

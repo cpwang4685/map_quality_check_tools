@@ -23,6 +23,9 @@
 #include <QSpinBox>
 #include <QDoubleSpinBox>
 #include <QScrollArea>
+#include <QFrame>
+#include <QScreen>
+#include <QGuiApplication>
 #include <QTabWidget>
 #include <QMap>
 #include <QDomDocument>
@@ -151,6 +154,48 @@ CSE_AutoQualityCheckDialog::~CSE_AutoQualityCheckDialog()
     s.setValue("AutoQualityCheck/MissionXml",     m_qstrMissionXmlPath, QgsSettings::Plugins);
     s.setValue("AutoQualityCheck/OutputDir",      m_qstrOutputDir,      QgsSettings::Plugins);
     s.setValue("AutoQualityCheck/LayerMappingPath",  m_qstrLayerMappingPath, QgsSettings::Plugins);
+}
+
+// ================================================================
+//  首次显示把窗口收敛到屏幕可用区域（跨分辨率适配）
+//  检查项超高部分已由 buildMissionUI 的每页 QScrollArea 滚动兜底，
+//  这里再把整窗限制在当前屏幕可用范围内，避免低分辨率/高DPI下
+//  窗口越出屏幕导致阈值、输出区与底部按钮不可见。
+// ================================================================
+void CSE_AutoQualityCheckDialog::showEvent(QShowEvent* event)
+{
+    QDialog::showEvent(event);
+
+    if (m_uiFitOnce)
+        return;
+    m_uiFitOnce = true;
+
+    // 取本窗口所在屏幕（窗口中心落入的屏幕）的可用区域。
+    // 不用 QWidget::screen()：麒麟系统 Qt 5.12.12 未提供该成员，此写法跨平台可用。
+    QScreen* scr = nullptr;
+    const QList<QScreen*> screens = QGuiApplication::screens();
+    if (screens.size() > 1) {
+        const QPoint c = geometry().center();
+        for (QScreen* s : screens) {
+            if (s->availableGeometry().contains(c)) {
+                scr = s;
+                break;
+            }
+        }
+    }
+    if (!scr)
+        scr = QGuiApplication::primaryScreen();
+
+    if (scr) {
+        const QRect avail = scr->availableGeometry();
+        const int maxW = qMax(200, avail.width());
+        const int maxH = qMax(200, avail.height());
+        // 仅当屏幕放不下时才收敛（绝不在大屏上缩小用户已调好的窗口）
+        if (minimumWidth()  > maxW) setMinimumWidth(maxW);
+        if (minimumHeight() > maxH) setMinimumHeight(maxH);
+        if (width()  > maxW) resize(maxW, height());
+        if (height() > maxH) resize(width(), maxH);
+    }
 }
 
 // ================================================================
@@ -869,14 +914,25 @@ void CSE_AutoQualityCheckDialog::buildMissionUI()
 	        // ====== Tab 页内容 ======
 	        QWidget* page = new QWidget(tabWidget);
 	        QVBoxLayout* pageLayout = new QVBoxLayout(page);
-	        pageLayout->setContentsMargins(8, 8, 8, 8);
+	        pageLayout->setContentsMargins(8, 8, 8, 4);
+
+	        // 勾选框网格放入滚动区：可用高度不足时该页检查项纵向滚动，不再被裁切
+	        QScrollArea* scrollArea = new QScrollArea(page);
+	        scrollArea->setWidgetResizable(true);
+	        scrollArea->setFrameShape(QFrame::NoFrame);
+	        scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+
+	        QWidget* listHost = new QWidget(scrollArea);
+	        QVBoxLayout* listLayout = new QVBoxLayout(listHost);
+	        listLayout->setContentsMargins(0, 0, 0, 0);
+	        listLayout->setSpacing(0);
 
 	        QGridLayout* gl = new QGridLayout();
 	        gl->setSpacing(6);
 
 	        for (int j = 0; j < group.items.size(); j++) {
 	            auto& item = group.items[j];
-	            QCheckBox* cb = new QCheckBox(page);
+	            QCheckBox* cb = new QCheckBox(listHost);
 	            QString cbText = item.name;
 	            if (!item.implemented)
 	                cbText += " (待开发)";
@@ -891,10 +947,13 @@ void CSE_AutoQualityCheckDialog::buildMissionUI()
 	            gl->addWidget(cb, j / cols, j % cols);
 	        }
 
-	        pageLayout->addLayout(gl);
-	        pageLayout->addStretch();
+	        listLayout->addLayout(gl);
+	        listLayout->addStretch();
+	        scrollArea->setWidget(listHost);
 
-	        // 全选 / 取消全选
+	        pageLayout->addWidget(scrollArea, 1); // 检查项占满剩余高度，超高时出现滚动条
+
+	        // 全选 / 取消全选（固定在滚动区下方，始终可见）
 	        QHBoxLayout* btnLayout = new QHBoxLayout();
 	        btnLayout->addStretch();
 	        QPushButton* btnAll = new QPushButton("全选", page);

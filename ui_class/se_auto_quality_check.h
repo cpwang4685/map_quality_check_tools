@@ -8,6 +8,7 @@
 #include <QCheckBox>
 #include <QGroupBox>
 #include <QScrollArea>
+#include <QShowEvent>
 #include <QPushButton>
 #include "qgisinterface.h"
 #include <vector>
@@ -67,6 +68,9 @@ private:
     // ---- 引擎 ----
     QProcess* m_chkProcess = nullptr;
 
+    // ---- UI 跨分辨率适配 ----
+    bool m_uiFitOnce = false;  // 首次显示时把窗口收敛到当前屏幕可用区域（仅一次）
+
     // ---- 初始化 ----
     void restoreState();
     bool loadMissionConfig(const QString& xmlPath = QString());
@@ -97,6 +101,11 @@ private:
 
     // ---- 图层扫描 ----
     static QStringList scanShpFiles(const QString& dirPath);
+
+protected:
+    // 首次显示把窗口收敛到屏幕可用区域，避免低分辨率/高DPI下越出屏幕
+    // （检查项超高部分由每页 QScrollArea 滚动兜底）
+    void showEvent(QShowEvent* event) override;
 
 private slots:
     // 路径浏览

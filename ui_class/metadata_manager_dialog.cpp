@@ -3,6 +3,7 @@
 #include "database/postgis_connector.h"
 #include "core/calendar_helper.h"
 #include "core/directory_helper.h"
+#include "core/layer_icon_helper.h"
 #include <QSettings>
 #include <qgsapplication.h>
 #include <qgsmessagelog.h>
@@ -28,8 +29,6 @@
 #include <QStyle>
 #include <QListWidget>
 #include <QMenu>
-#include <QAction>
-#include <QShowEvent>
 #include "qgsgui.h"
 #include "core/add_to_map_helper.h"
 
@@ -257,15 +256,25 @@ void MetadataManagerDialog::populateResultDirChildren(QTreeWidgetItem* parentIte
 		ci->setText(0, child.name); // 纯结构展示，不显示统计数目
 		ci->setData(0, Qt::UserRole, child.id);
 		ci->setData(0, Qt::UserRole + 1, 0); // 0=目录节点
-		// 固定分类节点（制图成果/制图要素/制图资料及其二级节点）用文件夹图标
-		if (mFixedDirIds.contains(child.id))
+		// 图层节点（nodeType==1）：根据其下产品类型显示矢量点/线/面或栅格图标
+		if (child.nodeType == 1)
 		{
-			ci->setIcon(0, style->standardIcon(QStyle::SP_DirIcon));
+			const auto layerProducts = mDAO->getProductsByDirectory(child.id);
+			int kind = -1;
+			for (const auto& p : layerProducts)
+			{
+				kind = LayerIconHelper::layerIconKindForProduct(p);
+				if (kind >= 0) break;
+			}
+			if (kind >= 0)
+				ci->setIcon(0, LayerIconHelper::drawLayerIcon(kind));
+			else
+				ci->setIcon(0, style->standardIcon(QStyle::SP_FileIcon));
 		}
-		// 其余子节点（图层/普通目录）统一用文件图标
+		// 其余目录节点（固定分类节点、导入的各级普通目录）统一用文件夹图标
 		else
 		{
-			ci->setIcon(0, style->standardIcon(QStyle::SP_FileIcon));
+			ci->setIcon(0, style->standardIcon(QStyle::SP_DirIcon));
 		}
 
 		// 固定叶子节点（AI/PDF/其它、影像/晕渲、文档资料/表格资料/其它）下展示产品数据子节点
@@ -278,7 +287,9 @@ void MetadataManagerDialog::populateResultDirChildren(QTreeWidgetItem* parentIte
 				pi->setText(0, p.productName);
 				pi->setData(0, Qt::UserRole, p.id);
 				pi->setData(0, Qt::UserRole + 1, 1); // 1=产品数据节点
-				pi->setIcon(0, style->standardIcon(QStyle::SP_FileIcon));
+				// 产品数据节点按产品类型显示对应图层图标
+				int kind = LayerIconHelper::layerIconKindForProduct(p);
+				pi->setIcon(0, kind >= 0 ? LayerIconHelper::drawLayerIcon(kind) : style->standardIcon(QStyle::SP_FileIcon));
 				pi->setToolTip(0, QStringLiteral("数据名称: %1\n密级: %2").arg(p.productName, securityLevelToString(p.securityLevel)));
 			}
 		}
