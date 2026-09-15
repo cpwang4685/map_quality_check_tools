@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?><MapGeneBatchProcessing>
+	<Mission id="453" note="地理名称">
+		<ParaIn>
+			<Layers note="SourceDataStore">
+				<FilePath>地理名称.shp</FilePath>
+			</Layers>
+			<Parameter>
+				<FieldName name="NAME" note="NAME">
+					<Field note="NAME">
+						<Name>NAME</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>上浪隆|东岔|公卡垭壑|大偏岔|小恰勒|摩天岭|西台|阳山|韭菜沟墩|鸡尾山|黄草坪口|黑圪瘩梁</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+			</Parameter>
+		</ParaIn>
+		<ParaOut>
+			<Layers note="DstDataStore">
+				<FilePath editable="true">地理名称_检查.shp</FilePath>
+			</Layers>
+		</ParaOut>
+	</Mission>
+</MapGeneBatchProcessing>

@@ -1,17 +1,52 @@
 #include "se_mission455_check.h"
+
+#include "../ui_task/wuji_engine_bridge.h"
+#include "../ui_task/wuji_mission_runner.h"
+#include "../ui_task/wuji_mission_xml.h"
+
 #include "qgsvectorlayer.h"
 #include "qgsfeature.h"
 #include "qgsgeometry.h"
 #include "qgspointxy.h"
 #include "qgsspatialindex.h"
 #include "qgsfeaturerequest.h"
+
+#include <QDir>
+#include <QFileInfo>
 #include <QSet>
+#include <QTemporaryDir>
 #include <cmath>
 
-using namespace Mission455;
+// ============================================================
+//  本地回退实现
+//
+//  检查逻辑正常由引擎子进程（MapBatchProcessing.exe）完成；该可执行
+//  文件只存在于 Windows，麒麟上不存在，此时退回下面的本地 QGIS 算法，
+//  保证 455 在无引擎环境下仍可执行（Windows 用引擎、麒麟用本地）。
+//
+//  算法本体与本工程综合前的实现逐字一致，唯一差别是参考面图层由已合并
+//  好的 SHP 路径加载而来（引擎路径下参考图层同样以合并 SHP 形式传入）。
+//  模式位含义与引擎实现一致：1 悬挂节点 2 伪节点 4 自重叠 8 自相交
+//  16 多部件 32 相互重叠 64 相互相交 4096 线在面内部。
+// ============================================================
+namespace {
+
+// 从 SHP 路径加载参考图层；失败返回 nullptr（调用方负责 delete）
+QgsVectorLayer* openRefLayer(const QString& shpPath)
+{
+    if (shpPath.isEmpty() || !QFileInfo::exists(shpPath))
+        return nullptr;
+    QgsVectorLayer* lyr = new QgsVectorLayer(
+        shpPath, QFileInfo(shpPath).completeBaseName(), QStringLiteral("ogr"));
+    if (!lyr->isValid()) {
+        delete lyr;
+        return nullptr;
+    }
+    return lyr;
+}
 
 // ====== 模式1: 不能有悬挂节点 ======
-void Mission455::checkDangles(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors, double tol)
+void checkDangles(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors, double tol)
 {
     if (!layer) return;
     // 统计每个端点出现的次数
@@ -50,7 +85,7 @@ void Mission455::checkDangles(QgsVectorLayer* layer, QList<QPair<QgsFeature, QSt
 }
 
 // ====== 模式2: 不能有伪节点 ======
-void Mission455::checkPseudos(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors, double tol)
+void checkPseudos(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors, double tol)
 {
     if (!layer) return;
     QHash<QString, QStringList> nodeLines;
@@ -88,7 +123,7 @@ void Mission455::checkPseudos(QgsVectorLayer* layer, QList<QPair<QgsFeature, QSt
 }
 
 // ====== 模式3: 不能自重叠 ======
-void Mission455::checkSelfOverlap(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors)
+void checkSelfOverlap(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors)
 {
     if (!layer) return;
     QgsFeatureIterator it = layer->getFeatures();
@@ -109,7 +144,7 @@ void Mission455::checkSelfOverlap(QgsVectorLayer* layer, QList<QPair<QgsFeature,
 }
 
 // ====== 模式4: 不能自相交 ======
-void Mission455::checkSelfIntersect(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors)
+void checkSelfIntersect(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors)
 {
     if (!layer) return;
     QgsFeatureIterator it = layer->getFeatures();
@@ -124,7 +159,7 @@ void Mission455::checkSelfIntersect(QgsVectorLayer* layer, QList<QPair<QgsFeatur
 }
 
 // ====== 模式5: 必须是单部件 ======
-void Mission455::checkSinglePart(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors)
+void checkSinglePart(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors)
 {
     if (!layer) return;
     QgsFeatureIterator it = layer->getFeatures();
@@ -138,7 +173,7 @@ void Mission455::checkSinglePart(QgsVectorLayer* layer, QList<QPair<QgsFeature, 
 }
 
 // ====== 模式6: 线不能相互重叠 ======
-void Mission455::checkOverlap(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors)
+void checkOverlap(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors)
 {
     if (!layer) return;
     QgsSpatialIndex index(layer->getFeatures());
@@ -168,7 +203,7 @@ void Mission455::checkOverlap(QgsVectorLayer* layer, QList<QPair<QgsFeature, QSt
 }
 
 // ====== 模式7: 线不能相互相交 ======
-void Mission455::checkIntersect(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors)
+void checkIntersect(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors)
 {
     if (!layer) return;
     QgsSpatialIndex index(layer->getFeatures());
@@ -198,7 +233,7 @@ void Mission455::checkIntersect(QgsVectorLayer* layer, QList<QPair<QgsFeature, Q
 }
 
 // ====== 线必须在面内部 ======
-void Mission455::checkInsidePolygon(QgsVectorLayer* lineLayer, QgsVectorLayer* polyLayer,
+void checkInsidePolygon(QgsVectorLayer* lineLayer, QgsVectorLayer* polyLayer,
     QList<QPair<QgsFeature, QString>>& errors)
 {
     if (!lineLayer || !polyLayer) return;
@@ -220,8 +255,8 @@ void Mission455::checkInsidePolygon(QgsVectorLayer* lineLayer, QgsVectorLayer* p
     }
 }
 
-// ====== 主入口 ======
-void Mission455::execute(QgsVectorLayer* lineLayer, QgsVectorLayer* pointLayer,
+// ====== 本地回退主入口 ======
+void executeLocal(QgsVectorLayer* lineLayer, QgsVectorLayer* pointLayer,
     QgsVectorLayer* polyLayer, QgsVectorLayer* refLineLayer,
     int processMode, const QHash<QString, double>& thresholds,
     QList<QPair<QgsFeature, QString>>& allErrors, QStringList& executedChecks)
@@ -252,3 +287,79 @@ void Mission455::execute(QgsVectorLayer* lineLayer, QgsVectorLayer* pointLayer,
         run(4096, "线在面内部", [&](auto& e){ checkInsidePolygon(lineLayer, polyLayer, e); });
     }
 }
+
+} // namespace
+
+namespace Mission455 {
+
+void execute(QgsVectorLayer* lineLayer, const QString& refPointShp,
+             const QString& refPolyShp,
+             int processMode, const QHash<QString, double>& thresholds,
+             QList<QPair<QgsFeature, QString>>& allErrors, QStringList& executedChecks)
+{
+    if (!lineLayer) {
+        executedChecks.append(QStringLiteral("线拓扑检查：无线要素图层，本次不涉及"));
+        return;
+    }
+
+    // ---- 引擎不可用（如麒麟无 MapBatchProcessing.exe）→ 本地 QGIS 实现 ----
+    if (!WujiEngineBridge::engineAvailable()) {
+        QgsVectorLayer* refPoly = openRefLayer(refPolyShp);
+        executeLocal(lineLayer, nullptr /*参考点图层未用*/,
+                     refPoly, nullptr /*参考线图层未用*/,
+                     processMode, thresholds, allErrors, executedChecks);
+        delete refPoly;
+        return;
+    }
+
+    QTemporaryDir work;
+    if (!work.isValid()) {
+        executedChecks.append(QStringLiteral("线拓扑检查：无法创建工作目录，本次未执行"));
+        return;
+    }
+    const QString dir = work.path();
+
+    // ---- 输入图层导出为 GBK 编码 SHP ----
+    QString errOut;
+    const QString lineShp = WujiMissionRunner::exportLayerShp(
+        lineLayer, dir, QStringLiteral("polyline"), &errOut);
+    if (lineShp.isEmpty()) {
+        executedChecks.append(QStringLiteral("线拓扑检查：无法导出线图层（%1），本次未执行").arg(errOut));
+        return;
+    }
+    // 参考图层（其余类型的全部图层合并件）复制进任务目录（FilePath 必须相对路径）
+    const QString pointShp = refPointShp.isEmpty() ? QString()
+        : WujiMissionRunner::stageShapefiles(QStringList() << refPointShp, dir).value(0);
+    const QString polyShp = refPolyShp.isEmpty() ? QString()
+        : WujiMissionRunner::stageShapefiles(QStringList() << refPolyShp, dir).value(0);
+
+    // ---- 构造任务 XML 并执行 ----
+    const QString outLineShp = QDir(dir).filePath(QStringLiteral("polyline_out.shp"));
+    const QString outPointShp = QDir(dir).filePath(QStringLiteral("point_out.shp"));
+    const QString xml = WujiMissionXml::buildMission455(
+        dir, lineShp, pointShp, polyShp, QString() /*refLineShp 未用*/,
+        processMode, thresholds.value(QStringLiteral("FuzzyTolerance"), 0.001),
+        thresholds.value(QStringLiteral("BufferDistance"), 0.0),
+        outLineShp, outPointShp);
+
+    int errBefore = allErrors.size();
+    if (WujiMissionRunner::runMissionXml(xml, dir, QStringLiteral("线拓扑检查"),
+                                         processMode, executedChecks)) {
+        // 线结果层：源线要素副本 + info_NM 字段（非空即错误）
+        // 错误消息带图层名，如"线拓扑检查(一级河流)"，供合并输出时提取
+        const QString baseName = QFileInfo(lineLayer->source()).completeBaseName();
+        WujiMissionRunner::readResultErrors(outLineShp, lineLayer,
+            QStringLiteral("线拓扑检查(%1)").arg(baseName), WujiMissionRunner::ReadInfoField,
+            QStringLiteral("info_NM"), allErrors);
+        // 错误位置点层：每个要素即一处错误
+        WujiMissionRunner::readResultErrors(outPointShp, lineLayer,
+            QStringLiteral("线拓扑检查错误位置(%1)").arg(baseName), WujiMissionRunner::ReadAll,
+            QStringLiteral("info_NM"), allErrors);
+    }
+    int added = allErrors.size() - errBefore;
+    executedChecks.append(QStringLiteral("线拓扑检查(%1)：%2")
+        .arg(QFileInfo(lineLayer->source()).completeBaseName())
+        .arg(added == 0 ? QStringLiteral("未检出异常") : QStringLiteral("检出异常%1处").arg(added)));
+}
+
+} // namespace Mission455

@@ -1,0 +1,406 @@
+<?xml version="1.0" encoding="utf-8"?><MapGeneBatchProcessing>
+	<Mission id="453" note="三级河流">
+		<ParaIn>
+			<Layers note="SourceDataStore">
+				<FilePath>三级河流.shp</FilePath>
+			</Layers>
+			<Parameter>
+				<FieldName name="OBJECTID_1" note="OBJECTID_1">
+					<Field note="OBJECTID_1">
+						<Name>OBJECTID_1</Name>
+						<DataType>DataType_Int32</DataType>
+						<Length>10</Length>
+						<Precision/>
+						<Ignore>true</Ignore>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="ELEMID" note="ELEMID">
+					<Field note="ELEMID">
+						<Name>ELEMID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>15</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="CLASID" note="CLASID">
+					<Field note="CLASID">
+						<Name>CLASID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>6</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="NAME" note="NAME">
+					<Field note="NAME">
+						<Name>NAME</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="TYPE" note="TYPE">
+					<Field note="TYPE">
+						<Name>TYPE</Name>
+						<DataType>DataType_String</DataType>
+						<Length>32</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="LEVEL" note="LEVEL">
+					<Field note="LEVEL">
+						<Name>LEVEL</Name>
+						<DataType>DataType_String</DataType>
+						<Length>10</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="ZTFJ" note="ZTFJ">
+					<Field note="ZTFJ">
+						<Name>ZTFJ</Name>
+						<DataType>DataType_String</DataType>
+						<Length>10</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="BAS" note="BAS">
+					<Field note="BAS">
+						<Name>BAS</Name>
+						<DataType>DataType_String</DataType>
+						<Length>16</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="ECRM" note="ECRM">
+					<Field note="ECRM">
+						<Name>ECRM</Name>
+						<DataType>DataType_Int32</DataType>
+						<Length>10</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="EC" note="EC">
+					<Field note="EC">
+						<Name>EC</Name>
+						<DataType>DataType_String</DataType>
+						<Length>16</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="GRADE" note="GRADE">
+					<Field note="GRADE">
+						<Name>GRADE</Name>
+						<DataType>DataType_String</DataType>
+						<Length>8</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="LEN" note="LEN">
+					<Field note="LEN">
+						<Name>LEN</Name>
+						<DataType>DataType_Double</DataType>
+						<Length>24</Length>
+						<Precision>15</Precision>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="PASS" note="PASS">
+					<Field note="PASS">
+						<Name>PASS</Name>
+						<DataType>DataType_String</DataType>
+						<Length>8</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="PERIOD" note="PERIOD">
+					<Field note="PERIOD">
+						<Name>PERIOD</Name>
+						<DataType>DataType_String</DataType>
+						<Length>16</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="SHRC" note="SHRC">
+					<Field note="SHRC">
+						<Name>SHRC</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="SDTF" note="SDTF">
+					<Field note="SDTF">
+						<Name>SDTF</Name>
+						<DataType>DataType_String</DataType>
+						<Length>4</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="WIDTH" note="WIDTH">
+					<Field note="WIDTH">
+						<Name>WIDTH</Name>
+						<DataType>DataType_Double</DataType>
+						<Length>24</Length>
+						<Precision>15</Precision>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="WRID" note="WRID">
+					<Field note="WRID">
+						<Name>WRID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>16</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="WRGR" note="WRGR">
+					<Field note="WRGR">
+						<Name>WRGR</Name>
+						<DataType>DataType_Int32</DataType>
+						<Length>10</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="DSOURCE" note="DSOURCE">
+					<Field note="DSOURCE">
+						<Name>DSOURCE</Name>
+						<DataType>DataType_String</DataType>
+						<Length>254</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="XGSM" note="XGSM">
+					<Field note="XGSM">
+						<Name>XGSM</Name>
+						<DataType>DataType_String</DataType>
+						<Length>50</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>与质检科商讨确定|峪质检科商讨确定</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="UPDATE_" note="UPDATE_">
+					<Field note="UPDATE_">
+						<Name>UPDATE_</Name>
+						<DataType>DataType_String</DataType>
+						<Length>50</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="NAMES" note="NAMES">
+					<Field note="NAMES">
+						<Name>NAMES</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="Shape_Leng" note="Shape_Leng">
+					<Field note="Shape_Leng">
+						<Name>Shape_Leng</Name>
+						<DataType>DataType_Double</DataType>
+						<Length>24</Length>
+						<Precision>15</Precision>
+						<Ignore>true</Ignore>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="备注" note="备注">
+					<Field note="备注">
+						<Name>备注</Name>
+						<DataType>DataType_String</DataType>
+						<Length>50</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="Shape_Le_1" note="Shape_Le_1">
+					<Field note="Shape_Le_1">
+						<Name>Shape_Le_1</Name>
+						<DataType>DataType_Double</DataType>
+						<Length>24</Length>
+						<Precision>15</Precision>
+						<Ignore>true</Ignore>
+						<PrimaryKey/>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+			</Parameter>
+		</ParaIn>
+		<ParaOut>
+			<Layers note="DstDataStore">
+				<FilePath editable="true">三级河流_检查.shp</FilePath>
+			</Layers>
+		</ParaOut>
+	</Mission>
+</MapGeneBatchProcessing>

@@ -73,6 +73,8 @@ public:
     ~GeneralizationConfigDialog() override;
 
     QString shpDirectory() const;
+    QString gdbDirectory() const;   // 【2026-09-09】GDB 数据页：GDB 目录选择
+    QString convXmlPath() const;    // 【2026-09-09】GDB 数据页：gdb→shp 转换知识库 XML 路径
     QString configXmlPath() const;
     QString outputDirectory() const;
     bool    isFileSystemSource() const;   // 仅文件系统数据源，恒 true
@@ -85,6 +87,9 @@ private slots:
     // 【2026-08-23】地图综合 PostGIS 数据库源已注释（与地图数据下载 UI 重复）
     // void onSourceTypeChanged();
     void onBrowseShpDir();
+    void onBrowseGdbDir();    // 【2026-09-09】GDB 数据页：GDB 目录浏览
+    void onBrowseConvXml();   // 【2026-09-09】GDB 数据页：转换知识库 XML 浏览
+    void onRunGdb2Shp();      // 【2026-09-09】GDB 数据页：执行 gdb→shp 转换
     void onBrowseConfigXml();
     void onBrowseOutputDir();
     // void onTestDbConnection();
@@ -110,6 +115,29 @@ private:
     QPushButton*  m_btnSelectFsLayerTypes = nullptr;
     QLabel*       m_labelFsSelectedTypes  = nullptr;
     QStringList   m_selectedFsLayerTypes;
+
+    // ---- GDB 数据页（已废弃） ----
+    // 【2026-09-09】测试 gdb→shp：GDB 目录 + 转换知识库 XML + 执行转换按钮。
+    // 【2026-09-10】该页签的 UI 已整体移除（矢量数据目录现在同时接受 SHP / FileGDB，
+    // 走两阶段流程，不再需要独立的 GDB 测试入口）。下面两个指针不再被创建，
+    // onBrowseGdbDir/onBrowseConvXml/onRunGdb2Shp 也因控件消失而不再被 connect，
+    // 属不可达代码，保留仅为减少改动面；切勿让它们重新接上。
+    QLineEdit*    m_lineEditGdbDir   = nullptr;
+    QLineEdit*    m_lineEditConvXml  = nullptr;
+
+    // ---- 运行期文案（综合 / gdb→shp 转换共用同一 worker 回调） ----
+    QString       m_taskLabel;            // 结果弹窗/进度标题（"综合缩编" / "GDB→SHP 转换"）
+    QString       m_progressLabelPrefix;  // 进度条前缀，startWorkerRun 里按 taskLabel 生成
+
+    // ---- 【2026-09-10】GDB 输入两阶段执行状态 ----
+    // 输入是 FileGDB 时：阶段1 = gdb→shp 转换（临时 XML，输出到结果输出目录），
+    // 阶段1 的 finished 回调里再启动阶段2 = 综合（综合知识库容器）。
+    // 单一对话框、串行执行，故用普通成员保存阶段2参数即可。
+    bool                                     m_pendingGdb2ShpRun = false;
+    QString                                  m_stage2XmlDir;   // 综合容器：XML 所在目录（直接格式则为 XML 全路径）
+    QString                                  m_stage2DataDir;  // 综合的数据基准目录 = 结果输出目录
+    QString                                  m_stage2DllDir;   // NMO SDK / 插件目录
+    QVector<GeneralizationWorker::LinkEntry> m_stage2Links;    // 已剔除 gdb2shp 转换步骤的综合 Link
 
     // ---- 数据库面板 ----
     // 【2026-08-23】地图综合 PostGIS 数据库源已注释（与地图数据下载 UI 重复）
@@ -139,6 +167,17 @@ private:
 
     // ---- 内部方法 ----
     void connectSignals();
+    // 【2026-09-09】通用启动一次 DoXMLFile 任务（onExecute / onRunGdb2Shp 共用）
+    void startWorkerRun(const QString& xmlDir, const QString& dataDir,
+                        const QVector<GeneralizationWorker::LinkEntry>& links,
+                        const QString& dllDir, const QString& taskLabel);
+    // 【2026-09-10】GDB 输入准备：在知识库 Link 里找 gdb2shp 转换步骤 → 生成临时
+    // 转换 XML（把实际 GDB 目录 / 输出目录注入进去）→ 把该 Link 从综合步骤里剔除。
+    // 返回 false 表示已弹错，调用方直接 return。
+    bool prepareGdb2ShpStage(const QString& gdbDir, const QString& outDir,
+                             bool isLinkContainer,
+                             QVector<GeneralizationWorker::LinkEntry>& links,
+                             QString& tempXmlPath);
     // 【2026-08-23】以下 DB 相关方法已注释（与地图数据下载 UI 重复）
     // void loadDbConfigSettings();
     // QString pgConnString() const;

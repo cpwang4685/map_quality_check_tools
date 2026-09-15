@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?><MapGeneBatchProcessing>
+	<Mission id="453" note="山峰">
+		<ParaIn>
+			<Layers note="SourceDataStore">
+				<FilePath>山峰.shp</FilePath>
+			</Layers>
+			<Parameter>
+				<FieldName name="ELEMID" note="ELEMID">
+					<Field note="ELEMID">
+						<Name>ELEMID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>15</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey>true</PrimaryKey>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>620000306|620001063|620001085|620001241|620001259|620001263|620001266|620001268|620001274|620001285</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="CLASID" note="CLASID">
+					<Field note="CLASID">
+						<Name>CLASID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>6</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="NAME" note="NAME">
+					<Field note="NAME">
+						<Name>NAME</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>大万山|大圪垯岭|太平山|奖俊埠岭|岗斯姆岭|巴家大岭|平沟岭|杨洼掌圪垯|桌子山|郎儿岭</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="PINXIN" note="PINXIN">
+					<Field note="PINXIN">
+						<Name>PINXIN</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>Bajiada Ling|Dageda Ling|Dawan Shan|Gongsizhu Ling|Jiangjunbu Ling|Lang'er Ling|Pinggou Ling|Taiping Shan|Yangwazhang Geda|Zhuozi Shan</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="ELEV" note="ELEV">
+					<Field note="ELEV">
+						<Name>ELEV</Name>
+						<DataType>DataType_Double</DataType>
+						<Length>24</Length>
+						<Precision>15</Precision>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="ELEV_Lable" note="ELEV_Lable">
+					<Field note="ELEV_Lable">
+						<Name>ELEV_Lable</Name>
+						<DataType>DataType_String</DataType>
+						<Length>10</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>1958|1990|2064|2235|2436|2641|2939|3455|3718|3835</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="SFFJ" note="SFFJ">
+					<Field note="SFFJ">
+						<Name>SFFJ</Name>
+						<DataType>DataType_String</DataType>
+						<Length>10</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="CLASS" note="CLASS">
+					<Field note="CLASS">
+						<Name>CLASS</Name>
+						<DataType>DataType_String</DataType>
+						<Length>3</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="SZ" note="SZ">
+					<Field note="SZ">
+						<Name>SZ</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="DSOURCE" note="DSOURCE">
+					<Field note="DSOURCE">
+						<Name>DSOURCE</Name>
+						<DataType>DataType_String</DataType>
+						<Length>255</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="备注" note="备注">
+					<Field note="备注">
+						<Name>备注</Name>
+						<DataType>DataType_String</DataType>
+						<Length>50</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>根据地名普查资料更新名称</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="UPDATE_" note="UPDATE_">
+					<Field note="UPDATE_">
+						<Name>UPDATE_</Name>
+						<DataType>DataType_String</DataType>
+						<Length>50</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+			</Parameter>
+		</ParaIn>
+		<ParaOut>
+			<Layers note="DstDataStore">
+				<FilePath editable="true">山峰_检查.shp</FilePath>
+			</Layers>
+		</ParaOut>
+	</Mission>
+</MapGeneBatchProcessing>

@@ -4,7 +4,6 @@
 #include <QDialog>
 #include "ui_auto_quality_check.h"
 #include <QString>
-#include <QProcess>
 #include <QCheckBox>
 #include <QGroupBox>
 #include <QScrollArea>
@@ -65,9 +64,6 @@ private:
     QHash<QString, double> m_thresholds;  // 阈值参数
     QList<LayerMappingItem> m_layerMappingItems; // 图层映射：标准图层→实际SHP
 
-    // ---- 引擎 ----
-    QProcess* m_chkProcess = nullptr;
-
     // ---- UI 跨分辨率适配 ----
     bool m_uiFitOnce = false;  // 首次显示时把窗口收敛到当前屏幕可用区域（仅一次）
 
@@ -87,9 +83,6 @@ private:
     void loadLayerMappingCsv(const QString& csvPath);
     QList<LayerMappingItem> getDefaultStandardLayers() const;
     QString getDefaultLayerMappingCsvPath() const;
-
-    // ---- XML生成 ----
-    QString generateMissionXml(const QString& dataDir, const QString& dataLabel);
 
     // ---- 写入日志 ----
     void writeJsonLog(const QString& logPath, const QString& dataType,
@@ -118,7 +111,6 @@ private slots:
 
     // 质检
     void onStartCheck();
-    void onChkProcessFinished(int exitCode, QProcess::ExitStatus status);
     void onSelectAll();
     void onDeselectAll();
 

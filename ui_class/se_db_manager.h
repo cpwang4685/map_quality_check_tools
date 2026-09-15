@@ -8,7 +8,22 @@
 #include <QStringList>
 
 class QgsVectorLayer;
-struct FieldDefinition;  // 定义在 se_mission453_check.h 中
+
+// 字段定义结构体（数据库字段定义读取，供属性检查相关功能使用）
+struct FieldDefinition {
+    QString fieldName;
+    int fieldIdx = -1;
+    QString fieldType;
+    QString fieldDesc;
+    QString fieldRequired;
+    QString fieldLength;
+    QString fieldUnit;
+    QString allowNull;
+    QString defaultValue;
+    QStringList enumValues;
+    QString enumMultiply;
+    QString splitList;
+};
 
 // 数据库连接参数
 struct DbConnectionParams {

@@ -5,34 +5,18 @@
 #include <QList>
 #include <QPair>
 #include <QHash>
-#include "map_check_common.h"
+#include <QStringList>
 
 class QgsVectorLayer;
 class QgsFeature;
 
 // ---- Mission 454: 点拓扑规则 ----
+// 检查逻辑由引擎子进程完成，本模块负责数据存储准备、参数设置与结果收集。
+// 目标点图层每次一个（全部图层逐层检查）；参考图层为已合并好的
+// 线/面参考 SHP 路径（为空则不参与），进入任务目录时复制为相对路径。
 namespace Mission454 {
-    // 模式1: 点必须重合 — Must be coincident with
-    void checkCoincident(QgsVectorLayer* layer, QgsVectorLayer* refLayer,
-        QList<QPair<QgsFeature, QString>>& errors, double tolerance = 0.001);
-    // 模式2: 点必须分离 — Must be disjoint
-    void checkDisjoint(QgsVectorLayer* layer, QgsVectorLayer* refLayer,
-        QList<QPair<QgsFeature, QString>>& errors, double tolerance = 0.001);
-    // 模式4: 点被线端点覆盖 — Must be covered by endpoint of
-    void checkCoveredByEndpoint(QgsVectorLayer* pointLayer, QgsVectorLayer* lineLayer,
-        QList<QPair<QgsFeature, QString>>& errors, double tolerance = 0.001);
-    // 模式8: 点必须被线覆盖 — Point must be covered by line
-    void checkCoveredByLine(QgsVectorLayer* pointLayer, QgsVectorLayer* lineLayer,
-        QList<QPair<QgsFeature, QString>>& errors, double tolerance = 0.001);
-    // 模式16: 点必须在面内部 — Must be properly inside polygons
-    void checkInsidePolygon(QgsVectorLayer* pointLayer, QgsVectorLayer* polyLayer,
-        QList<QPair<QgsFeature, QString>>& errors);
-    // 模式32: 点必须在面边界上 — Must be covered by boundary of
-    void checkOnBoundary(QgsVectorLayer* pointLayer, QgsVectorLayer* polyLayer,
-        QList<QPair<QgsFeature, QString>>& errors, double tolerance = 0.001);
-
-    void execute(QgsVectorLayer* pointLayer, QgsVectorLayer* lineLayer,
-        QgsVectorLayer* polyLayer, QgsVectorLayer* refPointLayer,
+    void execute(QgsVectorLayer* pointLayer, const QString& refLineShp,
+        const QString& refPolyShp,
         int processMode, const QHash<QString, double>& thresholds,
         QList<QPair<QgsFeature, QString>>& allErrors, QStringList& executedChecks);
 }

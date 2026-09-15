@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?><MapGeneBatchProcessing>
+	<Mission id="453" note="火车隧道口">
+		<ParaIn>
+			<Layers note="SourceDataStore">
+				<FilePath>火车隧道口.shp</FilePath>
+			</Layers>
+			<Parameter>
+				<FieldName name="ELEMID" note="ELEMID">
+					<Field note="ELEMID">
+						<Name>ELEMID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>15</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="CLASID" note="CLASID">
+					<Field note="CLASID">
+						<Name>CLASID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>6</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="NAME" note="NAME">
+					<Field note="NAME">
+						<Name>NAME</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="TYPE" note="TYPE">
+					<Field note="TYPE">
+						<Name>TYPE</Name>
+						<DataType>DataType_String</DataType>
+						<Length>32</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="RN" note="RN">
+					<Field note="RN">
+						<Name>RN</Name>
+						<DataType>DataType_String</DataType>
+						<Length>32</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="SHAPE_Leng" note="SHAPE_Leng">
+					<Field note="SHAPE_Leng">
+						<Name>SHAPE_Leng</Name>
+						<DataType>DataType_Double</DataType>
+						<Length>24</Length>
+						<Precision>15</Precision>
+						<Ignore>true</Ignore>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="Shape_Leng" note="Shape_Leng">
+					<Field note="Shape_Leng">
+						<Name>Shape_Leng</Name>
+						<DataType>DataType_Double</DataType>
+						<Length>24</Length>
+						<Precision>15</Precision>
+						<Ignore>true</Ignore>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="ANGLE" note="ANGLE">
+					<Field note="ANGLE">
+						<Name>ANGLE</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>105.89842508289453|147.95543351029281|15.212396103735401|150.57402414137326|160.50440927227203|163.14791691194452|169.51758978312924|188.92065273877853|200.58166441255287|274.42726583807251|285.89842508289456|330.57402414137329|336.5446062348135|336.83573072648272|339.48820070615176|340.58518575357101|345.18878561779115|94.343346676009531</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="HCSDK" note="HCSDK">
+					<Field note="HCSDK">
+						<Name>HCSDK</Name>
+						<DataType>DataType_String</DataType>
+						<Length>32</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+			</Parameter>
+		</ParaIn>
+		<ParaOut>
+			<Layers note="DstDataStore">
+				<FilePath editable="true">火车隧道口_检查.shp</FilePath>
+			</Layers>
+		</ParaOut>
+	</Mission>
+</MapGeneBatchProcessing>

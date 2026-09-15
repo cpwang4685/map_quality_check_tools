@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?><MapGeneBatchProcessing>
+	<Mission id="453" note="农林牧">
+		<ParaIn>
+			<Layers note="SourceDataStore">
+				<FilePath>农林牧.shp</FilePath>
+			</Layers>
+			<Parameter>
+				<FieldName name="ELEMID" note="ELEMID">
+					<Field note="ELEMID">
+						<Name>ELEMID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>15</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey>true</PrimaryKey>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>620000129|620000318|620000319|620000333|620000334</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="CLASID" note="CLASID">
+					<Field note="CLASID">
+						<Name>CLASID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>6</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="NAME" note="NAME">
+					<Field note="NAME">
+						<Name>NAME</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>奖俊埠林场|生态林业试验总场|红古林场|西河林场|连城林场</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="NAMES" note="NAMES">
+					<Field note="NAMES">
+						<Name>NAMES</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>奖俊埠林场|生态林业试验总场|红古林场|西河林场|连城林场</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="GRADE" note="GRADE">
+					<Field note="GRADE">
+						<Name>GRADE</Name>
+						<DataType>DataType_String</DataType>
+						<Length>8</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="TYPE" note="TYPE">
+					<Field note="TYPE">
+						<Name>TYPE</Name>
+						<DataType>DataType_String</DataType>
+						<Length>32</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="REMK" note="REMK">
+					<Field note="REMK">
+						<Name>REMK</Name>
+						<DataType>DataType_String</DataType>
+						<Length>255</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="AreaCode" note="AreaCode">
+					<Field note="AreaCode">
+						<Name>AreaCode</Name>
+						<DataType>DataType_Int32</DataType>
+						<Length>10</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="DSOURCE" note="DSOURCE">
+					<Field note="DSOURCE">
+						<Name>DSOURCE</Name>
+						<DataType>DataType_String</DataType>
+						<Length>255</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="备注" note="备注">
+					<Field note="备注">
+						<Name>备注</Name>
+						<DataType>DataType_String</DataType>
+						<Length>50</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="UPDATE_" note="UPDATE_">
+					<Field note="UPDATE_">
+						<Name>UPDATE_</Name>
+						<DataType>DataType_String</DataType>
+						<Length>50</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+			</Parameter>
+		</ParaIn>
+		<ParaOut>
+			<Layers note="DstDataStore">
+				<FilePath editable="true">农林牧_检查.shp</FilePath>
+			</Layers>
+		</ParaOut>
+	</Mission>
+</MapGeneBatchProcessing>

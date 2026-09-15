@@ -10,13 +10,448 @@
 #include <QProcess>
 #include <QRegExp>
 #include <QStandardPaths>
+#include <QSettings>
+#include <QMap>
 
 /*--------------QGIS---------------*/
 #include "qgssettings.h"
 
+/*--------------PostgreSQL---------------*/
+// 【2026-09-11】查服务器大版本号用（插件本就链接 libpq.lib + /DELAYLOAD:libpq.dll，
+// database/data_importer.cpp、core/add_to_map_helper.h 同样直接包含本头文件）。
+#include <libpq-fe.h>
+
+/*--------------Windows---------------*/
+// 【2026-09-11】取系统 ANSI 代码页（GetACP）用。见 postgresEncodingForSystemAnsi()。
+#ifdef Q_OS_WIN
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#endif
+
 /*-----------------------------------*/
 
 static CMapCheckBackupManager* s_pInstance = nullptr;
+
+/*========== 【2026-09-11】pg_dump 客户端编码（中文表名修复） ==========
+ * 背景：pg_dump.exe 是 ANSI 子系统的程序，Windows 会把 Qt 经 CreateProcessW
+ * 传过去的 UTF-16 命令行按“系统 ANSI 代码页”转成字节（中文 Windows 上是 GBK）。
+ * 单看这一步字节是对的，但 pg_dump 拿到 argv 后会把它们**当成客户端编码来解读**；
+ * 连接编码默认是数据库编码（UTF8），于是每个非法字节被替换成 2 字节的坏序列
+ * C0 20，再发给服务器，服务器直接拒绝：
+ *
+ *     ERROR: invalid byte sequence for encoding "UTF8": 0xc0 0x20
+ *
+ * 于是表名里只要有一个中文就备份失败（-t "public"."专用道_v1"）。表名全 ASCII 时
+ * GBK 字节 == UTF-8 字节，问题不会暴露。
+ *
+ * 修法分两级：
+ *
+ *  1) 首选——把非 ASCII 从命令行里挪出去。表名含非 ASCII 时不再逐个用 -t 传，改成写出
+ *     一份 --filter 文件（PostgreSQL 17 起提供）交给 pg_dump。文件内容是 UTF-8，pg_dump
+ *     按客户端编码（=数据库编码 UTF8）正常读取；命令行里于是只剩 ASCII，客户端编码
+ *     完全不必改动，备份文件仍是 UTF8。这一级没有任何副作用：既不会把库里带生僻字的
+ *     数据（GBK 装不下的字符，如 U+4D16）逼到失败，也不改变输出编码。
+ *
+ *  2) 兜底——非 ASCII 仍然留在命令行里时（pg_dump 低于 17 用不了 --filter，或中文出现在
+ *     库名/Schema/用户名上），把 PGCLIENTENCODING 设成“系统 ANSI 代码页对应的 PostgreSQL
+ *     编码名”，让 pg_dump 正确地按该编码解读 argv。副作用是备份文件变成该编码（如 GBK），
+ *     文件自带 SET client_encoding = 'GBK'; 属自描述，psql / pg_restore 恢复无碍；但该
+ *     编码装不下的字符会让 pg_dump 明确报错退出（exit 1）——不会静默丢数据，却会备份失败。
+ *
+ * 触发判断只统计"会经 argv 送给服务器解析"的值（主机/用户/库名/Schema/表名），**不含**
+ * -f 的输出文件路径：那是本地文件系统路径、不发给服务器，把它算进来会让"表名全 ASCII、
+ * 只是目标目录名带中文"的机器误开 PGCLIENTENCODING，反而把原本正常的备份打挂。
+ * Linux（麒麟）下 argv 以 UTF-8 原样传递，两级都不触发，行为与改动前一致。
+ * ================================================================= */
+
+// 命令行参数里是否出现非 ASCII 字符
+static bool listHasNonAscii(const QStringList& list)
+{
+    for (const QString& s : list)
+    {
+        for (const QChar& c : s)
+        {
+            if (c.unicode() > 0x7F)
+                return true;
+        }
+    }
+    return false;
+}
+
+// 系统 ANSI 代码页 -> PostgreSQL 编码名；未收录的代码页返回空串（调用方跳过设置）
+static QString postgresEncodingForSystemAnsi()
+{
+    QString enc;
+#ifdef Q_OS_WIN
+    switch (GetACP())
+    {
+    case 874:   enc = QStringLiteral("WIN874");  break;
+    case 932:   enc = QStringLiteral("SJIS");    break;   // 日文
+    case 936:   enc = QStringLiteral("GBK");     break;   // 简体中文
+    case 949:   enc = QStringLiteral("UHC");     break;   // 韩文
+    case 950:   enc = QStringLiteral("BIG5");    break;   // 繁体中文
+    case 1250:  enc = QStringLiteral("WIN1250"); break;
+    case 1251:  enc = QStringLiteral("WIN1251"); break;
+    case 1252:  enc = QStringLiteral("WIN1252"); break;
+    case 1253:  enc = QStringLiteral("WIN1253"); break;
+    case 1254:  enc = QStringLiteral("WIN1254"); break;
+    case 1255:  enc = QStringLiteral("WIN1255"); break;
+    case 1256:  enc = QStringLiteral("WIN1256"); break;
+    case 1257:  enc = QStringLiteral("WIN1257"); break;
+    case 1258:  enc = QStringLiteral("WIN1258"); break;
+    case 65001: enc = QStringLiteral("UTF8");    break;
+    default:    enc.clear();                     break;
+    }
+#endif
+    return enc;
+}
+
+/*========== 【2026-09-11】PostgreSQL 客户端工具解析（辅助函数） ==========
+ * 策略与背景见 map_check_backup_manager.h 里 resolvePgClientTool() 的注释。
+ * ====================================================================== */
+
+// 连一次数据库问出服务器大版本号（18.6 -> 18）。失败返回 false，调用方据此跳过版本校验。
+static bool queryPostgresServerMajor(const QString& host, int port, const QString& dbName,
+                                     const QString& user, const QString& password,
+                                     int& majorOut, QString& versionTextOut)
+{
+    majorOut = -1;
+    versionTextOut.clear();
+
+    if (dbName.isEmpty())
+        return false;
+
+    const QByteArray baHost     = host.toUtf8();
+    const QByteArray baPort     = QString::number(port).toUtf8();
+    const QByteArray baDbName   = dbName.toUtf8();
+    const QByteArray baUser     = user.toUtf8();
+    const QByteArray baPassword = password.toUtf8();
+
+    const char* keys[] = { "host", "port", "dbname", "user", "password",
+                           "connect_timeout", "application_name", nullptr };
+    const char* vals[] = { baHost.constData(), baPort.constData(), baDbName.constData(),
+                           baUser.constData(), baPassword.constData(),
+                           "5", "map_quality_check_tools", nullptr };
+
+    PGconn* conn = PQconnectdbParams(keys, vals, 0);
+    if (!conn || PQstatus(conn) != CONNECTION_OK)
+    {
+        if (conn) PQfinish(conn);
+        return false;
+    }
+
+    const int verNum = PQserverVersion(conn);   // 例如 180006
+    if (verNum > 0)
+    {
+        majorOut = verNum / 10000;
+        // server_version 文本（如 "18.6 (Debian 18.6-1)"）仅用于提示，拿不到也不影响
+        PGresult* res = PQexec(conn, "SHOW server_version");
+        if (res && PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0)
+        {
+            const QString text = QString::fromUtf8(PQgetvalue(res, 0, 0)).trimmed();
+            // 只保留前面的版本号部分，去掉括号里的发行版说明
+            QRegExp re(QStringLiteral("^([0-9][0-9.]*)"));
+            versionTextOut = (re.indexIn(text) >= 0) ? re.cap(1) : text;
+        }
+        if (res) PQclear(res);
+    }
+
+    PQfinish(conn);
+    return majorOut > 0;
+}
+
+// 跑一次 "<exe> --version"，取出版本号文本。例："pg_dump (PostgreSQL) 15.2" -> "15.2"。
+// 探测失败（启动不了 / 非 0 退出 / 输出解析不出来）返回空串。
+static QString probePgToolVersionText(const QString& exePath)
+{
+    QProcess proc;
+    proc.start(exePath, QStringList() << QStringLiteral("--version"));
+    if (!proc.waitForStarted(5000))
+        return QString();
+    if (!proc.waitForFinished(5000))
+    {
+        proc.kill();
+        proc.waitForFinished(1000);
+        return QString();
+    }
+    if (proc.exitCode() != 0)
+        return QString();
+
+    const QString out = QString::fromLocal8Bit(proc.readAllStandardOutput())
+                      + QString::fromLocal8Bit(proc.readAllStandardError());
+
+    QRegExp re(QStringLiteral("([0-9]+\\.[0-9]+)"));
+    if (re.indexIn(out) < 0)
+        return QString();
+    return re.cap(1);
+}
+
+// 从版本号文本取大版本号（"15.2" -> 15）。取不到返回 -1。
+static int majorFromVersionText(const QString& verText)
+{
+    QRegExp re(QStringLiteral("^([0-9]+)"));
+    if (re.indexIn(verText) < 0)
+        return -1;
+    return re.cap(1).toInt();
+}
+
+// 收集本机 PostgreSQL 的 bin 目录候选（与盘符无关）。
+static void collectPgBinDirs(QStringList& dirs)
+{
+#ifdef Q_OS_WIN
+    // a) 官方安装器登记的安装位置。
+    //    实测本机（装在 D 盘）：HKLM\SOFTWARE\PostgreSQL\Installations\postgresql-x64-17
+    //      Base Directory = D:\Software\postgreSQL   Version = 17.5-1
+    //    这正是"客户装在别的盘、我们不知道在哪"的解法——安装器会如实记录。
+    {
+        QSettings reg(QStringLiteral("HKEY_LOCAL_MACHINE\\SOFTWARE\\PostgreSQL\\Installations"),
+                      QSettings::NativeFormat);
+        const QStringList groups = reg.childGroups();
+        for (const QString& group : groups)
+        {
+            reg.beginGroup(group);
+            const QString base = reg.value(QStringLiteral("Base Directory")).toString();
+            reg.endGroup();
+            if (base.isEmpty())
+                continue;
+            const QString bin = QDir::fromNativeSeparators(base) + QStringLiteral("/bin");
+            if (QDir(bin).exists() && !dirs.contains(bin))
+                dirs << bin;
+        }
+    }
+
+    // b) 兜底：服务登记的可执行路径。
+    //    ImagePath 形如 "D:\Software\postgreSQL\bin\pg_ctl.exe" runservice -N ... -D "..."
+    //    取 "\bin\" 之前那段即为安装根目录。
+    {
+        QSettings services(QStringLiteral("HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services"),
+                           QSettings::NativeFormat);
+        const QStringList groups = services.childGroups();
+        for (const QString& group : groups)
+        {
+            if (!group.startsWith(QStringLiteral("postgresql"), Qt::CaseInsensitive))
+                continue;
+            services.beginGroup(group);
+            const QString image = services.value(QStringLiteral("ImagePath")).toString();
+            services.endGroup();
+            if (image.isEmpty())
+                continue;
+            const int idx = image.lastIndexOf(QStringLiteral("\\bin\\"), -1, Qt::CaseInsensitive);
+            if (idx <= 0)
+                continue;
+            const QString bin = QDir::fromNativeSeparators(image.left(idx)) + QStringLiteral("/bin");
+            if (QDir(bin).exists() && !dirs.contains(bin))
+                dirs << bin;
+        }
+    }
+
+    // c) 各盘符的常见安装位置（覆盖注册表没登记的情况，如解压版、绿色版）。
+    for (char drive = 'C'; drive <= 'Z'; ++drive)
+    {
+        const QString root = QString(QChar(drive)) + QStringLiteral(":/");
+        if (!QDir(root).exists())
+            continue;
+        for (int ver = 9; ver <= 20; ++ver)
+        {
+            const QStringList bases = {
+                root + QStringLiteral("Program Files/PostgreSQL/%1").arg(ver),
+                root + QStringLiteral("Program Files (x86)/PostgreSQL/%1").arg(ver),
+                root + QStringLiteral("PostgreSQL/%1").arg(ver),
+            };
+            for (const QString& b : bases)
+            {
+                const QString bin = b + QStringLiteral("/bin");
+                if (QDir(bin).exists() && !dirs.contains(bin))
+                    dirs << bin;
+            }
+        }
+    }
+#else
+    // Linux（麒麟）：服务端工具在 /usr/lib/postgresql/<版本>/bin；
+    // postgresql-client 装的 psql/pg_dump 一般在 /usr/bin。
+    {
+        QDir pgRoot(QStringLiteral("/usr/lib/postgresql"));
+        if (pgRoot.exists())
+        {
+            const QStringList versions = pgRoot.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+            for (const QString& v : versions)
+            {
+                const QString bin = pgRoot.filePath(v + QStringLiteral("/bin"));
+                if (QDir(bin).exists() && !dirs.contains(bin))
+                    dirs << bin;
+            }
+        }
+    }
+    const QStringList sysDirs = {
+        QStringLiteral("/usr/bin"),
+        QStringLiteral("/usr/local/bin"),
+        QStringLiteral("/usr/local/pgsql/bin"),
+        QStringLiteral("/usr/lib/postgresql/bin"),
+    };
+    for (const QString& d : sysDirs)
+    {
+        if (QDir(d).exists() && !dirs.contains(d))
+            dirs << d;
+    }
+#endif
+}
+
+// 解析客户端工具的可用路径。语义见头文件注释。
+QString CMapCheckBackupManager::resolvePgClientTool(const QString& toolName,
+                                                    const QString& host, int port, const QString& dbName,
+                                                    const QString& user, const QString& password,
+                                                    QString& errMsg,
+                                                    bool enforceVersionGate)
+{
+    errMsg.clear();
+
+#ifdef Q_OS_WIN
+    const QString exeSuffix = QStringLiteral(".exe");
+#else
+    const QString exeSuffix = QString();
+#endif
+
+    // ---- 1) 先问服务器版本。连不上不算失败，只是退化成"选能找到的最高版本"。----
+    int serverMajor = -1;
+    QString serverVerText;
+    queryPostgresServerMajor(host, port, dbName, user, password, serverMajor, serverVerText);
+
+    // 结果按 (工具名, 服务器大版本, 是否开闸门) 缓存：同一进程内反复备份不必每次重扫磁盘 + 重跑子进程。
+    static QMap<QString, QString> s_mapResolved;
+    const QString cacheKey = toolName + QLatin1Char('|') + QString::number(serverMajor)
+                           + QLatin1Char('|') + (enforceVersionGate ? QLatin1Char('1') : QLatin1Char('0'));
+    if (s_mapResolved.contains(cacheKey))
+        return s_mapResolved.value(cacheKey);
+
+    // ---- 2) 收集候选可执行文件，按可靠性从高到低 ----
+    QStringList candidates;
+
+    QStringList binDirs;
+    collectPgBinDirs(binDirs);
+    for (const QString& d : binDirs)
+    {
+        const QString exe = QDir(d).filePath(toolName + exeSuffix);
+        if (QFileInfo::exists(exe) && !candidates.contains(exe))
+            candidates << exe;
+    }
+
+    // 历史硬编码路径（保留兼容，但要过下面的版本闸门才可能被选中）
+#ifdef Q_OS_WIN
+    {
+        const QString legacy = QStringLiteral("D:/Software/postgreSQL/bin/") + toolName + exeSuffix;
+        if (QFileInfo::exists(legacy) && !candidates.contains(legacy))
+            candidates << legacy;
+    }
+#endif
+
+    // PATH 上的同名工具也纳入候选——但同样必须过版本闸门。
+    // 客户机上的 15.2 就是这样被抓到的；在这里它会被服务器版本淘汰掉。
+    const QString pathExe = QStandardPaths::findExecutable(toolName);
+    if (!pathExe.isEmpty() && !candidates.contains(pathExe))
+        candidates << pathExe;
+
+    // ---- 3) 版本闸门 ----
+    // gate 为真：只接受大版本 >= 服务器大版本的候选（pg_dump / pg_restore 的硬性要求）。
+    // gate 为假：不设下限，直接选能找到的最高版本（psql，或没能问到服务器版本时）。
+    const bool gate = (enforceVersionGate && serverMajor > 0);
+
+    int bestMajor = -1;
+    QString bestPath;
+    QStringList foundTexts;   // 用于失败时的提示
+
+    for (const QString& exe : candidates)
+    {
+        const QString verText = probePgToolVersionText(exe);
+        if (verText.isEmpty())
+            continue;
+        const int major = majorFromVersionText(verText);
+        if (major < 0)
+            continue;
+
+        const QString mark = (gate && major < serverMajor) ? tr("  [版本过低]") : QString();
+        foundTexts << QStringLiteral("%1%2  %3")
+                          .arg(verText, mark, QDir::toNativeSeparators(exe));
+
+        if (gate)
+        {
+            // pg_dump / pg_restore 要求工具大版本 >= 目标服务器大版本，否则会在连接阶段
+            // 直接报 "aborting because of server version mismatch"。
+            if (major < serverMajor)
+                continue;
+            // 够用的里面挑最贴近服务器的（同版本最稳），避免无谓地用一个过新的工具
+            if (bestMajor < 0 || major < bestMajor)
+            {
+                bestMajor = major;
+                bestPath = exe;
+            }
+        }
+        else
+        {
+            if (major > bestMajor)
+            {
+                bestMajor = major;
+                bestPath = exe;
+            }
+        }
+    }
+
+    if (!bestPath.isEmpty())
+    {
+        writeLog(tr("选用 %1: %2 (v%3)")
+                     .arg(toolName, QDir::toNativeSeparators(bestPath), QString::number(bestMajor)));
+        if (serverMajor > 0)
+            writeLog(tr("数据库服务器版本: %1").arg(
+                serverVerText.isEmpty() ? QString::number(serverMajor) : serverVerText));
+        s_mapResolved.insert(cacheKey, bestPath);
+        return bestPath;
+    }
+
+    // ---- 4) 一个候选都没通过闸门 ----
+    if (!foundTexts.isEmpty())
+    {
+        // 情况 A：探测到了版本，但都不够新。这正是客户机上发生的那种失败，
+        // 必须把"服务器是几、本机只有几"说清楚，而不是像原来那样闷头用旧工具。
+        if (gate)
+        {
+            errMsg = tr("数据库服务器为 PostgreSQL %1，但本机没有版本足够新的 %2 工具。\n"
+                        "PostgreSQL 不允许用低版本客户端访问高版本服务器，操作会直接失败。\n"
+                        "请在本机安装 PostgreSQL %3 的客户端工具后重试。")
+                         .arg(serverVerText.isEmpty() ? QString::number(serverMajor) : serverVerText,
+                              toolName, QString::number(serverMajor));
+        }
+        else
+        {
+            errMsg = tr("未找到可用的 %1 工具。").arg(toolName);
+        }
+        errMsg += tr("\n\n本机已找到：\n%1").arg(foundTexts.join(QStringLiteral("\n")));
+        writeLog(errMsg);
+        // 不缓存失败结果：用户装好工具后无需重启即可重试。
+        return QString();
+    }
+
+    // 情况 B：所有候选都探测不出有效版本（被安全软件拦截、非标准构建等）。
+    // 此时无从判断版本，保留改动前的行为——PATH 上有同名工具就继续用，总比直接判死好。
+    if (!pathExe.isEmpty())
+    {
+        errMsg = tr("未能识别 %1 的版本号，将直接使用 PATH 上的 %2（可能因版本不匹配而失败）。")
+                     .arg(toolName, QDir::toNativeSeparators(pathExe));
+        writeLog(errMsg);
+        s_mapResolved.insert(cacheKey, pathExe);
+        return pathExe;
+    }
+
+    // 情况 C：本机连一个同名工具都没有。
+    errMsg = tr("未找到 %1 工具。\n"
+                "请确认 PostgreSQL 已安装，或手动将 PostgreSQL 的 bin 目录加入系统 PATH 环境变量后重启程序。")
+                 .arg(toolName);
+    writeLog(errMsg);
+    return QString();
+}
 
 CMapCheckBackupManager* CMapCheckBackupManager::instance()
 {
@@ -152,6 +587,9 @@ void CMapCheckBackupManager::saveSettings()
             settings.setValue(prefix + "DbBackupScope", static_cast<int>(strategy.eDbBackupScope), QgsSettings::Section::Plugins);
             settings.setValue(prefix + "DbBackupMethod", static_cast<int>(strategy.eDbBackupMethod), QgsSettings::Section::Plugins);
             settings.setValue(prefix + "DbBackupFormat", static_cast<int>(strategy.eDbBackupFormat), QgsSettings::Section::Plugins);
+            // 【2026-09-11】选中的表列表原先没有落盘，定时备份取到的策略里
+            // lstDbTables 恒为空 -> 不加任何 -t -> 静默退化成整库备份。补上。
+            settings.setValue(prefix + "DbTables", strategy.lstDbTables, QgsSettings::Section::Plugins);
         }
     }
 
@@ -204,6 +642,8 @@ void CMapCheckBackupManager::loadSettings()
             strategy.eDbBackupScope = static_cast<DatabaseBackupScope>(settings.value(prefix + "DbBackupScope", 0, QgsSettings::Section::Plugins).toInt());
             strategy.eDbBackupMethod = static_cast<DatabaseBackupMethod>(settings.value(prefix + "DbBackupMethod", 0, QgsSettings::Section::Plugins).toInt());
             strategy.eDbBackupFormat = static_cast<DatabaseBackupFormat>(settings.value(prefix + "DbBackupFormat", 0, QgsSettings::Section::Plugins).toInt());
+            // 【2026-09-11】与 saveSettings 对应：恢复选中的表列表（旧版无此项时为空表）
+            strategy.lstDbTables = settings.value(prefix + "DbTables", QStringList(), QgsSettings::Section::Plugins).toStringList();
         }
         m_vecStrategies.push_back(strategy);
     }
@@ -459,24 +899,37 @@ bool CMapCheckBackupManager::incrementalBackup(const QString& srcPath, const QSt
 
 bool CMapCheckBackupManager::databaseBackup(const TimedBackupStrategy& strategy, const QString& dstPath, const QString& backupName)
 {
-    // 查找 pg_dump（与数据库连接配置 UI 相同策略）
-    QStringList candidates = {
-        "D:/Software/postgreSQL/bin/pg_dump.exe",
-        "/usr/bin/pg_dump",
-        "/usr/lib/postgresql/16/bin/pg_dump",
-    };
-    QString pgDumpPath;
-    for (const auto& c : candidates) {
-        if (QFile::exists(c)) { pgDumpPath = c; break; }
-    }
-    // 也尝试在 PATH 中查找
-    if (pgDumpPath.isEmpty()) pgDumpPath = "pg_dump";
-    if (pgDumpPath.isEmpty())
+    // 检查数据库名称是否为空
+    // 【2026-09-11】这一检查由原先的"查完 pg_dump 之后"提到了最前面：解析 pg_dump 需要
+    // 先拿到库名才能连库问出服务器版本，再据此挑一个版本够新的 pg_dump
+    // （详见 resolvePgClientTool 的注释）。原顺序下库名为空会先建出空目录再失败。
+    if (strategy.strDbName.isEmpty())
     {
-        m_qstrLastError = tr("未找到 pg_dump 工具。\n"
-                             "请确认 PostgreSQL 已安装，或手动将 PostgreSQL 的 bin 目录加入系统 PATH 环境变量后重启程序。");
+        m_qstrLastError = tr("数据库名称为空，请输入数据库名称。");
         writeLog(m_qstrLastError);
         return false;
+    }
+
+    // 解析 pg_dump：客户端大版本必须 >= 服务器大版本，否则连接阶段就会被驳回。
+    QString toolErr;
+    const QString pgDumpPath = resolvePgClientTool(
+        QStringLiteral("pg_dump"),
+        strategy.strDbHost.isEmpty() ? QStringLiteral("127.0.0.1") : strategy.strDbHost,
+        strategy.nDbPort,
+        strategy.strDbName,
+        strategy.strDbUser.isEmpty() ? QStringLiteral("postgres") : strategy.strDbUser,
+        strategy.strDbPassword,
+        toolErr);
+
+    if (pgDumpPath.isEmpty())
+    {
+        m_qstrLastError = toolErr;   // resolvePgClientTool 内部已写日志
+        return false;
+    }
+    if (!toolErr.isEmpty())
+    {
+        // 拿到了可用路径、但附带一条降级说明（例如没能识别出版本号）：记日志后照常继续
+        writeLog(toolErr);
     }
 
     QDir dstDir(dstPath + QDir::separator() + backupName);
@@ -488,14 +941,6 @@ bool CMapCheckBackupManager::databaseBackup(const TimedBackupStrategy& strategy,
             writeLog(m_qstrLastError);
             return false;
         }
-    }
-
-    // 检查数据库名称是否为空
-    if (strategy.strDbName.isEmpty())
-    {
-        m_qstrLastError = tr("数据库名称为空，请输入数据库名称。");
-        writeLog(m_qstrLastError);
-        return false;
     }
 
     // 构建数据库连接信息字符串
@@ -523,23 +968,93 @@ bool CMapCheckBackupManager::databaseBackup(const TimedBackupStrategy& strategy,
 
     // 构建 pg_dump 命令参数
     QStringList args;
-    args << "-h" << (strategy.strDbHost.isEmpty() ? "127.0.0.1" : strategy.strDbHost);
+    // 【2026-09-11】另记一份"会经 argv 送给服务器解析"的值（主机/用户/库名/Schema/表名），
+    // 只有它们与 pg_dump 的 argv 编码问题有关（见文件头说明）。-f 的输出文件路径是本地
+    // 文件系统路径、不发给服务器，**绝不能**参与判断——否则目标目录名里带中文（例如桌面
+    // 上名为"备份"的文件夹）就会在表名全 ASCII 的库上误开 PGCLIENTENCODING，把那台机器
+    // 上原本正常的备份打挂。
+    QStringList serverSideValues;
+
+    const QString strHost   = strategy.strDbHost.isEmpty() ? QStringLiteral("127.0.0.1") : strategy.strDbHost;
+    const QString strUser   = strategy.strDbUser.isEmpty() ? QStringLiteral("postgres") : strategy.strDbUser;
+    const QString strSchema = strategy.strDbSchema;
+
+    args << "-h" << strHost;
     args << "-p" << QString::number(strategy.nDbPort);
-    args << "-U" << (strategy.strDbUser.isEmpty() ? "postgres" : strategy.strDbUser);
+    args << "-U" << strUser;
     args << "-d" << strategy.strDbName;
+    serverSideValues << strHost << strUser << strategy.strDbName;
+
+    // 表名含非 ASCII 时临时写出、用完即删的 --filter 文件
+    QString strTableFilterFile;
 
     // 根据备份范围构建参数
     if (strategy.eDbBackupScope == DatabaseBackupScope::Schema &&
         !strategy.strDbSchema.isEmpty())
     {
-        args << "-n" << strategy.strDbSchema;
+        args << "-n" << strSchema;
+        serverSideValues << strSchema;
     }
     else if (strategy.eDbBackupScope == DatabaseBackupScope::SelectedTables &&
         !strategy.lstDbTables.isEmpty())
     {
+        QStringList tablePatterns;
         for (const QString& table : strategy.lstDbTables)
         {
-            args << "-t" << ("\"" + strategy.strDbSchema + "\".\"" + table + "\"");
+            tablePatterns << ("\"" + strSchema + "\".\"" + table + "\"");
+        }
+
+        // 表名/Schema 全是 ASCII 时走原来的 -t 路径，行为与改动前逐字一致。
+        // 含非 ASCII 时优先把表名从命令行里挪走，改用一份 --filter 文件传递：
+        // 文件内容是 UTF-8，pg_dump 按客户端编码（=数据库编码 UTF8）正常读取，命令行里
+        // 于是不再有非 ASCII，客户端编码也就不必改动——备份文件仍是 UTF8，不会因为数据里
+        // 有 GBK 装不下的字符（生僻字如 U+4D16）而失败。--filter 自 PostgreSQL 17 起提供。
+        bool bUseFilter = false;
+#ifdef Q_OS_WIN
+        if (listHasNonAscii(tablePatterns))
+        {
+            const int nDumpMajor = majorFromVersionText(probePgToolVersionText(pgDumpPath));
+            bUseFilter = (nDumpMajor >= 17);
+        }
+#endif
+        if (bUseFilter)
+        {
+            strTableFilterFile = QDir::tempPath() + QDir::separator() +
+                QString("ltzk_pgdump_filter_%1.txt")
+                    .arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmsszzz"));
+
+            QFile fileFilter(strTableFilterFile);
+            QStringList filterLines;
+            for (const QString& pattern : tablePatterns)
+            {
+                filterLines << QString("include table %1").arg(pattern);
+            }
+
+            if (fileFilter.open(QIODevice::WriteOnly | QIODevice::Truncate) &&
+                fileFilter.write(filterLines.join("\n").toUtf8() + "\n") > 0)
+            {
+                fileFilter.close();
+                args << QString("--filter=%1").arg(strTableFilterFile);
+            }
+            else
+            {
+                // 写不出临时文件就退回 -t（老办法，由下面的 PGCLIENTENCODING 兜底）
+                fileFilter.close();
+                writeLog(tr("表名含非 ASCII，但无法写入过滤文件 %1，退回 -t 参数方式")
+                             .arg(strTableFilterFile));
+                QFile::remove(strTableFilterFile);
+                strTableFilterFile.clear();
+                bUseFilter = false;
+            }
+        }
+
+        if (!bUseFilter)
+        {
+            for (const QString& pattern : tablePatterns)
+            {
+                args << "-t" << pattern;
+                serverSideValues << pattern;
+            }
         }
     }
 
@@ -561,16 +1076,53 @@ bool CMapCheckBackupManager::databaseBackup(const TimedBackupStrategy& strategy,
         args << "-f" << backupFile;
     }
 
-    // 设置环境变量（密码）
+    // 【2026-09-11】--filter 临时文件用完即删；下面每个提前返回的分支都要调一次。
+    auto removeTableFilterFile = [&strTableFilterFile]()
+    {
+        if (!strTableFilterFile.isEmpty())
+        {
+            QFile::remove(strTableFilterFile);
+            strTableFilterFile.clear();
+        }
+    };
+
+    // 【2026-09-11】兜底路径：只有在"非 ASCII 仍然留在命令行里"时才设客户端编码
+    // （表名已改走 --filter 的情形不算；剩下的可能是中文库名/Schema/用户名，或 pg_dump
+    // 低于 17 而没法用 --filter）。不设的话 pg_dump 会把 ANSI 字节当 UTF-8 解读并生成
+    // 非法序列，见文件头说明。注意这里判断的是 serverSideValues，**不含** -f 输出路径。
+    QString strPgClientEnc;
+#ifdef Q_OS_WIN
+    if (listHasNonAscii(serverSideValues))
+    {
+        strPgClientEnc = postgresEncodingForSystemAnsi();
+    }
+#endif
+
+    // 设置环境变量（密码 / 客户端编码）
     QProcess process;
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     if (!strategy.strDbPassword.isEmpty())
     {
         env.insert("PGPASSWORD", strategy.strDbPassword);
     }
+    if (!strPgClientEnc.isEmpty())
+    {
+        env.insert("PGCLIENTENCODING", strPgClientEnc);
+    }
     process.setProcessEnvironment(env);
 
-    writeLog(tr("开始数据库备份: pg_dump %1").arg(args.join(" ")));
+    // 【2026-09-11】日志里带上实际选用的 pg_dump 路径：排查版本问题时一眼能看出用的是哪一个。
+    // 非 ASCII 时同时记下 PGCLIENTENCODING，便于区分“编码修复是否生效”。
+    if (!strTableFilterFile.isEmpty())
+    {
+        writeLog(tr("表名含非 ASCII，已改用 --filter 文件传递表名（备份文件仍为 UTF8）: %1")
+                     .arg(strTableFilterFile));
+    }
+    writeLog(tr("开始数据库备份: %1 %2%3")
+                 .arg(QDir::toNativeSeparators(pgDumpPath), args.join(" "),
+                      strPgClientEnc.isEmpty()
+                          ? QString()
+                          : tr("  [PGCLIENTENCODING=%1]").arg(strPgClientEnc)));
     emit backupProgress(tr("正在备份数据库 %1 ...").arg(strategy.strDbName));
 
     process.start(pgDumpPath, args);
@@ -578,6 +1130,7 @@ bool CMapCheckBackupManager::databaseBackup(const TimedBackupStrategy& strategy,
     {
         m_qstrLastError = tr("pg_dump 启动失败: %1").arg(process.errorString());
         writeLog(m_qstrLastError);
+        removeTableFilterFile();
         return false;
     }
 
@@ -586,6 +1139,7 @@ bool CMapCheckBackupManager::databaseBackup(const TimedBackupStrategy& strategy,
         m_qstrLastError = tr("pg_dump 执行超时");
         writeLog(m_qstrLastError);
         process.kill();
+        removeTableFilterFile();
         return false;
     }
 
@@ -617,6 +1171,7 @@ bool CMapCheckBackupManager::databaseBackup(const TimedBackupStrategy& strategy,
             BackupDataSource::Database, dbConnInfo);
         writeLog(tr("数据库备份成功: %1 -> %2").arg(strategy.strDbName, backupFile));
         m_qstrLastError.clear();
+        removeTableFilterFile();
         return true;
     }
     else
@@ -624,6 +1179,7 @@ bool CMapCheckBackupManager::databaseBackup(const TimedBackupStrategy& strategy,
         QString error = QString::fromLocal8Bit(process.readAllStandardError());
         m_qstrLastError = tr("pg_dump 失败 (exit=%1): %2").arg(process.exitCode()).arg(error.trimmed());
         writeLog(m_qstrLastError);
+        removeTableFilterFile();
         return false;
     }
 }
@@ -984,9 +1540,40 @@ bool CMapCheckBackupManager::restoreBackupToDatabase(const QString& backupPath,
 
     bool allSuccess = true;
 
+    // 【2026-09-11】解析恢复所需的客户端工具路径。
+    // 原来 pg_restore / psql 都是裸调 PATH 上的同名程序，客户机上会抓到 LTZK 自带
+    // OSGeo4W 里的 15.2——它读不了 18.6 服务器导出的 .dump，恢复同样会失败。
+    // pg_restore 要过版本闸门；psql 只执行 SQL 文本，官方允许连任意版本服务器，不设下限。
+    QString toolErr;
+    QString pgRestorePath;
+    QString psqlPath;
+    if (!dumpFiles.isEmpty())
+    {
+        pgRestorePath = resolvePgClientTool(QStringLiteral("pg_restore"), host, port, dbName,
+                                            username, password, toolErr);
+        if (pgRestorePath.isEmpty())
+        {
+            writeLog(tr("无法恢复 .dump 文件：%1").arg(toolErr));
+            allSuccess = false;
+        }
+    }
+    if (!sqlFiles.isEmpty() || !gzFiles.isEmpty())
+    {
+        psqlPath = resolvePgClientTool(QStringLiteral("psql"), host, port, dbName,
+                                       username, password, toolErr, false);
+        if (psqlPath.isEmpty())
+        {
+            writeLog(tr("无法恢复 .sql / .sql.gz 文件：%1").arg(toolErr));
+            allSuccess = false;
+        }
+    }
+
     // 1. 恢复 .dump 文件 (pg_restore)
     for (const QString& dumpFile : dumpFiles)
     {
+        if (pgRestorePath.isEmpty())
+            continue;   // 找不到可用的 pg_restore，原因已在上面记录
+
         writeLog(tr("正在恢复 dump 文件: %1").arg(dumpFile));
 
         QProcess process;
@@ -1011,7 +1598,7 @@ bool CMapCheckBackupManager::restoreBackupToDatabase(const QString& backupPath,
         args << dumpFile;
 
         emit restoreProgress(tr("正在恢复: %1").arg(QFileInfo(dumpFile).fileName()));
-        process.start("pg_restore", args);
+        process.start(pgRestorePath, args);
 
         if (!process.waitForStarted(10000))
         {
@@ -1048,6 +1635,9 @@ bool CMapCheckBackupManager::restoreBackupToDatabase(const QString& backupPath,
     // 2. 恢复 .sql.gz 文件 (先解压再 psql)
     for (const QString& gzFile : gzFiles)
     {
+        if (psqlPath.isEmpty())
+            continue;   // 找不到可用的 psql，原因已在上面记录（提前跳过，免得白解压一遍）
+
         writeLog(tr("正在恢复压缩 SQL 文件: %1").arg(gzFile));
 
         // 解压到临时文件
@@ -1087,7 +1677,7 @@ bool CMapCheckBackupManager::restoreBackupToDatabase(const QString& backupPath,
                  << "-f" << tempSqlFile;
 
         emit restoreProgress(tr("正在恢复: %1").arg(QFileInfo(gzFile).fileName()));
-        psqlProcess.start("psql", psqlArgs);
+        psqlProcess.start(psqlPath, psqlArgs);
 
         if (!psqlProcess.waitForStarted(10000))
         {
@@ -1128,6 +1718,9 @@ bool CMapCheckBackupManager::restoreBackupToDatabase(const QString& backupPath,
     // 3. 恢复 .sql 文件 (psql)
     for (const QString& sqlFile : sqlFiles)
     {
+        if (psqlPath.isEmpty())
+            continue;   // 找不到可用的 psql，原因已在上面记录
+
         writeLog(tr("正在恢复 SQL 文件: %1").arg(sqlFile));
 
         QProcess process;
@@ -1141,7 +1734,7 @@ bool CMapCheckBackupManager::restoreBackupToDatabase(const QString& backupPath,
              << "-f" << sqlFile;
 
         emit restoreProgress(tr("正在恢复: %1").arg(QFileInfo(sqlFile).fileName()));
-        process.start("psql", args);
+        process.start(psqlPath, args);
 
         if (!process.waitForStarted(10000))
         {

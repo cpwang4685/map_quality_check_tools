@@ -1,465 +1,495 @@
 #include "se_mission458_check.h"
-#include "qgsvectorlayer.h"
+
+#include "../ui_task/wuji_mission_runner.h"
+
 #include "qgsfeature.h"
-#include "qgsfields.h"
 #include "qgsgeometry.h"
-#include "qgspointxy.h"
-#include "qgslinestring.h"
-#include "qgspolygon.h"
 #include "qgscurve.h"
 #include "qgsgeometrycollection.h"
+#include "qgsspatialindex.h"
+#include "qgsvectorlayer.h"
+#include "qgsproviderregistry.h"
+#include "qgsprovidermetadata.h"
+#include "qgsprovidersublayerdetails.h"
+#include "qgswkbtypes.h"
+
 #include <QDir>
+#include <QDirIterator>
+#include <QDomDocument>
+#include <QDomElement>
+#include <QFile>
 #include <QFileInfo>
-#include <QSet>
+#include <QHash>
 #include <QMap>
+#include <QSet>
 #include <cmath>
-#include <functional>
 
-using namespace Mission458;
+// ---- Mission 458 本地实现说明 ----
+// 引擎路线（DataBufferMatch/MapBatchProcessing.exe）在成果数据上稳定失败
+// （引擎写中间文件丢 .shx 后重开失败），已改为 QGIS 本地缓冲匹配：
+//   1. 按图层映射表（成果图层名→源图层代码）或同名规则配对原始/成果图层；
+//   2. 成果要素按缓冲距离与原始要素求交（重叠面积/长度比），
+//      无原始来源的成果要素记为"未匹配"，显著变形的记为"变形"；
+//   3. 原始要素被综合掉（成果中找不到对应）属综合正常现象，只统计不报错。
+// 匹配参数优先从 matchParameter.xml 读取（config 目录随包提供），
+// 未找到时使用下列默认值（成果为投影坐标，单位米）。
+namespace Mission458 {
 
-// ====== 比较几何变化 ======
-void Mission458::compareGeometry(const QgsFeature& origFeat, const QgsFeature& resultFeat,
-    double& areaChange, double& lengthChange, int& vertexChange)
+static const double DEFAULT_BUFFER_DISTANCE = 10.0;   // 默认缓冲匹配距离（米）
+static const double DEFAULT_MIN_OVERLAP_RATIO = 0.5;  // 重叠面积/长度比低于该值视为未匹配
+static const double DEFAULT_MAX_CHANGE_RATIO = 0.3;   // 面积/长度变化率超过 30% 视为显著变形
+static const int    DEFAULT_MAX_VERTEX_CHANGE = 10;   // 顶点数变化超过 10 个视为显著变形
+
+// 匹配参数集（matchParameter.xml 提供，缺文件时取默认值）
+struct MatchParams {
+    double bufferDistance = DEFAULT_BUFFER_DISTANCE;
+    double minOverlapRatio = DEFAULT_MIN_OVERLAP_RATIO;
+    double maxChangeRatio = DEFAULT_MAX_CHANGE_RATIO;
+    int maxVertexChange = DEFAULT_MAX_VERTEX_CHANGE;
+    bool loadedFromFile = false;
+};
+
+// 解析 matchParameter.xml：
+// <MapGeneBatchProcessing><Mission id="458"><Parameter>
+//   <BufferDistance>10</BufferDistance><MinOverlapRatio>0.5</MinOverlapRatio>
+//   <MaxChangeRatio>0.3</MaxChangeRatio><MaxVertexChange>10</MaxVertexChange>
+// </Parameter></Mission></MapGeneBatchProcessing>
+static MatchParams loadMatchParams(const QString& path)
+{
+    MatchParams p;
+    if (path.isEmpty() || !QFileInfo::exists(path))
+        return p;
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+        return p;
+    QDomDocument doc;
+    if (!doc.setContent(&file)) {
+        file.close();
+        return p;
+    }
+    file.close();
+    const QDomElement param = doc.documentElement()
+        .firstChildElement(QStringLiteral("Mission"))
+        .firstChildElement(QStringLiteral("Parameter"));
+    if (param.isNull())
+        return p;
+    const auto readDouble = [&param](const QString& tag, double def) -> double {
+        const QDomElement e = param.firstChildElement(tag);
+        if (e.isNull())
+            return def;
+        bool ok = false;
+        const double v = e.text().trimmed().toDouble(&ok);
+        return ok ? v : def;
+    };
+    p.bufferDistance  = readDouble(QStringLiteral("BufferDistance"), DEFAULT_BUFFER_DISTANCE);
+    p.minOverlapRatio = readDouble(QStringLiteral("MinOverlapRatio"), DEFAULT_MIN_OVERLAP_RATIO);
+    p.maxChangeRatio  = readDouble(QStringLiteral("MaxChangeRatio"), DEFAULT_MAX_CHANGE_RATIO);
+    p.maxVertexChange = static_cast<int>(readDouble(QStringLiteral("MaxVertexChange"),
+                                                    DEFAULT_MAX_VERTEX_CHANGE));
+    p.loadedFromFile  = true;
+    return p;
+}
+
+// 递归收集目录下全部 .shp 绝对路径（原始数据按分类子目录存放，需要递归）
+static QStringList shpPathsIn(const QString& dir)
+{
+    QStringList paths;
+    QDirIterator it(dir, QStringList() << QStringLiteral("*.shp"),
+                    QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) paths.append(it.next());
+    return paths;
+}
+
+// 枚举 FileGDB 中全部矢量图层：返回 图层名(代码) → 图层URI列表
+// URI 形如 "D:/xxx/永登县.gdb|layername=LRDL"，可直接交给 QgsVectorLayer 打开；
+// 图层名即标准图层代码（LRDL/HYDL_HL/...），与图层映射表 sourceCode 列天然对应。
+static QHash<QString, QStringList> gdbLayersByCode(const QString& gdbPath)
+{
+    QHash<QString, QStringList> byCode;
+    QgsProviderMetadata* ogrMd =
+        QgsProviderRegistry::instance()->providerMetadata(QStringLiteral("ogr"));
+    if (!ogrMd) return byCode;
+    const QList<QgsProviderSublayerDetails> subs = ogrMd->querySublayers(gdbPath);
+    for (const QgsProviderSublayerDetails& s : subs) {
+        if (s.type() != QgsMapLayerType::VectorLayer) continue;   // 跳过非矢量子层
+        if (s.wkbType() == QgsWkbTypes::Unknown
+            || s.wkbType() == QgsWkbTypes::NoGeometry) continue;   // 跳过纯属性表
+        const QString name = s.name();
+        if (name.isEmpty()) continue;
+        byCode[name].append(s.uri());
+    }
+    return byCode;
+}
+
+// 在图层字段中查找标识字段（候选名大小写无关，找不到返回空）
+static QString findField(const QgsVectorLayer* layer, const QStringList& candidates)
+{
+    if (!layer) return QString();
+    const QgsFields& fields = layer->fields();
+    for (const QString& c : candidates) {
+        if (fields.indexOf(c) >= 0) return c;
+    }
+    for (int i = 0; i < fields.count(); i++) {
+        const QString fn = fields.at(i).name();
+        for (const QString& c : candidates) {
+            if (fn.compare(c, Qt::CaseInsensitive) == 0) return fn;
+        }
+    }
+    return QString();
+}
+
+// 去掉常见综合后缀（_选取/_名称/_点/_方向点/_注记/_跳绘），用于图层配对回退
+static QString stripSuffix(const QString& base)
+{
+    const QStringList suffixes = {
+        QStringLiteral("_选取"), QStringLiteral("_名称"), QStringLiteral("_点"),
+        QStringLiteral("_方向点"), QStringLiteral("_注记"), QStringLiteral("_跳绘")};
+    for (const QString& sfx : suffixes) {
+        if (base.endsWith(sfx))
+            return base.left(base.length() - sfx.length());
+    }
+    return base;
+}
+
+// 成果要素与原始要素的重叠比：面→面积比、线→长度比（分母取原始要素，
+// 综合后尺度更小、要素更大，原始要素大部分被覆盖即视为有来源）
+static double overlapRatio(const QgsGeometry& resultGeom, const QgsGeometry& origGeom)
+{
+    if (resultGeom.isNull() || origGeom.isNull()) return 0.0;
+    const QgsWkbTypes::GeometryType rt = resultGeom.type();
+    const QgsWkbTypes::GeometryType ot = origGeom.type();
+    if (rt == QgsWkbTypes::PolygonGeometry && ot == QgsWkbTypes::PolygonGeometry) {
+        const double ob = origGeom.area();
+        if (ob <= 0.0) return 0.0;
+        return resultGeom.intersection(origGeom).area() / ob;
+    }
+    if (rt == QgsWkbTypes::LineGeometry && ot == QgsWkbTypes::LineGeometry) {
+        const double lb = origGeom.length();
+        if (lb <= 0.0) return 0.0;
+        return resultGeom.intersection(origGeom).length() / lb;
+    }
+    return resultGeom.intersects(origGeom) ? 1.0 : 0.0;
+}
+
+// 统计顶点数（多部件递归）
+static int countVertices(const QgsAbstractGeometry* g)
+{
+    if (!g) return 0;
+    if (g->dimension() == 0) return 1;
+    if (const QgsCurve* curve = dynamic_cast<const QgsCurve*>(g))
+        return curve->numPoints();
+    if (const QgsGeometryCollection* gc = dynamic_cast<const QgsGeometryCollection*>(g)) {
+        int n = 0;
+        for (int i = 0; i < gc->numGeometries(); i++)
+            n += countVertices(gc->geometryN(i));
+        return n;
+    }
+    return 0;
+}
+
+// 比较综合前后几何变化（移植自 7-27 集成版）
+static void compareGeometry(const QgsFeature& origFeat, const QgsFeature& resultFeat,
+                            double& areaChange, double& lengthChange, int& vertexChange)
 {
     areaChange = 0.0;
     lengthChange = 0.0;
     vertexChange = 0;
 
-    QgsGeometry origGeom = origFeat.geometry();
-    QgsGeometry resultGeom = resultFeat.geometry();
+    const QgsGeometry origGeom = origFeat.geometry();
+    const QgsGeometry resultGeom = resultFeat.geometry();
     if (origGeom.isNull() || resultGeom.isNull()) return;
 
-    // 面积变化（面要素）
-    double origArea = origGeom.area();
-    double resultArea = resultGeom.area();
-    if (origArea > 0.0 && resultArea > 0.0) {
+    const double origArea = origGeom.area();
+    const double resultArea = resultGeom.area();
+    if (origArea > 0.0 && resultArea > 0.0)
         areaChange = (resultArea - origArea) / origArea;
-    }
 
-    // 长度变化（线要素）
-    double origLen = origGeom.length();
-    double resultLen = resultGeom.length();
-    if (origLen > 0.0 && resultLen > 0.0) {
+    const double origLen = origGeom.length();
+    const double resultLen = resultGeom.length();
+    if (origLen > 0.0 && resultLen > 0.0)
         lengthChange = (resultLen - origLen) / origLen;
-    }
 
-    // 顶点数变化
-    int origVerts = 0, resultVerts = 0;
-    std::function<int(const QgsAbstractGeometry*)> countVerts;
-    countVerts = [&](const QgsAbstractGeometry* g) -> int {
-        if (!g) return 0;
-        if (g->dimension() == 0) return 1;
-        const QgsCurve* curve = dynamic_cast<const QgsCurve*>(g);
-        if (curve) return curve->numPoints();
-        const QgsGeometryCollection* gc = dynamic_cast<const QgsGeometryCollection*>(g);
-        if (gc) {
-            int n = 0;
-            for (int i = 0; i < gc->numGeometries(); i++)
-                n += countVerts(gc->geometryN(i));
-            return n;
-        }
-        return 0;
-    };
-    if (origGeom.constGet())
-        origVerts = countVerts(origGeom.constGet());
-    if (resultGeom.constGet())
-        resultVerts = countVerts(resultGeom.constGet());
+    const int origVerts = countVertices(origGeom.constGet());
+    const int resultVerts = countVertices(resultGeom.constGet());
     if (origVerts > 0 && resultVerts > 0)
         vertexChange = resultVerts - origVerts;
 }
 
-// ====== 比较属性变化 ======
-QStringList Mission458::compareAttributes(const QgsFeature& origFeat, const QgsFeature& resultFeat,
-    const QStringList& ignoreFields)
+// basename → 路径列表（同名冲突时保留全部，选择时按确定性规则取）
+static QHash<QString, QStringList> groupByBase(const QStringList& shps)
 {
-    QStringList changes;
-    const QgsFields& oFields = origFeat.fields();
-    const QgsFields& rFields = resultFeat.fields();
-
-    for (int i = 0; i < oFields.count(); i++) {
-        QString fn = oFields.at(i).name();
-        if (ignoreFields.contains(fn, Qt::CaseInsensitive)) continue;
-        // 跳过FormerID/综合前ID字段（综合前后必然不同）
-        if (fn.compare("FormerID", Qt::CaseInsensitive) == 0) continue;
-        if (fn.compare("FORMER_ID", Qt::CaseInsensitive) == 0) continue;
-        if (fn.compare("OldID", Qt::CaseInsensitive) == 0) continue;
-        if (fn.compare("SrcID", Qt::CaseInsensitive) == 0) continue;
-
-        int ri = rFields.indexOf(fn);
-        if (ri < 0) continue; // 字段仅存在于原始数据
-
-        QVariant oVal = origFeat.attribute(i);
-        QVariant rVal = resultFeat.attribute(ri);
-
-        if (oVal.isNull() && rVal.isNull()) continue;
-        if (oVal.isNull() != rVal.isNull() || oVal.toString() != rVal.toString()) {
-            changes.append(QString("%1: '%2' → '%3'")
-                .arg(fn, oVal.isNull() ? "(null)" : oVal.toString(),
-                     rVal.isNull() ? "(null)" : rVal.toString()));
-        }
-    }
-    return changes;
+    QHash<QString, QStringList> byBase;
+    for (const QString& p : shps)
+        byBase[QFileInfo(p).completeBaseName()].append(p);
+    return byBase;
 }
 
-// ====== 匹配两个图层 ======
-QList<MatchResult> Mission458::matchLayers(QgsVectorLayer* origLayer, QgsVectorLayer* resultLayer,
-    const QString& eidField, const QString& formerIdField)
+// 同名 basename 冲突时选目录最浅者（更接近数据根目录，通常是主数据），
+// 深度相同则按路径字典序取首个，保证每次运行结果一致；冲突时经 note 记入日志
+static QString pickPath(const QStringList& paths, QString* ambiguousNote = nullptr)
 {
-    QList<MatchResult> results;
-    if (!origLayer || !resultLayer) return results;
-
-    // 构建原始数据EntityID索引
-    QMap<QString, QgsFeature> origIndex;
-    {
-        int eidIdx = origLayer->fields().indexOf(eidField);
-        if (eidIdx < 0) return results;
-
-        QgsFeatureIterator it = origLayer->getFeatures();
-        QgsFeature feat;
-        while (it.nextFeature(feat)) {
-            QString eid = feat.attribute(eidIdx).toString().trimmed();
-            if (!eid.isEmpty())
-                origIndex[eid] = feat;
-        }
+    if (paths.isEmpty()) return QString();
+    if (paths.size() > 1 && ambiguousNote) {
+        QStringList others;
+        for (int i = 1; i < paths.size(); ++i) others.append(paths.at(i));
+        *ambiguousNote = QStringLiteral("（同名%1个，另见：%2）")
+            .arg(paths.size()).arg(others.join(QStringLiteral("; ")));
     }
-
-    // 构建成果数据索引（通过EntityID 和 FormerID 两种方式）
-    QMap<QString, QgsFeature> resultByEid, resultByFormerId;
-    {
-        int eidIdx = resultLayer->fields().indexOf(eidField);
-        int fidIdx = formerIdField.isEmpty() ? -1 : resultLayer->fields().indexOf(formerIdField);
-
-        QgsFeatureIterator it = resultLayer->getFeatures();
-        QgsFeature feat;
-        while (it.nextFeature(feat)) {
-            if (eidIdx >= 0) {
-                QString eid = feat.attribute(eidIdx).toString().trimmed();
-                if (!eid.isEmpty()) resultByEid[eid] = feat;
-            }
-            if (fidIdx >= 0) {
-                QString fid = feat.attribute(fidIdx).toString().trimmed();
-                if (!fid.isEmpty()) resultByFormerId[fid] = feat;
-            }
-        }
-    }
-
-    QSet<QString> matchedResultIds;
-    QStringList ignoreFields = {"Shape_Area", "Shape_Leng", "BSM", "LoadTime", "UpdateTime",
-                                 "BornTime", "EndTime", "UpdateSts"};
-
-    // 匹配原始数据 → 成果数据
-    for (auto it = origIndex.begin(); it != origIndex.end(); ++it) {
-        const QString& origEid = it.key();
-        const QgsFeature& origFeat = it.value();
-
-        MatchResult mr;
-        mr.entityId = origEid;
-        mr.isNew = false;
-        mr.isRemoved = false;
-
-        // 尝试通过EntityID匹配
-        QgsFeature matchedFeat;
-        bool found = false;
-
-        if (resultByEid.contains(origEid)) {
-            matchedFeat = resultByEid[origEid];
-            found = true;
-            matchedResultIds.insert(origEid);
-        }
-        // 尝试通过FormerID匹配（成果数据的FormerID指向原始数据的EntityID）
-        else if (resultByFormerId.contains(origEid)) {
-            matchedFeat = resultByFormerId[origEid];
-            found = true;
-            // 也记录成果数据的EntityID
-            int eidIdx = resultLayer->fields().indexOf(eidField);
-            if (eidIdx >= 0) {
-                QString reid = matchedFeat.attribute(eidIdx).toString().trimmed();
-                if (!reid.isEmpty()) matchedResultIds.insert(reid);
-            }
-        }
-
-        if (found) {
-            mr.matched = true;
-            compareGeometry(origFeat, matchedFeat, mr.areaChange, mr.lengthChange, mr.vertexChange);
-            mr.attrChanges = compareAttributes(origFeat, matchedFeat, ignoreFields);
-        } else {
-            mr.matched = false;
-            mr.isRemoved = true; // 原始数据中的要素在成果数据中找不到了
-        }
-
-        results.append(mr);
-    }
-
-    // 查找新增要素（在成果数据中存在但原始数据中没有）
-    for (auto it = resultByEid.begin(); it != resultByEid.end(); ++it) {
-        if (matchedResultIds.contains(it.key())) continue;
-
-        // 同时检查FormerID是否指向原始数据
-        const QgsFeature& feat = it.value();
-        int fidIdx = formerIdField.isEmpty() ? -1 : resultLayer->fields().indexOf(formerIdField);
-        bool hasFormerMatch = false;
-        if (fidIdx >= 0) {
-            QString fid = feat.attribute(fidIdx).toString().trimmed();
-            if (!fid.isEmpty() && origIndex.contains(fid))
-                hasFormerMatch = true;
-        }
-
-        if (!origIndex.contains(it.key()) && !hasFormerMatch) {
-            MatchResult mr;
-            mr.entityId = it.key();
-            mr.matched = false;
-            mr.isNew = true;
-            mr.isRemoved = false;
-            results.append(mr);
-        }
-    }
-
-    return results;
-}
-
-// ====== 带图层映射的入口 ======
-void Mission458::executeWithMapping(const QString& origDir, const QString& resultDir,
-    int processMode,
-    const QHash<QString, QString>& layerMapping,
-    QList<QPair<QgsFeature, QString>>& allErrors,
-    QStringList& executedChecks)
-{
-    execute(origDir, resultDir, processMode, allErrors, executedChecks, &layerMapping);
-    executedChecks.append("(使用图层映射)");
-}
-
-// ====== 主入口（可选图层映射） ======
-void Mission458::execute(const QString& origDir, const QString& resultDir,
-    int processMode,
-    QList<QPair<QgsFeature, QString>>& allErrors,
-    QStringList& executedChecks,
-    const QHash<QString, QString>* layerMapping)
-{
-    Q_UNUSED(processMode) // 458目前只有模式1，全部执行
-
-    // 自动探测字段
-    auto resolveField = [&](const QgsVectorLayer* lyr, const QStringList& candidates,
-                             bool fuzzyMatch = false) -> QString {
-        if (!lyr) return QString();
-        // 精确匹配候选名
-        for (const auto& c : candidates) {
-            if (lyr->fields().indexOf(c) >= 0) return c;
-        }
-        // 模糊匹配（实体标识字段）
-        if (fuzzyMatch) {
-            const QgsFields& fields = lyr->fields();
-            for (int i = 0; i < fields.count(); i++) {
-                QString fn = fields.at(i).name();
-                if (fn.compare("ELEMID", Qt::CaseInsensitive) == 0) return fn;
-                if (fn.compare("FEATID", Qt::CaseInsensitive) == 0) return fn;
-                if (fn.compare("FeatureID", Qt::CaseInsensitive) == 0) return fn;
-                if (fn.contains("ELEM", Qt::CaseInsensitive) && fn.contains("ID", Qt::CaseInsensitive)) return fn;
-                if (fn.contains("Entity", Qt::CaseInsensitive) && fn.contains("ID", Qt::CaseInsensitive))
-                    return fn;
-            }
-        }
-        return QString();
+    QString best = paths.first();
+    const auto depthOf = [](const QString& p) {
+        return p.count(QLatin1Char('/')) + p.count(QLatin1Char('\\'));
     };
+    int bestDepth = depthOf(best);
+    for (const QString& p : paths) {
+        const int d = depthOf(p);
+        if (d < bestDepth || (d == bestDepth && p < best)) {
+            bestDepth = d;
+            best = p;
+        }
+    }
+    return best;
+}
+
+// 成果图层名 → 原始 SHP 路径配对。
+// 优先用图层映射表（成果图层名→源图层代码），回退同名/去后缀同名；
+// 同名 basename 冲突按"目录最浅优先"确定性规则选取，不再后写覆盖先写。
+// origByBase: 原始数据条目（basename 或 GDB 图层代码 → 路径/URI 列表）
+static QMap<QString, QString> pairLayers(const QHash<QString, QStringList>& origByBase,
+                                         const QStringList& resultShps,
+                                         const QHash<QString, QString>* layerMapping,
+                                         QStringList* ambiguousNotes)
+{
+    QStringList resultNames;
+    for (const QString& p : resultShps)
+        resultNames.append(QFileInfo(p).completeBaseName());
+
+    QMap<QString, QString> pairs; // 成果 basename → 原始路径
+    for (const QString& r : resultNames) {
+        QString origPath;
+        // 1) 图层映射表（支持去后缀回退）
+        if (layerMapping) {
+            const QString stripped = stripSuffix(r);
+            const auto it = layerMapping->constFind(r);
+            const auto it2 = layerMapping->constFind(stripped);
+            const QString code = (it != layerMapping->constEnd()) ? it.value()
+                               : (it2 != layerMapping->constEnd()) ? it2.value() : QString();
+            if (!code.isEmpty()) {
+                const auto oit = origByBase.constFind(code);
+                if (oit != origByBase.constEnd()) {
+                    QString note;
+                    origPath = pickPath(oit.value(), &note);
+                    if (!note.isEmpty() && ambiguousNotes)
+                        ambiguousNotes->append(QStringLiteral("[%1] 源图层代码%2存在同名SHP%3")
+                                                   .arg(r, code, note));
+                }
+            }
+        }
+        // 2) 同名 / 去后缀同名
+        if (origPath.isEmpty()) {
+            const QStringList& same = origByBase.value(r);
+            const QStringList& cand = same.isEmpty()
+                ? origByBase.value(stripSuffix(r)) : same;
+            if (!cand.isEmpty()) {
+                QString note;
+                origPath = pickPath(cand, &note);
+                if (!note.isEmpty() && ambiguousNotes)
+                    ambiguousNotes->append(QStringLiteral("[%1] 原始数据存在同名SHP%2").arg(r, note));
+            }
+        }
+        if (!origPath.isEmpty()) pairs[r] = origPath;
+    }
+    return pairs;
+}
+
+void executeWithMapping(const QString& origDir, const QString& resultDir,
+                        int processMode,
+                        const QHash<QString, QString>& layerMapping,
+                        QList<QPair<QgsFeature, QString>>& allErrors,
+                        QStringList& executedChecks,
+                        const QString& matchParamPath)
+{
+    execute(origDir, resultDir, processMode, allErrors, executedChecks,
+            &layerMapping, matchParamPath);
+}
+
+void execute(const QString& origDir, const QString& resultDir,
+             int processMode,
+             QList<QPair<QgsFeature, QString>>& allErrors,
+             QStringList& executedChecks,
+             const QHash<QString, QString>* layerMapping,
+             const QString& matchParamPath)
+{
+    Q_UNUSED(processMode) // 458 只有模式1（综合前后要素匹配检查），全部执行
 
     if (origDir.isEmpty() || resultDir.isEmpty()) {
-        executedChecks.append("综合前后匹配(跳过：需要原始数据目录和成果数据目录两个数据源)");
+        executedChecks.append(QStringLiteral("综合前后匹配：需同时提供原始数据与成果数据，本次未执行"));
         return;
     }
 
-    // 扫描两个目录的SHP文件
-    QDir oDir(origDir), rDir(resultDir);
-    QStringList oShps = oDir.entryList({"*.shp"}, QDir::Files, QDir::Name);
-    QStringList rShps = rDir.entryList({"*.shp"}, QDir::Files, QDir::Name);
+    // 匹配参数：优先 matchParameter.xml，缺失时取默认值并在日志中注明
+    const MatchParams mp = loadMatchParams(matchParamPath);
+    if (!mp.loadedFromFile)
+        executedChecks.append(QStringLiteral("综合前后匹配(未找到matchParameter.xml，使用默认参数："
+                                             "缓冲%1米/重叠比%2/变化率%3/顶点差%4)")
+            .arg(mp.bufferDistance).arg(mp.minOverlapRatio)
+            .arg(mp.maxChangeRatio).arg(mp.maxVertexChange));
 
-    if (oShps.isEmpty() || rShps.isEmpty()) {
-        executedChecks.append(QString("综合前后匹配(跳过：原始数据%1个SHP，成果数据%2个SHP)")
-            .arg(oShps.size()).arg(rShps.size()));
+    // 原始数据支持两种形态：SHP 目录（递归收集）或 FileGDB（枚举图层，层名=图层代码）
+    const bool origIsGdb = WujiMissionRunner::isFileGdbSource(origDir);
+    const QHash<QString, QStringList> origByBase = origIsGdb
+        ? gdbLayersByCode(origDir) : groupByBase(shpPathsIn(origDir));
+    const QStringList resultShps = shpPathsIn(resultDir);
+    if (origByBase.isEmpty() || resultShps.isEmpty()) {
+        executedChecks.append(QStringLiteral("综合前后匹配：无可参与匹配的图层（原始数据%1个图层，成果数据%2个SHP），本次未执行")
+                                  .arg(origByBase.size()).arg(resultShps.size()));
         return;
     }
 
-    executedChecks.append(QString("原始数据: %1个图层, 成果数据: %2个图层")
-        .arg(oShps.size()).arg(rShps.size()));
+    executedChecks.append((origIsGdb
+        ? QStringLiteral("原始数据(FileGDB): %1个图层, 成果数据: %2个图层")
+        : QStringLiteral("原始数据: %1个图层, 成果数据: %2个图层"))
+        .arg(origByBase.size()).arg(resultShps.size()));
 
-    // 构建查找索引
-    QMap<QString, QString> oBaseMap; // basename→full path (orig: GDB代码命名如BOUP6, BOUA6等)
-    for (const auto& s : oShps) {
-        QString base = s;
-        base.remove(".shp");
-        oBaseMap[base] = origDir + "/" + s;
-    }
-    QMap<QString, QString> rBaseMap; // basename→full path (result: 中文标准名命名如市级驻地、飞地_标注等)
-    for (const auto& s : rShps) {
-        QString base = s;
-        base.remove(".shp");
-        rBaseMap[base] = resultDir + "/" + s;
-    }
+    const QHash<QString, QStringList> resultByBaseGroup = groupByBase(resultShps);
+    QMap<QString, QString> resultByBase; // 成果 basename → 路径（同名冲突取目录最浅）
+    for (auto git = resultByBaseGroup.constBegin(); git != resultByBaseGroup.constEnd(); ++git)
+        resultByBase[git.key()] = pickPath(git.value());
 
-    // 构建GDB代码→原始SHP的索引（方便快速查找）
-    QHash<QString, QString> gdbToOrigPath; // "BOUP6" → origDir/BOUP6.shp
-    for (auto it = oBaseMap.begin(); it != oBaseMap.end(); ++it) {
-        gdbToOrigPath[it.key()] = it.value();
+    QStringList ambiguousNotes;
+    const QMap<QString, QString> pairs =
+        pairLayers(origByBase, resultShps, layerMapping, &ambiguousNotes);
+    for (const QString& n : ambiguousNotes)
+        executedChecks.append(QStringLiteral("综合前后匹配图层配对提示：%1").arg(n));
+    if (pairs.isEmpty()) {
+        executedChecks.append(QStringLiteral("综合前后匹配：原始数据与成果数据中未找到可配对图层，本次未执行"));
+        return;
     }
 
-    int totalMatched = 0, totalRemoved = 0, totalNew = 0;
-    int totalAttrChanges = 0, totalGeomChanges = 0;
-    int comparedLayers = 0;
+    int totalMatched = 0, totalUnmatched = 0, totalChanged = 0, totalDropped = 0;
 
-    if (layerMapping && !layerMapping->isEmpty())
-        executedChecks.append(QString("已加载图层映射表(%1条对应关系)").arg(layerMapping->size()));
+    for (auto pit = pairs.constBegin(); pit != pairs.constEnd(); ++pit) {
+        const QString resultName = pit.key();
+        const QString origPath = pit.value();
+        const QString resultPath = resultByBase.value(resultName);
+        if (resultPath.isEmpty()) continue;
 
-    // 遍历成果数据图层（中文标准名命名），通过映射表找到对应的原始数据图层
-    for (auto rit = rBaseMap.begin(); rit != rBaseMap.end(); ++rit) {
-        const QString& rBaseName = rit.key();  // 成果图层中文名（如"市级驻地"）
-        const QString& rPath = rit.value();
-
-        // 通过图层映射表查找对应的GDB代码
-        QString gdbCode;
-        if (layerMapping && layerMapping->contains(rBaseName)) {
-            gdbCode = (*layerMapping)[rBaseName];
-        } else {
-            // 无映射条目时跳过（无法确定对应关系）
+        QgsVectorLayer origLayer(origPath, QStringLiteral("m458_orig"), QStringLiteral("ogr"));
+        QgsVectorLayer resultLayer(resultPath, QStringLiteral("m458_result"), QStringLiteral("ogr"));
+        if (!origLayer.isValid() || !resultLayer.isValid()) {
+            executedChecks.append(QStringLiteral("[%1] 图层打开失败，本图层未参与匹配").arg(resultName));
             continue;
         }
 
-        // 在原始数据中查找GDB代码对应的SHP文件
-        QString oPath;
-        if (gdbToOrigPath.contains(gdbCode)) {
-            oPath = gdbToOrigPath[gdbCode];
-        } else {
-            // 尝试匹配带后缀的（如BOUP6_A, BOUP6_L, BOUP6_P）
-            QStringList geomSuffixes = {"", "_A", "_L", "_P", "_R"};
-            for (const auto& sfx : geomSuffixes) {
-                QString tryKey = gdbCode + sfx;
-                if (gdbToOrigPath.contains(tryKey)) {
-                    oPath = gdbToOrigPath[tryKey];
+        // 原始要素索引（一次性装入内存做空间查询）
+        QgsSpatialIndex origIndex;
+        QVector<QgsFeature> origFeats;
+        QHash<QgsFeatureId, int> origPos; // fid → origFeats 下标
+        {
+            QgsFeatureIterator fit = origLayer.getFeatures();
+            QgsFeature f;
+            while (fit.nextFeature(f)) {
+                origIndex.addFeature(f);
+                origPos.insert(f.id(), origFeats.size());
+                origFeats.append(f);
+            }
+        }
+        if (origFeats.isEmpty()) {
+            executedChecks.append(QStringLiteral("[%1] 原始图层无要素，本图层未参与匹配").arg(resultName));
+            continue;
+        }
+
+        // 成果标识字段（ELEMID 等），用于错误消息定位
+        const QString eidField = findField(&resultLayer, QStringList()
+            << QStringLiteral("ELEMID") << QStringLiteral("EntityID")
+            << QStringLiteral("FormerID"));
+        // 原始图层标识字段：ELEMID 一致的候选即为来源要素（优先匹配）
+        const QString origEidField = findField(&origLayer, QStringList()
+            << QStringLiteral("ELEMID") << QStringLiteral("EntityID")
+            << QStringLiteral("FormerID"));
+        const int origEidIdx = origEidField.isEmpty() ? -1
+            : origLayer.fields().indexOf(origEidField);
+
+        QSet<QgsFeatureId> usedOrigIds;
+        int layerMatched = 0, layerUnmatched = 0, layerChanged = 0;
+
+        QgsFeatureIterator rit = resultLayer.getFeatures();
+        QgsFeature rf;
+        while (rit.nextFeature(rf)) {
+            const QgsGeometry rGeom = rf.geometry();
+            if (rGeom.isNull()) continue;
+
+            const QString eid = eidField.isEmpty() ? QString()
+                : rf.attribute(rf.fields().indexOf(eidField)).toString().trimmed();
+            const QString eidText = eid.isEmpty() ? QString() : QStringLiteral(" ELEMID='%1'").arg(eid);
+
+            // 缓冲后按包围盒查询候选原始要素
+            const QgsGeometry bufGeom = rGeom.buffer(mp.bufferDistance, 5);
+            const QList<QgsFeatureId> candIds =
+                origIndex.intersects(bufGeom.boundingBox());
+
+            // 候选选取：ELEMID 一致者优先（综合会移动/简化几何，重叠比最高的
+            // 候选未必是原要素）；无同标识候选时取重叠比最大者。
+            double bestRatio = 0.0;
+            const QgsFeature* bestOrig = nullptr;
+            bool eidMatched = false;
+            for (const QgsFeatureId oid : candIds) {
+                const auto posIt = origPos.constFind(oid);
+                if (posIt == origPos.constEnd()) continue;
+                const QgsFeature& of = origFeats.at(posIt.value());
+                if (origEidIdx >= 0 && !eid.isEmpty()
+                    && of.attribute(origEidIdx).toString().trimmed() == eid) {
+                    bestOrig = &of;
+                    eidMatched = true;
                     break;
                 }
-            }
-            if (oPath.isEmpty()) {
-                // 尝试oBaseMap中的模糊匹配
-                for (auto oit = oBaseMap.begin(); oit != oBaseMap.end(); ++oit) {
-                    if (oit.key().startsWith(gdbCode)) {
-                        oPath = oit.value();
-                        break;
-                    }
+                const double ratio = overlapRatio(bufGeom, of.geometry());
+                if (ratio > bestRatio) {
+                    bestRatio = ratio;
+                    bestOrig = &of;
                 }
             }
-        }
 
-        if (oPath.isEmpty()) {
-            executedChecks.append(QString("[%1] 跳过：未找到GDB代码'%2'对应的原始SHP")
-                .arg(rBaseName, gdbCode));
-            continue;
-        }
+            if (!bestOrig || (!eidMatched && bestRatio < mp.minOverlapRatio)) {
+                // 成果要素在原始数据中找不到来源 → 异常
+                totalUnmatched++; layerUnmatched++;
+                allErrors.append(qMakePair(rf, QStringLiteral("[%1] 综合前后未匹配：%2缓冲范围内无原始要素来源")
+                                                  .arg(resultName, eidText)));
+                continue;
+            }
 
-        comparedLayers++;
+            usedOrigIds.insert(bestOrig->id());
+            totalMatched++; layerMatched++;
 
-        // 打开图层
-        QgsVectorLayer* oLyr = new QgsVectorLayer(oPath, gdbCode, "ogr");
-        QgsVectorLayer* rLyr = new QgsVectorLayer(rPath, rBaseName, "ogr");
-
-        if (!oLyr || !oLyr->isValid() || !rLyr || !rLyr->isValid()) {
-            delete oLyr; delete rLyr;
-            continue;
-        }
-
-        // 查找实体编码字段（自动探测）
-        QString eidField = resolveField(oLyr,
-            {"ELEMID", "ELEM_ID", "FEATID", "FeatureID", "EntityID", "ENTITYID", "entityid", "Id"}, true);
-        if (eidField.isEmpty())
-            eidField = resolveField(rLyr,
-                {"ELEMID", "ELEM_ID", "FEATID", "FeatureID", "EntityID", "ENTITYID", "entityid", "Id"}, true);
-        // FormerID：成果数据中指向原始数据EntityID的字段
-        QString formerIdField = resolveField(rLyr,
-            {"FormerID", "FORMERID", "formerid", "FormerId", "FORMER_ID",
-             "OldID", "OLDID", "PreID", "PREID", "SourceID", "SRCID"}, false);
-
-        if (eidField.isEmpty()) {
-            executedChecks.append(QString("[%1↔%2] 跳过：未找到实体标识字段(ELEMID)")
-                .arg(rBaseName, gdbCode));
-            delete oLyr; delete rLyr;
-            continue;
-        }
-
-        // 执行匹配
-        QList<MatchResult> matchResults = matchLayers(oLyr, rLyr, eidField, formerIdField);
-
-        int layerMatched = 0, layerRemoved = 0, layerNew = 0;
-
-        for (const auto& mr : matchResults) {
-            if (mr.isRemoved) {
-                totalRemoved++; layerRemoved++;
-                QgsFeature feat;
-                QgsFeatureIterator fit = oLyr->getFeatures();
-                int eidIdx = oLyr->fields().indexOf(eidField);
-                while (fit.nextFeature(feat)) {
-                    if (feat.attribute(eidIdx).toString().trimmed() == mr.entityId) break;
-                }
-                allErrors.append(qMakePair(feat,
-                    QString("[%1↔%2] 要素消失：实体编码='%3'在原始数据中存在但在成果数据中未找到")
-                        .arg(rBaseName, gdbCode, mr.entityId)));
-            } else if (mr.isNew) {
-                totalNew++; layerNew++;
-                QgsFeature feat;
-                QgsFeatureIterator fit = rLyr->getFeatures();
-                int eidIdx = rLyr->fields().indexOf(eidField);
-                while (fit.nextFeature(feat)) {
-                    if (feat.attribute(eidIdx).toString().trimmed() == mr.entityId) break;
-                }
-                allErrors.append(qMakePair(feat,
-                    QString("[%1↔%2] 新增要素：实体编码='%3'在成果数据中存在但在原始数据中未找到")
-                        .arg(rBaseName, gdbCode, mr.entityId)));
-            } else if (mr.matched) {
-                totalMatched++; layerMatched++;
-
-                QStringList warnings;
-                if (std::abs(mr.areaChange) > 0.3)
-                    warnings.append(QString("面积变化%1%").arg(static_cast<int>(mr.areaChange * 100)));
-                if (std::abs(mr.lengthChange) > 0.3)
-                    warnings.append(QString("长度变化%1%").arg(static_cast<int>(mr.lengthChange * 100)));
-                if (std::abs(mr.vertexChange) > 10)
-                    warnings.append(QString("顶点数变化%1").arg(mr.vertexChange));
-
-                if (!mr.attrChanges.isEmpty()) {
-                    totalAttrChanges++;
-                    if (mr.attrChanges.size() <= 3)
-                        warnings.append(QString("属性变化: %1").arg(mr.attrChanges.join(", ")));
-                    else
-                        warnings.append(QString("属性变化: %1等%2项")
-                            .arg(mr.attrChanges.mid(0,3).join(", ")).arg(mr.attrChanges.size()));
-                }
-
-                if (!warnings.isEmpty()) {
-                    totalGeomChanges++;
-                    QgsFeature feat;
-                    QgsFeatureIterator fit = rLyr->getFeatures();
-                    int eidIdx = rLyr->fields().indexOf(eidField);
-                    while (fit.nextFeature(feat)) {
-                        if (feat.attribute(eidIdx).toString().trimmed() == mr.entityId) break;
-                    }
-                    allErrors.append(qMakePair(feat,
-                        QString("[%1↔%2] 实体编码='%3'综合前后变化: %4")
-                            .arg(rBaseName, gdbCode, mr.entityId, warnings.join("; "))));
-                }
+            // 显著变形检测
+            double areaChange = 0.0, lengthChange = 0.0;
+            int vertexChange = 0;
+            compareGeometry(*bestOrig, rf, areaChange, lengthChange, vertexChange);
+            QStringList warnings;
+            if (std::abs(areaChange) > mp.maxChangeRatio)
+                warnings.append(QStringLiteral("面积变化%1%").arg(static_cast<int>(areaChange * 100)));
+            if (std::abs(lengthChange) > mp.maxChangeRatio)
+                warnings.append(QStringLiteral("长度变化%1%").arg(static_cast<int>(lengthChange * 100)));
+            if (std::abs(vertexChange) > mp.maxVertexChange)
+                warnings.append(QStringLiteral("顶点数变化%1").arg(vertexChange));
+            if (!warnings.isEmpty()) {
+                totalChanged++; layerChanged++;
+                allErrors.append(qMakePair(rf, QStringLiteral("[%1] 综合前后变形：%2%3")
+                                                  .arg(resultName, warnings.join(QStringLiteral("; ")), eidText)));
             }
         }
 
-        executedChecks.append(QString("[%1↔%2] 匹配%3/消失%4/新增%5/属性变化%6/几何变化%7 (字段:%8%9)")
-            .arg(rBaseName, gdbCode)
-            .arg(layerMatched).arg(layerRemoved).arg(layerNew)
-            .arg(totalAttrChanges).arg(totalGeomChanges)
-            .arg(eidField)
-            .arg(formerIdField.isEmpty() ? "" : QString("/%1").arg(formerIdField)));
+        // 原始要素被综合掉（无成果要素覆盖）只统计，不报错——综合会按选取指标舍弃要素
+        totalDropped += origFeats.size() - usedOrigIds.size();
 
-        delete oLyr; delete rLyr;
+        executedChecks.append(QStringLiteral("[%1] 匹配%2/未匹配%3/显著变形%4 (缓冲%5米)")
+                                  .arg(resultName)
+                                  .arg(layerMatched).arg(layerUnmatched).arg(layerChanged)
+                                  .arg(mp.bufferDistance));
     }
 
-    // 汇总
-    executedChecks.append(QString("综合前后匹配汇总: %1个可比图层, %2条匹配, %3条消失, %4条新增, %5条属性变化, %6条几何变化")
-        .arg(comparedLayers).arg(totalMatched).arg(totalRemoved).arg(totalNew)
-        .arg(totalAttrChanges).arg(totalGeomChanges));
-
-    if (comparedLayers == 0) {
-        executedChecks.append("注意：成果数据图层与原始数据图层未能通过映射表匹配。请确认mission_config.xml中<LayerMapping>配置正确。");
-    }
+    executedChecks.append(QStringLiteral("综合前后匹配汇总: %1个可比图层, %2条匹配, %3条未匹配, %4条显著变形, %5条原始要素被综合")
+                              .arg(pairs.size())
+                              .arg(totalMatched).arg(totalUnmatched).arg(totalChanged).arg(totalDropped));
 }
+
+} // namespace Mission458

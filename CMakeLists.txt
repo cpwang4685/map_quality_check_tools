@@ -171,6 +171,10 @@ set(PLUGIN_SOURCES
     ui_task/se_nmo_sdk_bridge.cpp
     ui_task/se_wuji_process_runner.cpp
     ui_task/se_wuji_xml_generator.cpp
+    # 无极引擎（MapBatchProcessing.exe 子进程）桥接：纯 Qt/QGIS，双平台通用
+    ui_task/wuji_engine_bridge.cpp
+    ui_task/wuji_mission_runner.cpp
+    ui_task/wuji_mission_xml.cpp
 
     # 跨目录共享源码（geo_algorithm_h）
     ${GEO_ALGORITHM_H_DIR}/vector/cse_generalization.cpp

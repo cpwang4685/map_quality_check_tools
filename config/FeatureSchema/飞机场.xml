@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?><MapGeneBatchProcessing>
+	<Mission id="453" note="飞机场">
+		<ParaIn>
+			<Layers note="SourceDataStore">
+				<FilePath>飞机场.shp</FilePath>
+			</Layers>
+			<Parameter>
+				<FieldName name="ELEMID" note="ELEMID">
+					<Field note="ELEMID">
+						<Name>ELEMID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>15</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey>true</PrimaryKey>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>620000008</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="CLASID" note="CLASID">
+					<Field note="CLASID">
+						<Name>CLASID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>6</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>480100</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="NAME" note="NAME">
+					<Field note="NAME">
+						<Name>NAME</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>兰州中川国际机场</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="JCFJ" note="JCFJ">
+					<Field note="JCFJ">
+						<Name>JCFJ</Name>
+						<DataType>DataType_String</DataType>
+						<Length>10</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>1</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="UPDATE_" note="UPDATE_">
+					<Field note="UPDATE_">
+						<Name>UPDATE_</Name>
+						<DataType>DataType_String</DataType>
+						<Length>50</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+			</Parameter>
+		</ParaIn>
+		<ParaOut>
+			<Layers note="DstDataStore">
+				<FilePath editable="true">飞机场_检查.shp</FilePath>
+			</Layers>
+		</ParaOut>
+	</Mission>
+</MapGeneBatchProcessing>

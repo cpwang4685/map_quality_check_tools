@@ -974,6 +974,24 @@ void CSE_DataRestoreDialog::on_Button_ImmediateBackup_clicked()
         return;
     }
 
+    // 【2026-09-11】把本次从界面读到的数据库配置（备份范围 + 选中的表）回写到策略行，
+    // 并立即同步给管理器。原先 strategy 只是栈上临时变量，界面上“指定表”的选择进不了
+    // m_vecStrategies，于是保存下来的定时策略 lstDbTables 恒为空，定时触发时静默退化成
+    // 整库备份（不加任何 -t）。
+    if (row >= 0 && row < static_cast<int>(m_vecStrategies.size()))
+    {
+        const bool bTypeChanged = (m_vecStrategies[row].eBackupType != strategy.eBackupType);
+        m_vecStrategies[row] = strategy;
+        if (bTypeChanged)
+            refreshBackupStrategyTable();
+
+        CMapCheckBackupManager* pMgr = CMapCheckBackupManager::instance();
+        pMgr->setSourcePath(m_qstrSourcePath);
+        pMgr->setTargetPath(m_qstrTargetPath);
+        pMgr->setStrategies(m_vecStrategies);
+        pMgr->saveSettings();
+    }
+
     CMapCheckBackupManager::instance()->clearLastError();
     CMapCheckBackupManager::instance()->setSourcePath(m_qstrSourcePath);
     CMapCheckBackupManager::instance()->setTargetPath(m_qstrTargetPath);

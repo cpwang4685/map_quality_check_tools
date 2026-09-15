@@ -74,6 +74,8 @@ public slots:
     void FormatConversion();
     // 要素自动接边
     void AutoEdgeMatch();
+    // 【2026-09-10】参数配置（独立入口：不预置 XML，由用户在对话框里自行打开）
+    void ParamConfig();
 
     // === 地图成果管理 ===
     void ProductLogin();
@@ -120,6 +122,12 @@ private:
     QAction* mActionAccessControl = nullptr;
     QAction* mActionDataImport = nullptr;
     QAction* mActionMapDataDownload = nullptr;
+
+    // 【2026-09-10】参数配置独立菜单项。
+    // 必须创建在 initGui 的最末尾：LTZK 平台用 findChildren<QAction*> 的枚举序号
+    // 做 plugin_bindings.json 的 fallbackActionIndex，插在中间会让其后所有下标平移，
+    // 使 JSON 里已有的绑定错位（现有 0..14 全部依赖创建顺序）。
+    QAction* mActionParamConfig = nullptr;
 
     void updateActions();
 

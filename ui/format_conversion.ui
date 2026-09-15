@@ -121,8 +121,17 @@
               <property name="minimumSize">
                <size><width>100</width><height>0</height></size>
               </property>
-              <property name="text"><string>选择数据</string></property>
-              <property name="toolTip"><string>打开选择窗口，同时勾选要转换的文件和文件夹</string></property>
+              <property name="text"><string>选择文件</string></property>
+              <property name="toolTip"><string>打开系统文件对话框，多选要转换的文件（Shift/Ctrl 多选）</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="Button_SelectFolder">
+              <property name="minimumSize">
+               <size><width>100</width><height>0</height></size>
+              </property>
+              <property name="text"><string>选择文件夹</string></property>
+              <property name="toolTip"><string>打开系统文件夹对话框，选择要转换的文件夹（整个文件夹参与转换）</string></property>
              </widget>
             </item>
             <item>
@@ -151,7 +160,7 @@
            <property name="minimumSize">
             <size><width>0</width><height>110</height></size>
            </property>
-           <property name="toolTip"><string>已选择的数据清单，勾选文件夹表示整个文件夹参与转换</string></property>
+           <property name="toolTip"><string>已选择的数据清单；文件夹条目表示整个文件夹参与转换</string></property>
           </widget>
          </item>
          <item row="5" column="0">

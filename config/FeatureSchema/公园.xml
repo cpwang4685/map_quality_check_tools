@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?><MapGeneBatchProcessing>
+	<Mission id="453" note="公园">
+		<ParaIn>
+			<Layers note="SourceDataStore">
+				<FilePath>公园.shp</FilePath>
+			</Layers>
+			<Parameter>
+				<FieldName name="ELEMID" note="ELEMID">
+					<Field note="ELEMID">
+						<Name>ELEMID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>15</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey>true</PrimaryKey>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>620000022|620000054|620000239|620000241</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="CLASID" note="CLASID">
+					<Field note="CLASID">
+						<Name>CLASID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>6</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="NAME" note="NAME">
+					<Field note="NAME">
+						<Name>NAME</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>甘肃兰州天斧砂宫省级地质公园|甘肃秦王川国家级湿地公园|青海乐都大地湾湿地公园|青海北山国家森林公园</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="NAMES" note="NAMES">
+					<Field note="NAMES">
+						<Name>NAMES</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique>true</Unique>
+						<NotNULL>true</NotNULL>
+						<ConstraintType>枚举</ConstraintType>
+						<ConstraintSet>乐都大地湾国家级湿地公园|兰州天斧砂宫省级地质公园|北山国家级森林公园|秦王川国家级湿地公园</ConstraintSet>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="GRADE" note="GRADE">
+					<Field note="GRADE">
+						<Name>GRADE</Name>
+						<DataType>DataType_String</DataType>
+						<Length>8</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="TYPE" note="TYPE">
+					<Field note="TYPE">
+						<Name>TYPE</Name>
+						<DataType>DataType_String</DataType>
+						<Length>32</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="REMK" note="REMK">
+					<Field note="REMK">
+						<Name>REMK</Name>
+						<DataType>DataType_String</DataType>
+						<Length>255</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="AreaCode" note="AreaCode">
+					<Field note="AreaCode">
+						<Name>AreaCode</Name>
+						<DataType>DataType_Int32</DataType>
+						<Length>10</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="XQ" note="XQ">
+					<Field note="XQ">
+						<Name>XQ</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="DSOURCE" note="DSOURCE">
+					<Field note="DSOURCE">
+						<Name>DSOURCE</Name>
+						<DataType>DataType_String</DataType>
+						<Length>255</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="备注" note="备注">
+					<Field note="备注">
+						<Name>备注</Name>
+						<DataType>DataType_String</DataType>
+						<Length>50</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="XGSM" note="XGSM">
+					<Field note="XGSM">
+						<Name>XGSM</Name>
+						<DataType>DataType_String</DataType>
+						<Length>50</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="UPDATE_" note="UPDATE_">
+					<Field note="UPDATE_">
+						<Name>UPDATE_</Name>
+						<DataType>DataType_String</DataType>
+						<Length>50</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL/>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+			</Parameter>
+		</ParaIn>
+		<ParaOut>
+			<Layers note="DstDataStore">
+				<FilePath editable="true">公园_检查.shp</FilePath>
+			</Layers>
+		</ParaOut>
+	</Mission>
+</MapGeneBatchProcessing>

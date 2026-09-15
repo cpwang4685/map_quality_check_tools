@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?><MapGeneBatchProcessing>
+	<Mission id="453" note="国家公园界">
+		<ParaIn>
+			<Layers note="SourceDataStore">
+				<FilePath>国家公园界.shp</FilePath>
+			</Layers>
+			<Parameter>
+				<FieldName name="YSDM" note="YSDM">
+					<Field note="YSDM">
+						<Name>YSDM</Name>
+						<DataType>DataType_String</DataType>
+						<Length>4</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="ZRBHDMC" note="ZRBHDMC">
+					<Field note="ZRBHDMC">
+						<Name>ZRBHDMC</Name>
+						<DataType>DataType_String</DataType>
+						<Length>200</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="面积（公顷" note="面积（公顷">
+					<Field note="面积（公顷">
+						<Name>面积（公顷</Name>
+						<DataType>DataType_Double</DataType>
+						<Length>24</Length>
+						<Precision>15</Precision>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="Shape_Leng" note="Shape_Leng">
+					<Field note="Shape_Leng">
+						<Name>Shape_Leng</Name>
+						<DataType>DataType_Double</DataType>
+						<Length>24</Length>
+						<Precision>15</Precision>
+						<Ignore>true</Ignore>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="Shape_Area" note="Shape_Area">
+					<Field note="Shape_Area">
+						<Name>Shape_Area</Name>
+						<DataType>DataType_Double</DataType>
+						<Length>24</Length>
+						<Precision>15</Precision>
+						<Ignore>true</Ignore>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="a" note="a">
+					<Field note="a">
+						<Name>a</Name>
+						<DataType>DataType_String</DataType>
+						<Length>64</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+				<FieldName name="CLASID" note="CLASID">
+					<Field note="CLASID">
+						<Name>CLASID</Name>
+						<DataType>DataType_String</DataType>
+						<Length>32</Length>
+						<Precision/>
+						<Ignore/>
+						<PrimaryKey/>
+						<Unique/>
+						<NotNULL>true</NotNULL>
+						<ConstraintType/>
+						<ConstraintSet/>
+						<Comment/>
+					</Field>
+				</FieldName>
+			</Parameter>
+		</ParaIn>
+		<ParaOut>
+			<Layers note="DstDataStore">
+				<FilePath editable="true">国家公园界_检查.shp</FilePath>
+			</Layers>
+		</ParaOut>
+	</Mission>
+</MapGeneBatchProcessing>

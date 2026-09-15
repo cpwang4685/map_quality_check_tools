@@ -20,124 +20,23 @@
 
 #include "../ui_task/se_format_convert_task.h"
 
-namespace {
-
-// 数据选择窗口：文件与文件夹在同一棵树里打勾，文件夹懒加载
-class SrcSelectDialog : public QDialog
-{
-public:
-    SrcSelectDialog(const QStringList& extensions, bool allowFiles, bool showGdbDirs, QWidget* parent)
-        : QDialog(parent)
-        , m_extensions(extensions)
-        , m_allowFiles(allowFiles)
-        , m_showGdbDirs(showGdbDirs)
-    {
-        setWindowTitle(QStringLiteral("选择数据"));
-        resize(520, 560);
-
-        auto* hint = new QLabel(QStringLiteral("勾选要转换的文件夹或文件（勾选文件夹＝整个文件夹参与转换），双击或点箭头展开文件夹"), this);
-        hint->setWordWrap(true);
-
-        m_tree = new QTreeWidget(this);
-        m_tree->setHeaderHidden(true);
-        m_tree->setColumnCount(1);
-
-        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
-        buttons->button(QDialogButtonBox::Ok)->setText(QStringLiteral("确定"));
-        buttons->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("取消"));
-
-        auto* layout = new QVBoxLayout(this);
-        layout->addWidget(hint);
-        layout->addWidget(m_tree, 1);
-        layout->addWidget(buttons);
-
-        connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
-        connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
-        connect(m_tree, &QTreeWidget::itemExpanded, this,
-                [this](QTreeWidgetItem* item) { populateItem(item); });
-
-        for (const QFileInfo& drive : QDir::drives())
-        {
-            auto* item = new QTreeWidgetItem(QStringList(drive.absolutePath()));
-            item->setData(0, PathRole, drive.absolutePath());
-            item->setCheckState(0, Qt::Unchecked);
-            item->addChild(new QTreeWidgetItem);
-            m_tree->addTopLevelItem(item);
-        }
-    }
-
-    QStringList selectedPaths() const
-    {
-        QStringList result;
-        collectChecked(m_tree->invisibleRootItem(), result);
-        return result;
-    }
-
-private:
-    enum { PathRole = Qt::UserRole };
-
-    QStringList m_extensions;
-    bool m_allowFiles;
-    bool m_showGdbDirs;
-    QTreeWidget* m_tree = nullptr;
-
-    void populateItem(QTreeWidgetItem* item)
-    {
-        if (item->childCount() == 1 && item->child(0)->data(0, PathRole).isNull())
-            delete item->takeChild(0);
-        if (item->childCount() > 0) return;
-
-        QDir dir(item->data(0, PathRole).toString());
-        const QFileInfoList subDirs = dir.entryInfoList(
-            QDir::Dirs | QDir::NoDotAndDotDot | QDir::Readable, QDir::Name);
-        for (const QFileInfo& fi : subDirs)
-        {
-            if (!m_showGdbDirs && fi.fileName().endsWith(QStringLiteral(".gdb"), Qt::CaseInsensitive))
-                continue;
-            auto* child = new QTreeWidgetItem(QStringList(fi.fileName()));
-            child->setData(0, PathRole, fi.absoluteFilePath());
-            child->setCheckState(0, Qt::Unchecked);
-            child->addChild(new QTreeWidgetItem);
-            item->addChild(child);
-        }
-        if (m_allowFiles)
-        {
-            const QFileInfoList files = dir.entryInfoList(
-                QDir::Files | QDir::Readable, QDir::Name);
-            for (const QFileInfo& fi : files)
-            {
-                if (!m_extensions.contains(fi.suffix().toLower()))
-                    continue;
-                auto* child = new QTreeWidgetItem(QStringList(fi.fileName()));
-                child->setData(0, PathRole, fi.absoluteFilePath());
-                child->setCheckState(0, Qt::Unchecked);
-                item->addChild(child);
-            }
-        }
-    }
-
-    void collectChecked(QTreeWidgetItem* item, QStringList& out) const
-    {
-        for (int i = 0; i < item->childCount(); ++i)
-        {
-            QTreeWidgetItem* child = item->child(i);
-            const QString path = child->data(0, PathRole).toString();
-            if (path.isEmpty()) continue;
-            if (child->checkState(0) == Qt::Checked)
-                out << path;
-            else
-                collectChecked(child, out);
-        }
-    }
-};
-
-} // namespace
-
 FormatConversionDialog::FormatConversionDialog(QWidget* parent, Qt::WindowFlags fl)
     : QDialog(parent, fl)
 {
     ui.setupUi(this);
     QgsGui::enableAutoGeometryRestore(this);
+
+    // 【2026-09-10】收紧对话框顶部空白。
+    // 平台 sci-fi 主题（resources/styles/ltzk_sci_fi.qss）里的 QGroupBox 是"标题浮在
+    // 框外"的样式：QGroupBox { margin-top: 52px; padding: 8px 14px 14px 14px; }，
+    // 这 52px 是给 QGroupBox::title 留的带子（title 用 subcontrol-origin: margin 定位）。
+    // 本对话框最外层的 groupBox_main 只负责框住"转换设置/输入输出设置/日志设置"三个
+    // 子分组、自身 title 为空，于是这段带子全程留白——对话框顶部到主布局之间凭空多出
+    // ~52px。这里只把这一个 groupBox 的标题带收掉。
+    // 用 ID 选择器，三个子分组（有标题、需要标题带）不受影响；背景/边框/圆角仍走平台
+    // 全局 QSS——widget 级样式表只覆盖它显式写了的那两个属性。
+    ui.groupBox_main->setStyleSheet(
+        QStringLiteral("QGroupBox#groupBox_main { margin-top: 0px; padding-top: 4px; }"));
 
     setWindowFlags(Qt::CustomizeWindowHint | Qt::WindowCloseButtonHint);
     ui.widget_batchBtns->setVisible(false);
@@ -163,6 +62,7 @@ FormatConversionDialog::FormatConversionDialog(QWidget* parent, Qt::WindowFlags 
     connect(ui.radioButton_mdb2gdb,      &QRadioButton::toggled, this, &FormatConversionDialog::onConversionTypeChanged);
     connect(ui.radioButton_BatchMode,    &QRadioButton::toggled, this, &FormatConversionDialog::onBatchToggled);
     connect(ui.Button_SelectData,        &QPushButton::clicked,  this, &FormatConversionDialog::Button_SelectData_clicked);
+    connect(ui.Button_SelectFolder,      &QPushButton::clicked,  this, &FormatConversionDialog::Button_SelectFolder_clicked);
     connect(ui.Button_RemoveSelected,    &QPushButton::clicked,  this, &FormatConversionDialog::Button_RemoveSelected_clicked);
     connect(ui.listWidget_SrcList, &QListWidget::itemSelectionChanged, this, [this] {
         ui.Button_RemoveSelected->setEnabled(!ui.listWidget_SrcList->selectedItems().isEmpty());
@@ -364,12 +264,45 @@ void FormatConversionDialog::Button_SelectData_clicked()
     bool allowFiles = true;
     bool showGdbDirs = false;
     currentSourceFilter(extensions, allowFiles, showGdbDirs);
+    if (!allowFiles) return;
 
-    SrcSelectDialog dlg(extensions, allowFiles, showGdbDirs, this);
-    if (dlg.exec() != QDialog::Accepted) return;
+    // 系统原生文件对话框，多选（Shift 连选、Ctrl 逐个多选）
+    QString filter;
+    if (!extensions.isEmpty())
+    {
+        QStringList pats;
+        for (const QString& e : extensions)
+            pats << QStringLiteral("*.") + e;
+        filter = QStringLiteral("数据文件 (%1)").arg(pats.join(QStringLiteral(" ")));
+    }
+    const QStringList files = QFileDialog::getOpenFileNames(
+        this, QStringLiteral("选择要转换的文件"), QString(), filter);
+    if (files.isEmpty()) return;
+
+    appendSourcePaths(files);
+    resizeToContent();
+}
+
+void FormatConversionDialog::Button_SelectFolder_clicked()
+{
+    // 系统原生文件夹对话框；文件夹＝整个文件夹参与转换
+    const QString dir = QFileDialog::getExistingDirectory(
+        this, QStringLiteral("选择要转换的文件夹（整个文件夹参与转换）"));
+    if (dir.isEmpty()) return;
+
+    appendSourcePaths(QStringList() << dir);
+    resizeToContent();
+}
+
+void FormatConversionDialog::appendSourcePaths(const QStringList& paths)
+{
+    QStringList extensions;
+    bool allowFiles = true;
+    bool showGdbDirs = false;
+    currentSourceFilter(extensions, allowFiles, showGdbDirs);
 
     QStringList rejected;
-    for (const QString& p : dlg.selectedPaths())
+    for (const QString& p : paths)
     {
         const QFileInfo fi(p);
         if (fi.isDir())
@@ -423,7 +356,9 @@ void FormatConversionDialog::Button_SelectData_clicked()
             tr("已忽略 %1 个与当前源格式不符的条目，未加入列表：%2")
                 .arg(rejected.size()).arg(names));
     }
-    resizeToContent();
+
+    // 批量模式下库名跟随首个源条目自动填充
+    autoFillNames();
 }
 
 void FormatConversionDialog::Button_RemoveSelected_clicked()
@@ -436,6 +371,8 @@ void FormatConversionDialog::Button_RemoveSelected_clicked()
     }
     if (ui.listWidget_SrcList->count() == 0)
         ui.Button_RemoveSelected->setEnabled(false);
+    // 移除后库名跟随新的首个源条目
+    autoFillNames();
 }
 
 void FormatConversionDialog::Button_OK_accepted()
@@ -573,8 +510,9 @@ void FormatConversionDialog::Button_OK_accepted()
         QDir().mkpath(fi.absolutePath());
     }
 
-    // SHP 目标需要填写图层名（批量模式按源文件名自动命名，无需填写）
-    if (!ui.radioButton_BatchMode->isChecked() && isShpTarget())
+    // SHP 目标需要填写图层名（批量模式按源文件名自动命名、gdb2shp 用 GDB 内图层原名，均无需填写）
+    if (!ui.radioButton_BatchMode->isChecked() && isShpTarget()
+        && !ui.radioButton_gdb2shp->isChecked())
     {
         if (ui.lineEdit_LayerName->text().trimmed().isEmpty())
         {
@@ -582,8 +520,8 @@ void FormatConversionDialog::Button_OK_accepted()
             return;
         }
     }
-    // GDB 目标（单个模式）需要填写库名；批量模式按源文件名自动命名
-    if (!ui.radioButton_BatchMode->isChecked() && isGdbTarget())
+    // GDB 目标需要填写库名：单个模式=输出库名；批量模式=所有源数据汇入的同一个库
+    if (isGdbTarget())
     {
         if (ui.lineEdit_GdbName->text().trimmed().isEmpty())
         {
@@ -682,7 +620,11 @@ void FormatConversionDialog::Button_OK_accepted()
         return;
     }
 
-    string strLayerName = ui.lineEdit_LayerName->text().trimmed().toUtf8().toStdString();
+    // gdb2shp：输出名 = GDB 内图层原名，不透传"图层名"给转换任务，
+    // 否则会被拼成 库名_图层名 / 库名（2026-09-11 甲方口径）
+    string strLayerName = ui.radioButton_gdb2shp->isChecked()
+        ? string()
+        : ui.lineEdit_LayerName->text().trimmed().toUtf8().toStdString();
     string strGdbName   = ui.lineEdit_GdbName->text().trimmed().toUtf8().toStdString();
 
     bool bBatch = ui.radioButton_BatchMode->isChecked();
@@ -699,6 +641,7 @@ void FormatConversionDialog::Button_OK_accepted()
         ui.progressBar->setValue(static_cast<int>(p));
     });
 
+    ui.Button_OK->setEnabled(false); // 任务运行中禁止重复发起
     QgsApplication::taskManager()->addTask(task);
 
     // 保存设置
@@ -759,13 +702,16 @@ void FormatConversionDialog::onConversionTypeChanged()
         ui.listWidget_SrcList->clear();
     }
 
-    // 批量模式：隐藏路径输入行与浏览按钮，显示“选择数据”+提示+清单+移除选中
+    // 批量模式：隐藏路径输入行与浏览按钮，显示“选择文件/选择文件夹”+清单+移除选中
     bool bGdbSrc = ui.radioButton_gdb2shp->isChecked();
     ui.label_input->setVisible(!bBatch);
     ui.lineEdit_InputDataPath->setVisible(!bBatch);
     ui.Button_Open->setVisible(!bBatch);
     ui.widget_batchBtns->setVisible(bBatch);
     ui.listWidget_SrcList->setVisible(bBatch);
+
+    // GDB 源是目录，批量时只有"选择文件夹"可用
+    ui.Button_SelectData->setEnabled(!bGdbSrc);
 
     ui.Button_Open->setText(bGdbSrc ? tr("选择目录") : tr("浏览"));
     if (!bBatch)
@@ -774,14 +720,16 @@ void FormatConversionDialog::onConversionTypeChanged()
             bGdbSrc ? tr("请选择GDB数据目录") : tr("请选择单个数据文件"));
     }
 
-    // 批量模式下 SHP 图层名按源文件名自动命名，隐藏输入
-    bool bShowLayerName = bShpTarget && !bBatch;
+    // 批量模式下 SHP 图层名按源文件名自动命名，隐藏输入；
+    // gdb2shp 的输出名一律用 GDB 内部图层自己的名字（2026-09-11 甲方口径），
+    // 没有"图层名"需要用户填，一并隐藏 —— 否则会自动填入 GDB 目录名并拼进输出名。
+    bool bShowLayerName = bShpTarget && !bBatch && !bGdbSrc;
     ui.label_layerName->setVisible(bShowLayerName);
     ui.lineEdit_LayerName->setVisible(bShowLayerName);
     if (!bShowLayerName) ui.lineEdit_LayerName->clear();
 
-    // 批量模式每个源文件 → 各自 <源名>.gdb，无需库名；单个模式保留输入
-    bool bShowGdbName = bGdbTarget && !bBatch;
+    // GDB 目标统一需要库名：单个模式=输出库名；批量模式=所有源数据汇入的同一个库
+    bool bShowGdbName = bGdbTarget;
     ui.label_gdbName->setVisible(bShowGdbName);
     ui.lineEdit_GdbName->setVisible(bShowGdbName);
     if (!bShowGdbName) ui.lineEdit_GdbName->clear();
@@ -818,7 +766,12 @@ void FormatConversionDialog::onBatchToggled(bool checked)
 
     // 切到批量模式时自动弹出数据选择窗口，用户不用自己找按钮
     if (checked)
-        Button_SelectData_clicked();
+    {
+        if (ui.radioButton_gdb2shp->isChecked())
+            Button_SelectFolder_clicked();
+        else
+            Button_SelectData_clicked();
+    }
 
     // 事件循环转完后（含模态选择窗口）再精确收放一次，覆盖任何过期缓存导致的高度残留
     QTimer::singleShot(0, this, [this] { resizeToContent(); });
@@ -826,26 +779,34 @@ void FormatConversionDialog::onBatchToggled(bool checked)
 
 void FormatConversionDialog::onTaskFinished(bool result)
 {
-    CalculateTotalProgress();
+    ui.Button_OK->setEnabled(true);
     if (result)
-        QMessageBox::information(this, tr("格式转换"), tr("格式转换完成!"));
-    else
-        QMessageBox::warning(this, tr("格式转换"), tr("格式转换失败，请查看日志了解详情。"));
-}
+        ui.progressBar->setValue(100);
 
-void FormatConversionDialog::CalculateTotalProgress()
-{
-    int totalProgress = 0;
-    int count = QgsApplication::taskManager()->count();
-    for (const auto& task : QgsApplication::taskManager()->tasks())
+    SeFormatConvertTask* t = qobject_cast<SeFormatConvertTask*>(sender());
+    if (result && (!t || t->successCount() == t->totalCount()))
     {
-        if (task->status() == QgsTask::Complete)
-            totalProgress += 100;
-        else
-            totalProgress += task->progress();
+        QMessageBox::information(this, tr("格式转换"), tr("格式转换完成!"));
     }
-    if (count > 0) totalProgress /= count;
-    ui.progressBar->setValue(totalProgress);
+    else if (result && t)
+    {
+        // 部分失败：如实报成功 X/N 和失败名单，不再笼统提示"完成"
+        QString names;
+        const QStringList failed = t->failedNames();
+        const int showCount = qMin(5, failed.size());
+        for (int k = 0; k < showCount; ++k)
+            names += QStringLiteral("\n  ") + failed[k];
+        if (failed.size() > showCount)
+            names += QStringLiteral("\n  …");
+        QMessageBox::warning(this, tr("格式转换"),
+            tr("转换部分完成：成功 %1/%2，失败 %3 个：%4\n详情见日志。")
+                .arg(t->successCount()).arg(t->totalCount())
+                .arg(failed.size()).arg(names));
+    }
+    else
+    {
+        QMessageBox::warning(this, tr("格式转换"), tr("格式转换失败，请查看日志了解详情。"));
+    }
 }
 
 bool FormatConversionDialog::CheckFileOrDirExist(const QString& path)
@@ -879,17 +840,27 @@ QString FormatConversionDialog::cleanFileName(const QString& fileName)
 
 void FormatConversionDialog::autoFillNames()
 {
-    if (ui.radioButton_BatchMode->isChecked()) return;
-    QString path = ui.lineEdit_InputDataPath->text();
-    if (path.isEmpty()) return;
-    QFileInfo fi(path);
-    QString baseName = fi.completeBaseName();
+    QString src;
+    if (ui.radioButton_BatchMode->isChecked())
+    {
+        // 批量：库名默认取首个源条目的名（文件夹用文件夹名，文件用基名）
+        if (m_srcFileList.isEmpty()) return;
+        src = m_srcFileList.first();
+    }
+    else
+    {
+        src = ui.lineEdit_InputDataPath->text();
+        if (src.isEmpty()) return;
+    }
+    QFileInfo fi(src);
+    QString baseName = fi.isDir() ? fi.fileName() : fi.completeBaseName();
     if (baseName.isEmpty())
         baseName = fi.fileName();
     if (baseName.isEmpty()) return;
     QString clean = cleanFileName(baseName);
 
-    if (!m_bLayerNameManual)
+    // gdb2shp 不自动填 SHP 图层名：输出名由 GDB 内图层名决定（2026-09-11 甲方口径）
+    if (!m_bLayerNameManual && !ui.radioButton_gdb2shp->isChecked())
         ui.lineEdit_LayerName->setText(clean);
     if (!m_bGdbNameManual)
         ui.lineEdit_GdbName->setText(clean);

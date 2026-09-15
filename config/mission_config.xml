@@ -6,6 +6,25 @@
   ============================================================ -->
 <MissionConfig version="1.0" notice="地图成果质检配置">
 
+  <!-- 图层对应关系配置表：标准图层名→GDB图层代码，用于综合前后匹配(M458) -->
+  <!-- #开头为占位项（无对应GDB图层），—表示无映射 -->
+  <LayerMapping>
+    <Map standard="飞地_标注" gdb="BOUA6"/>
+    <Map standard="市级驻地" gdb="BOUP6"/>
+    <Map standard="市级驻地_标注" gdb="BOUA6"/>
+    <Map standard="市级表面注记" gdb="BOUA4"/>
+    <Map standard="县级驻地" gdb="BOUP6"/>
+    <Map standard="县级驻地_标注" gdb="BOUA6"/>
+    <Map standard="县级表面注记" gdb="BOUA5"/>
+    <Map standard="乡镇级驻地" gdb="BOUP6"/>
+    <Map standard="乡镇级驻地_标注" gdb="BOUA6"/>
+    <Map standard="乡镇级表面注记" gdb="BOUA6"/>
+    <Map standard="省级表面注记" gdb="BOUA2"/>
+    <Map standard="省外乡镇驻地" gdb="BOUP6"/>
+    <Map standard="省外乡镇驻地_标注" gdb="BOUP6"/>
+    <Map standard="行政村" gdb="BOUP7"/>
+  </LayerMapping>
+
   <GlobalParams>
     <Scale note="比例尺">10000</Scale>
     <FuzzyTolerance note="结点拟合容差(米)">0.001</FuzzyTolerance>
@@ -25,17 +44,17 @@
     <NodeDensityLower note="节点密度下界" default="0.0" min="0.0" max="1000.0"/>
   </Thresholds>
 
-  <Mission id="453" name="属性检查" category="属性" note="校验矢量字段名称、类型、长度、精度等">
+  <Mission id="453" name="属性检查" category="属性" note="按随包标准字段结构(config/FeatureSchema/&lt;图层名&gt;.xml，由标准数据DBF生成)校验字段名称、类型、长度、精度">
     <CheckItem name="字段名称检查" mode="1" enabled="true" applyTo="all" note="字段名是否与规范一致"/>
     <CheckItem name="数据类型检查" mode="2" enabled="true" applyTo="all" note="字段类型是否匹配"/>
     <CheckItem name="字段长度检查" mode="4" enabled="true" applyTo="all" note="字段长度是否超限"/>
     <CheckItem name="精度检查" mode="8" enabled="true" applyTo="all" note="数值精度是否符合规范"/>
-    <CheckItem name="枚举字段检查" mode="16" enabled="true" applyTo="all" note="枚举值是否在允许列表内"/>
-    <CheckItem name="约束条件检查" mode="32" enabled="true" applyTo="all" note="字段值是否符合约束条件"/>
-    <CheckItem name="唯一约束检查" mode="128" enabled="true" applyTo="all" note="字段值是否唯一"/>
-    <CheckItem name="非空约束检查" mode="256" enabled="true" applyTo="all" note="必填字段是否为空"/>
-    <CheckItem name="约束类型检查" mode="512" enabled="true" applyTo="all" note="约束类型是否匹配"/>
-    <CheckItem name="约束组合检查" mode="1024" enabled="true" applyTo="all" note="组合约束是否满足"/>
+    <CheckItem name="忽略字段检查" mode="16" enabled="true" applyTo="all" note="16-Ignore 按标准Schema的Ignore标记校验(标准数据为DBF，无此标记，暂不启用)"/>
+    <CheckItem name="主键检查" mode="32" enabled="true" applyTo="all" note="32-PrimaryKey 字段值是否满足主键约束(标准数据为DBF，无此标记，暂不启用)"/>
+    <CheckItem name="唯一约束检查" mode="128" enabled="true" applyTo="all" note="字段值是否唯一(标准数据为DBF，无此标记，暂不启用)"/>
+    <CheckItem name="非空约束检查" mode="256" enabled="true" applyTo="all" note="必填字段是否为空(标准数据为DBF，无此标记，暂不启用)"/>
+    <CheckItem name="约束类型检查" mode="512" enabled="true" applyTo="all" note="约束类型是否匹配(标准数据为DBF，无此标记，暂不启用)"/>
+    <CheckItem name="约束集检查" mode="1024" enabled="true" applyTo="all" note="1024-ConstraintSet 字段枚举约束是否满足(标准数据为DBF，无此标记，暂不启用)"/>
   </Mission>
 
   <Mission id="454" name="点拓扑检查" category="拓扑" note="点图层空间拓扑规则校验">
@@ -62,20 +81,25 @@
     <CheckItem name="面不能重叠" mode="1" enabled="true" applyTo="polygon" note="两个面不能有重叠区域"/>
     <CheckItem name="面不能有缝隙" mode="2" enabled="true" applyTo="polygon" note="相邻面之间不能有缝隙"/>
     <CheckItem name="面必须包含点" mode="4" enabled="true" applyTo="polygon" note="面必须包含指定的点要素"/>
+    <CheckItem name="面必须包含且仅包含一个点" mode="8" enabled="false" applyTo="polygon" note="8-Contains one point 面与点一一对应(需点图层)"/>
+    <CheckItem name="面必须被要素类覆盖" mode="16" enabled="false" applyTo="polygon" note="16-Covered by feature class 面必须被参考面要素类覆盖(需参考面图层)"/>
     <CheckItem name="面边界必须被线覆盖" mode="32" enabled="false" applyTo="polygon" note="面边界必须被线要素覆盖(需参考线图层)"/>
     <CheckItem name="面必须大于聚类容差" mode="1024" enabled="true" applyTo="polygon" note="面面积必须大于聚类容差阈值"/>
   </Mission>
 
-  <Mission id="457" name="关联表检查" category="关联" note="检查同一数据源内关联图层间的引用完整性（基于EntityID/LocationID外键）">
-    <CheckItem name="外键引用检查" mode="1" enabled="true" applyTo="all" note="关联图层中的EntityID/LocationID必须在基础图层中存在"/>
-    <CheckItem name="关联记录存在性检查" mode="2" enabled="true" applyTo="all" note="基础图层的每条记录在关联图层中必须有对应记录"/>
-    <CheckItem name="关联字段一致性检查" mode="4" enabled="true" applyTo="all" note="关联图层间的ClassID/ClassName等分类字段必须一致"/>
-    <CheckItem name="关联表结构检查" mode="8" enabled="true" applyTo="all" note="关联图层必须包含EntityID/LocationID/ClassID等关键字段"/>
-    <CheckItem name="关联数据完整性检查" mode="16" enabled="true" applyTo="all" note="关联图层记录数必须匹配，无孤立记录或缺失依赖"/>
+  <!-- M457 关联表检查：老师决定不做（无 relation.db 关联表，需甲方生产流程输出），整组已从界面移除。
+       如以后甲方提供 relation.db，把下面整段恢复即可，代码无需改动。
+  <Mission id="457" name="关联表检查" category="关联" note="检查数据GUID与关联表(relation.db;Relation_1w_5w)的一致性（需原始1w数据+成果5w数据，关联表缺失时本项按未检出异常记录）">
+    <CheckItem name="数据GUID正确性检查" mode="1" enabled="true" applyTo="all" note="数据中GUID字段（ELEMID）必须合法"/>
+    <CheckItem name="5WGUID必在关联表中" mode="2" enabled="true" applyTo="all" note="成果5w数据的GUID必须在relation.db关联表中存在"/>
+    <CheckItem name="关联表中1WGUID必在数据中" mode="4" enabled="true" applyTo="all" note="关联表中的1wGUID必须存在于原始1w数据中"/>
+    <CheckItem name="关联表中5WGUID必在数据中" mode="8" enabled="true" applyTo="all" note="关联表中的5wGUID必须存在于成果5w数据中"/>
+    <CheckItem name="注记GUID前后不变" mode="16" enabled="true" applyTo="all" note="注记要素GUID综合前后必须保持不变"/>
   </Mission>
+  -->
 
-  <Mission id="458" name="综合前后匹配" category="匹配" note="对比原始数据(综合前)与成果数据(综合后)的要素变化（需两个数据源）">
-    <CheckItem name="综合前后要素匹配检查" mode="1" enabled="true" applyTo="all" note="通过EntityID/FormerID匹配综合前后要素，检测新增/消失/几何属性变化"/>
+  <Mission id="458" name="综合前后匹配" category="匹配" note="对比原始数据(综合前)与成果数据(综合后)的要素对应关系（几何缓冲匹配，需两个数据源）">
+    <CheckItem name="综合前后要素匹配检查" mode="1" enabled="true" applyTo="all" note="几何缓冲匹配综合前后要素（缓冲+相交面积/长度比，含ELEMID标识字段），检测未匹配/变形要素"/>
   </Mission>
 
   <Mission id="459" name="图形规范性检查" category="图形" note="检测几何形态异常">
@@ -85,8 +109,8 @@
     <CheckItem name="碎面检查" mode="8" enabled="true" applyTo="polygon" note="检测面积小于阈值的碎面" threshold="SliverArea"/>
     <CheckItem name="狭长面检查" mode="16" enabled="true" applyTo="polygon" note="检测宽度小于阈值的狭长面" threshold="NarrowWidth"/>
     <CheckItem name="小面积检查" mode="32" enabled="true" applyTo="polygon" note="检测面积小于阈值的小面" threshold="MinArea"/>
-    <CheckItem name="节点平均密度检查" mode="64" enabled="false" applyTo="polygon" note="顶点密度需在上下界范围内" threshold="AvgNodeDensity"/>
-    <CheckItem name="节点密度检查" mode="128" enabled="false" applyTo="polygon" note="相邻顶点间距需在上下界范围内" threshold="NodeDensity"/>
+    <CheckItem name="节点平均密度检查" mode="64" enabled="true" applyTo="polygon" note="顶点密度需在上下界范围内" threshold="AvgNodeDensity"/>
+    <CheckItem name="节点密度检查" mode="128" enabled="true" applyTo="polygon" note="相邻顶点间距需在上下界范围内" threshold="NodeDensity"/>
     <CheckItem name="线自相交检查" mode="256" enabled="true" applyTo="line,polygon" note="线或面边界不能自相交"/>
     <CheckItem name="节点最小距离检查" mode="512" enabled="true" applyTo="all" note="相邻节点距离不能小于阈值" threshold="MinNodeDistance"/>
   </Mission>

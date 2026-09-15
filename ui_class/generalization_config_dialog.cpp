@@ -10,6 +10,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
+// 【2026-09-10】数据源页签（QTabWidget）已去除，SHP / GDB 输入合并到同一个"矢量数据目录"
 #include <QSpacerItem>
 #include <QProcess>
 #include <QProgressDialog>
@@ -101,19 +102,23 @@ GeneralizationConfigDialog::GeneralizationConfigDialog(QWidget* parent)
                           "QGroupBox { padding-top: 12px; }"));
     auto* vSource = new QVBoxLayout(groupSource);
 
-    // 文件系统输入（仅文件系统一种数据源，源类型 radio 已去除）
-    m_widgetFileInput = new QWidget(this);
+    // 【2026-09-10】原 "SHP 数据" / "GDB 数据" 两个页签已去除：矢量数据目录现在同时
+    // 接受 SHP 目录与 FileGDB 目录（GDB 走"先 gdb→shp 再综合"两阶段流程，入口合并），
+    // GDB 数据页（独立跑 gdb→shp 的测试入口）不再需要。
+    m_widgetFileInput = new QWidget(groupSource);
     auto* vFile = new QVBoxLayout(m_widgetFileInput);
-    vFile->setContentsMargins(0,0,0,0);
+    vFile->setContentsMargins(6,8,6,6);
     vFile->setSpacing(4);
 
     // 第1行: 矢量数据目录
     auto* hFileRow1 = new QHBoxLayout();
     hFileRow1->addWidget(new QLabel(QString::fromUtf8("矢量数据目录:"), this));
     m_lineEditShpDir = new QLineEdit(this);
-    m_lineEditShpDir->setPlaceholderText(QString::fromUtf8("选择包含 SHP 文件的目录..."));
+    // 【2026-09-10】同一入口同时接受 SHP 目录与 FileGDB 目录（GDB 会先转 SHP 再综合）
+    m_lineEditShpDir->setPlaceholderText(
+        QString::fromUtf8("选择包含SHP文件的目录，或FileGDB"));
     hFileRow1->addWidget(m_lineEditShpDir, 1);
-    auto* btnBrowseShpDir = new QPushButton(QString::fromUtf8("浏览..."), this);
+    auto* btnBrowseShpDir = new QPushButton(QString::fromUtf8("浏览"), this);
     btnBrowseShpDir->setFixedWidth(80);
     btnBrowseShpDir->setStyleSheet(kNarrowBtnStyle);
     connect(btnBrowseShpDir, &QPushButton::clicked, this, &GeneralizationConfigDialog::onBrowseShpDir);
@@ -213,7 +218,7 @@ GeneralizationConfigDialog::GeneralizationConfigDialog(QWidget* parent)
     m_lineEditConfigXml = new QLineEdit(this);
     m_lineEditConfigXml->setPlaceholderText(QString::fromUtf8("选择xml文件 ..."));
     hCfg->addWidget(m_lineEditConfigXml, 1);
-    auto* btnBrowseConfigXml = new QPushButton(QString::fromUtf8("浏览..."), this);
+    auto* btnBrowseConfigXml = new QPushButton(QString::fromUtf8("浏览"), this);
     btnBrowseConfigXml->setFixedWidth(80);
     btnBrowseConfigXml->setStyleSheet(kNarrowBtnStyle);
     connect(btnBrowseConfigXml, &QPushButton::clicked, this, &GeneralizationConfigDialog::onBrowseConfigXml);
@@ -228,10 +233,27 @@ GeneralizationConfigDialog::GeneralizationConfigDialog(QWidget* parent)
                 QString::fromUtf8("请先在 XML 配置框中选择配置文件"));
             return;
         }
+        // 【2026-09-10】打开参数配置时自动带入本对话框里已选的 XML 配置文件，免去用户
+        // 进对话框后再手动"打开XML"一遍。加载刻意放在 show() 之前：ParamConfigDialog 装了
+        // DialogFitHelper，首次 Show 时按内容最小尺寸撑大窗口，先加载再显示窗口才会按已加载
+        // 的内容定尺寸；反过来则可能定成一个空窗口的尺寸，看起来就像"没加载"。
         ParamConfigDialog* dlg = new ParamConfigDialog(this, Qt::WindowCloseButtonHint);
         dlg->setAttribute(Qt::WA_DeleteOnClose);
-        dlg->loadXmlFile(xmlPath);
+        const bool loaded = dlg->loadXmlFile(xmlPath);
+        genDebugLog(QStringLiteral("[参数配置] 自动加载 XML: %1 → %2")
+                    .arg(xmlPath, loaded ? QStringLiteral("成功") : QStringLiteral("失败")));
+        if (!loaded) {
+            // 空窗口没有解释会让人误以为"根本没自动加载"，这里把原因说清楚再照常打开，
+            // 用户仍可在对话框里手动打开别的文件。
+            QMessageBox::warning(this, QString::fromUtf8("参数配置"),
+                QString::fromUtf8("已选的 XML 配置文件加载失败：\n%1\n\n"
+                                  "该文件可能不是知识库/任务 XML，或已被移动、删除。\n"
+                                  "参数配置对话框仍会打开，可在其中手动打开其它文件。")
+                .arg(xmlPath));
+        }
         dlg->show();
+        dlg->raise();
+        dlg->activateWindow();
     });
     hCfg->addWidget(btnParamConfig);
     vCfg->addLayout(hCfg);
@@ -273,7 +295,7 @@ GeneralizationConfigDialog::GeneralizationConfigDialog(QWidget* parent)
     m_lineEditOutputDir = new QLineEdit(this);
     m_lineEditOutputDir->setPlaceholderText(QString::fromUtf8("选择综合缩编结果输出目录..."));
     hOutput->addWidget(m_lineEditOutputDir, 1);
-    auto* btnBrowseOutputDir = new QPushButton(QString::fromUtf8("浏览..."), this);
+    auto* btnBrowseOutputDir = new QPushButton(QString::fromUtf8("浏览"), this);
     btnBrowseOutputDir->setFixedWidth(80);
     btnBrowseOutputDir->setStyleSheet(kNarrowBtnStyle);
     connect(btnBrowseOutputDir, &QPushButton::clicked, this, &GeneralizationConfigDialog::onBrowseOutputDir);
@@ -363,6 +385,8 @@ void GeneralizationConfigDialog::connectSignals()
 // ====== 属性访问器 ======
 
 QString GeneralizationConfigDialog::shpDirectory() const    { return m_lineEditShpDir->text().trimmed(); }
+QString GeneralizationConfigDialog::gdbDirectory() const    { return m_lineEditGdbDir->text().trimmed(); }
+QString GeneralizationConfigDialog::convXmlPath() const      { return m_lineEditConvXml->text().trimmed(); }
 QString GeneralizationConfigDialog::configXmlPath() const    { return m_lineEditConfigXml->text().trimmed(); }
 QString GeneralizationConfigDialog::outputDirectory() const  { return m_lineEditOutputDir->text().trimmed(); }
 bool    GeneralizationConfigDialog::isFileSystemSource() const { return true; }   // 仅文件系统数据源
@@ -424,6 +448,111 @@ void GeneralizationConfigDialog::onBrowseShpDir()
     QString dir = QFileDialog::getExistingDirectory(this,
         QString::fromUtf8("选择矢量数据目录"), m_lineEditShpDir->text());
     if (!dir.isEmpty()) m_lineEditShpDir->setText(dir);
+}
+
+void GeneralizationConfigDialog::onBrowseGdbDir()
+{
+    QString dir = QFileDialog::getExistingDirectory(this,
+        QString::fromUtf8("选择 GDB 目录"), m_lineEditGdbDir->text());
+    if (!dir.isEmpty()) m_lineEditGdbDir->setText(dir);
+}
+
+void GeneralizationConfigDialog::onBrowseConvXml()
+{
+    QString startDir;
+    if (!m_lineEditConvXml->text().trimmed().isEmpty())
+        startDir = QFileInfo(m_lineEditConvXml->text()).absolutePath();
+    else {
+        // 默认定位到知识库目录（与插件部署的 know20260313 一致）
+        const QString appDir = QCoreApplication::applicationDirPath();
+        startDir = QDir::cleanPath(appDir + "/../plugins/know20260313");
+    }
+    QString file = QFileDialog::getOpenFileName(this,
+        QString::fromUtf8("选择转换知识库 XML"), startDir, "XML 文件 (*.xml);;所有文件 (*)");
+    if (!file.isEmpty()) m_lineEditConvXml->setText(file);
+}
+
+void GeneralizationConfigDialog::onRunGdb2Shp()
+{
+    // ====== 1. 校验输入 ======
+    const QString xmlPath = convXmlPath();
+    if (xmlPath.isEmpty()) {
+        QMessageBox::warning(this, QString::fromUtf8("GDB→SHP 转换"),
+            QString::fromUtf8("请先在 GDB 数据页选择转换知识库 XML。"));
+        return;
+    }
+    if (!QFile::exists(xmlPath)) {
+        QMessageBox::warning(this, QString::fromUtf8("GDB→SHP 转换"),
+            QString::fromUtf8("转换知识库 XML 不存在:\n%1").arg(xmlPath));
+        return;
+    }
+    if (m_workerThread && m_workerThread->isRunning()) {
+        QMessageBox::warning(this, QString::fromUtf8("GDB→SHP 转换"),
+            QString::fromUtf8("已有任务在执行中，请等待完成后再试。"));
+        return;
+    }
+
+    genDebugLog(QStringLiteral("=== GDB→SHP 转换开始 XML=%1 GDB目录=%2")
+        .arg(xmlPath, gdbDirectory()));
+
+    // ====== 2. 解析所选 XML：取输入 GDB / 输出 SHP 的 ConnectionString ======
+    // 用途: 输出目录（SHP 输出=一个目录）绝对路径时预建; 输入为绝对路径时预检存在
+    QString inputConn, outputConn;
+    {
+        QFile f(xmlPath);
+        if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QXmlStreamReader xml(&f);
+            QString ds;   // 当前所在数据源块: "in" / "out"
+            while (!xml.atEnd() && !xml.hasError()) {
+                xml.readNext();
+                if (xml.isStartElement()) {
+                    const QStringRef n = xml.name();
+                    if      (n == QStringLiteral("InputDataSource"))   ds = QStringLiteral("in");
+                    else if (n == QStringLiteral("OutputDataSource"))  ds = QStringLiteral("out");
+                    else if (n == QStringLiteral("ConnectionString")) {
+                        const QString v = xml.readElementText().trimmed();
+                        if      (ds == QStringLiteral("in"))  inputConn  = v;
+                        else if (ds == QStringLiteral("out")) outputConn = v;
+                    }
+                }
+                else if (xml.isEndElement()) {
+                    const QStringRef n = xml.name();
+                    if (n == QStringLiteral("InputDataSource") || n == QStringLiteral("OutputDataSource"))
+                        ds.clear();
+                }
+            }
+            f.close();
+        }
+    }
+
+    if (!inputConn.isEmpty()) {
+        const QFileInfo inFi(inputConn);
+        if (inFi.isAbsolute() && !QFileInfo::exists(inputConn)) {
+            QMessageBox::warning(this, QString::fromUtf8("GDB→SHP 转换"),
+                QString::fromUtf8("XML 中输入 GDB 不存在:\n%1\n\n"
+                                  "请检查所选转换知识库 XML 的 InputDataSource ConnectionString。")
+                    .arg(inputConn));
+            return;
+        }
+    }
+    if (!outputConn.isEmpty()) {
+        const QFileInfo outFi(outputConn);
+        if (outFi.isAbsolute())
+            QDir().mkpath(outputConn);   // SHP 输出目录预建，避免 SDK 侧因父目录缺失失败
+    }
+    genDebugLog(QStringLiteral("解析 XML: 输入GDB=%1 输出SHP=%2").arg(inputConn, outputConn));
+
+    // ====== 3. 子线程执行（直接格式单 XML，links 为空） ======
+    // dataDir = DoXMLFile 的 relativePath 基准目录: 优先 GDB 目录，空则回退 XML 所在目录
+    QString dataDir = gdbDirectory();
+    if (dataDir.isEmpty())
+        dataDir = QFileInfo(xmlPath).absolutePath();
+
+    const QString appDir     = QCoreApplication::applicationDirPath();
+    const QString pluginsDir = QDir::cleanPath(appDir + "/../plugins");
+
+    startWorkerRun(xmlPath, dataDir, QVector<GeneralizationWorker::LinkEntry>(),
+                   pluginsDir, QString::fromUtf8("GDB→SHP 转换"));
 }
 
 void GeneralizationConfigDialog::onBrowseConfigXml()
@@ -863,6 +992,172 @@ static int moveBackslashFilesToDirs(const QString& rootDir)
 }
 #endif // _WIN32
 
+// ============================================================================
+// 【2026-09-10】输入类型判定 + GDB→SHP 转换准备（地图综合支持 FileGDB 输入）
+// ============================================================================
+
+// ---- 输入目录类型：SHP 目录 / FileGDB / 名为 .gdb 但不是有效 FileGDB ----
+enum class InputKind { Shp, Gdb, GdbInvalid };
+
+// FileGDB 在磁盘上是一个目录，标志是内含 *.gdbtable 文件（实测本机样本：
+// 甘肃陇图 TemplateData.gdb 顶层 101 个条目、其中 22 个 .gdbtable；
+// 混合文件类型 test_data.gdb 10 个）。只看 ".gdb" 后缀不够——实测存在名字像
+// GDB 但里面是空的目录（D:\集成测试\数据备份模块\1.gdb，0 个条目），
+// 那种要单独报错，而不是掉进 SHP 分支去报"未找到 .shp 文件"。
+static InputKind detectInputKind(const QString& dir, QString& detail)
+{
+    const QDir d(dir);
+    const QStringList tables = d.entryList(
+        QStringList() << "*.gdbtable" << "*.GDBTABLE", QDir::Files);
+    if (!tables.isEmpty()) {
+        detail = QStringLiteral("FileGDB（%1 个 .gdbtable）").arg(tables.size());
+        return InputKind::Gdb;
+    }
+    if (QFileInfo(dir).fileName().endsWith(QStringLiteral(".gdb"), Qt::CaseInsensitive)) {
+        detail = QStringLiteral("目录名以 .gdb 结尾，但未找到 *.gdbtable（不是有效的 FileGDB）");
+        return InputKind::GdbInvalid;
+    }
+    detail = QStringLiteral("按 SHP 目录处理");
+    return InputKind::Shp;
+}
+
+// ---- 在 Link 列表里找 gdb→shp 转换子 XML，返回下标（-1 = 未找到）----
+// 判据：子 XML 的 InputDataSource/Provider == "DatastoreType_EsriGDB"。
+// 实测全知识库只有 gdb2shp 转换 XML 用该 Provider（如 1格式转换_gdb2shp_天津.xml），
+// 而综合子 XML 连 InputDataSource 节点都没有（用的是 <Layers><FilePath> /
+// <ParaIn><FilePath>），所以不会误判。注意 ProviderInfo 是另一个节点名，不匹配。
+static int findGdb2ShpLinkIndex(const QString& xmlDir,
+                                const QVector<GeneralizationWorker::LinkEntry>& links)
+{
+    for (int i = 0; i < links.size(); ++i) {
+        if (!links[i].run) continue;
+
+        // 容器 XML 里的子路径是 Windows 风格反斜杠，Linux 上必须转正斜杠
+        QString rel = links[i].path;
+        rel.replace(QLatin1Char('\\'), QLatin1Char('/'));
+        const QString subXml = QDir::cleanPath(xmlDir + "/" + rel);
+
+        QFile f(subXml);
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) continue;
+
+        QXmlStreamReader xml(&f);
+        bool inInputDs = false;
+        while (!xml.atEnd() && !xml.hasError()) {
+            xml.readNext();
+            if (xml.isStartElement()) {
+                const QStringRef n = xml.name();
+                if (n == QStringLiteral("InputDataSource")) {
+                    inInputDs = true;
+                }
+                else if (inInputDs && n == QStringLiteral("Provider")) {
+                    if (xml.readElementText().trimmed()
+                            == QStringLiteral("DatastoreType_EsriGDB"))
+                        return i;
+                    inInputDs = false;   // 该输入源不是 GDB，继续找下一条 Link
+                }
+            }
+            else if (xml.isEndElement()
+                     && xml.name() == QStringLiteral("InputDataSource")) {
+                inInputDs = false;
+            }
+        }
+    }
+    return -1;
+}
+
+// ---- XML 文本值的最小转义（路径里出现 & < > 的极端情况）----
+static QString xmlEscaped(const QString& v)
+{
+    QString r = v;
+    r.replace(QLatin1Char('&'), QStringLiteral("&amp;"));
+    r.replace(QLatin1Char('<'), QStringLiteral("&lt;"));
+    r.replace(QLatin1Char('>'), QStringLiteral("&gt;"));
+    return r;
+}
+
+// ---- 把 s 里 <openTag>…<closeTag> 之间的内容整段替换为 newValue ----
+static bool replaceTagBody(QString& s, const QString& openTag,
+                           const QString& closeTag, const QString& newValue)
+{
+    const int p = s.indexOf(openTag);
+    if (p < 0) return false;
+    const int bodyStart = p + openTag.length();
+    const int q = s.indexOf(closeTag, bodyStart);
+    if (q < 0) return false;
+    s.replace(bodyStart, q - bodyStart, newValue);
+    return true;
+}
+
+// ---- 生成 gdb→shp 临时转换 XML ----
+// 复制知识库模板，只替换运行时才知道的三处路径，其余（LayerNameList 要素集映射、
+// StringFieldLengthScale、中文注释、缩进）原样保留。不用 QXmlStreamWriter 重写
+// 全文——那会丢掉模板里的注释。
+// 与实测可用的样式一致：<RelativePath> 置空 + 两个 ConnectionString 用绝对路径。
+static QString writeGdb2ShpTempXml(const QString& tplPath, const QString& gdbDir,
+                                   const QString& outDir, QString& errMsg)
+{
+    QFile f(tplPath);
+    if (!f.open(QIODevice::ReadOnly)) {
+        errMsg = QStringLiteral("无法读取转换知识库模板: %1").arg(tplPath);
+        return QString();
+    }
+    const QByteArray raw = f.readAll();
+    f.close();
+
+    // 交付模板是 UTF-8 + BOM，读时剥掉、写时补回，保持原编码风格
+    const QByteArray bom = QByteArrayLiteral("\xEF\xBB\xBF");
+    const bool hasBom = raw.startsWith(bom);
+    QString text = QString::fromUtf8(hasBom ? raw.mid(bom.size()) : raw);
+
+    // 在 <secOpen>…<secClose> 区间内替换第一个 <ConnectionString>
+    const auto replaceConnIn = [&text, &errMsg](const QString& secOpen, const QString& secClose,
+                                                const QString& value, const QString& label) -> bool {
+        const int s = text.indexOf(secOpen);
+        if (s < 0) {
+            errMsg = QStringLiteral("模板缺少 %1 节点").arg(label);
+            return false;
+        }
+        const int e = text.indexOf(secClose, s);
+        if (e < 0) {
+            errMsg = QStringLiteral("模板 %1 节点未闭合").arg(label);
+            return false;
+        }
+        QString section = text.mid(s, e - s);
+        if (!replaceTagBody(section, QStringLiteral("<ConnectionString>"),
+                            QStringLiteral("</ConnectionString>"), xmlEscaped(value))) {
+            errMsg = QStringLiteral("模板 %1 内未找到 <ConnectionString>").arg(label);
+            return false;
+        }
+        text.replace(s, e - s, section);
+        return true;
+    };
+
+    if (!replaceConnIn(QStringLiteral("<InputDataSource"), QStringLiteral("</InputDataSource>"),
+                       gdbDir, QStringLiteral("InputDataSource")))
+        return QString();
+    if (!replaceConnIn(QStringLiteral("<OutputDataSource"), QStringLiteral("</OutputDataSource>"),
+                       outDir, QStringLiteral("OutputDataSource")))
+        return QString();
+
+    // <RelativePath> 置空：路径已全部绝对化，避免模板里的旧路径参与解析。
+    // 模板可能写成 <RelativePath></RelativePath>（空）也可能有值，两种都能替换。
+    replaceTagBody(text, QStringLiteral("<RelativePath>"),
+                   QStringLiteral("</RelativePath>"), QString());
+
+    QDir().mkpath(outDir);
+    const QString outPath = outDir + QStringLiteral("/_temp_gdb2shp.xml");
+    QFile out(outPath);
+    if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        errMsg = QStringLiteral("无法写入临时 XML: %1").arg(outPath);
+        return QString();
+    }
+    QByteArray data = text.toUtf8();
+    if (hasBom) data.prepend(bom);
+    out.write(data);
+    out.close();
+    return outPath;
+}
+
 // ====== GeneralizationWorker::process() — 在子线程中执行 ======
 void GeneralizationWorker::process()
 {
@@ -998,8 +1293,8 @@ void GeneralizationConfigDialog::onWorkerProgress(int current, int total, const 
         m_execProgress->setMaximum(total);
         m_execProgress->setValue(current);
         m_execProgress->setLabelText(
-            QString::fromUtf8("正在执行综合缩编... [%1/%2]\n%3")
-                .arg(current).arg(total).arg(stepName));
+            QStringLiteral("%1 [%2/%3]\n%4")
+                .arg(m_progressLabelPrefix).arg(current).arg(total).arg(stepName));
     }
     QgsMessageLog::logMessage(
         QStringLiteral("进度 [%1/%2]: %3").arg(current).arg(total).arg(stepName),
@@ -1009,7 +1304,13 @@ void GeneralizationConfigDialog::onWorkerProgress(int current, int total, const 
 // ====== Worker 完成回调 (主线程) ======
 void GeneralizationConfigDialog::onWorkerFinished(int success, int total)
 {
-    m_execProgress->close();
+    // 【2026-09-10】加 null 检查并置空：GDB 输入时一次用户操作会连续跑两轮
+    // （阶段1 gdb→shp、阶段2 综合），第二轮 startWorkerRun 会新建进度框，
+    // 不置空的话这里 close 的是新框、旧指针也会一直留着。
+    if (m_execProgress) {
+        m_execProgress->close();
+        m_execProgress = nullptr;
+    }
 
     // 清理线程
     if (m_workerThread) {
@@ -1028,19 +1329,159 @@ void GeneralizationConfigDialog::onWorkerFinished(int success, int total)
         LOG_TAG, Qgis::Info);
     genDebugLog(QStringLiteral("执行完毕: %1/%2 成功").arg(success).arg(total));
 
+    // 【2026-09-10】GDB 输入的两阶段串联：阶段1（gdb→shp 转换）结束后自动接
+    // 阶段2（综合）。此间不弹完成框——阶段1 失败才弹错并中止。
+    if (m_pendingGdb2ShpRun) {
+        m_pendingGdb2ShpRun = false;
+        if (success < total) {
+            QgsMessageLog::logMessage(
+                QStringLiteral("GDB→SHP 转换未全部完成，综合已中止"), LOG_TAG, Qgis::Critical);
+            genDebugLog(QStringLiteral("GDB→SHP 转换未全部完成，综合已中止"));
+            QMessageBox::warning(this, QString::fromUtf8("GDB→SHP 转换"),
+                QString::fromUtf8("GDB→SHP 转换未全部完成，综合已中止。\n\n"
+                                  "请查看 QGIS「日志消息」面板的「综合缩编」标签获取详情，\n"
+                                  "并检查临时转换配置与转换知识库模板。"));
+            return;
+        }
+        QgsMessageLog::logMessage(
+            QStringLiteral("GDB→SHP 转换完成，继续执行综合缩编"), LOG_TAG, Qgis::Info);
+        genDebugLog(QStringLiteral("GDB→SHP 转换完成，继续执行综合缩编"));
+        startWorkerRun(m_stage2XmlDir, m_stage2DataDir, m_stage2Links,
+                       m_stage2DllDir, QString::fromUtf8("综合缩编"));
+        return;   // 阶段2 结束时才走下面的常规完成弹框
+    }
+
+    // 【2026-09-09】文案改用 m_taskLabel（综合 / gdb→shp 转换共用此回调），
+    // 默认任务标签"综合缩编"，弹窗文案与改造前一致
+    const QString title = m_taskLabel.isEmpty() ? QString::fromUtf8("综合缩编") : m_taskLabel;
     if (success == total && total > 0) {
-        QMessageBox::information(this, QString::fromUtf8("综合缩编"),
-            QString::fromUtf8("综合缩编执行完成！\n\n 全部成功。"));
+        QMessageBox::information(this, title,
+            QString::fromUtf8("%1执行完成！\n\n 全部成功。").arg(title));
     }
     else if (success > 0) {
-        QMessageBox::warning(this, QString::fromUtf8("综合缩编"),
-            QString::fromUtf8("综合缩编部分完成。\n\n成功: %1 / 失败: %2")
-                .arg(success).arg(total - success));
+        QMessageBox::warning(this, title,
+            QString::fromUtf8("%1部分完成。\n\n成功: %2 / 失败: %3")
+                .arg(title).arg(success).arg(total - success));
     }
     else {
-        QMessageBox::warning(this, QString::fromUtf8("综合缩编"),
-            QString::fromUtf8("综合缩编执行失败。\n\n请查看 QGIS「日志消息」面板的「综合缩编」标签获取详情。"));
+        QMessageBox::warning(this, title,
+            QString::fromUtf8("%1执行失败。\n\n请查看 QGIS「日志消息」面板的「综合缩编」标签获取详情。").arg(title));
     }
+}
+
+// ====== 通用启动：创建子线程 worker + 进度条，跑一次 DoXMLFile ======
+// links 空 = 直接格式单 XML（综合单 XML / gdb→shp 转换）；
+// links 非空 = Link 容器格式，worker 内逐条跑。
+// 【2026-09-09】从 onExecute 抽出，onExecute 与 onRunGdb2Shp 共用。
+void GeneralizationConfigDialog::startWorkerRun(
+    const QString& xmlDir, const QString& dataDir,
+    const QVector<GeneralizationWorker::LinkEntry>& links,
+    const QString& dllDir, const QString& taskLabel)
+{
+    m_taskLabel = taskLabel;
+    m_progressLabelPrefix = QString::fromUtf8("正在执行%1...").arg(taskLabel);
+
+    if (m_workerThread && m_workerThread->isRunning()) {
+        QgsMessageLog::logMessage(
+            QStringLiteral("已有任务在执行中，忽略本次启动: %1").arg(taskLabel),
+            LOG_TAG, Qgis::Warning);
+        return;
+    }
+
+    // 创建子线程 Worker
+    m_worker = new GeneralizationWorker(this);
+    m_worker->setXmlDir(xmlDir);
+    m_worker->setDataDir(dataDir);
+    m_worker->setDllDir(dllDir);
+    m_worker->setLinks(links);
+
+    m_workerThread = new QThread(this);
+    m_worker->moveToThread(m_workerThread);
+
+    // 信号连接 (跨线程自动使用 QueuedConnection)
+    connect(m_workerThread, &QThread::started,
+            m_worker,       &GeneralizationWorker::process);
+    connect(m_worker, &GeneralizationWorker::progressChanged,
+            this,     &GeneralizationConfigDialog::onWorkerProgress);
+    connect(m_worker, &GeneralizationWorker::finished,
+            this,     &GeneralizationConfigDialog::onWorkerFinished);
+    connect(m_worker, &GeneralizationWorker::logMessage,
+            this,     [](const QString& msg, int level) {
+                QgsMessageLog::logMessage(msg, LOG_TAG,
+                    level == 2 ? Qgis::Critical : (level == 1 ? Qgis::Warning : Qgis::Info));
+                genDebugLog(msg);   // 同步写 /tmp 诊断日志（用户看不了 QGIS 面板）
+            });
+
+    // 显示进度条（实际执行 Link 数可能少于 links.size()，有 run=false 的项）
+    int activeCount = 0;
+    for (const auto& link : links) {
+        if (link.run) activeCount++;
+    }
+    if (activeCount == 0) activeCount = 1;
+
+    m_execProgress = new QProgressDialog(
+        m_progressLabelPrefix +
+            QStringLiteral("\n\n处理时间取决于数据量和算法复杂度。\n请耐心等待，不要关闭此窗口。"),
+        QString(), 0, activeCount, this);
+    m_execProgress->setWindowModality(Qt::WindowModal);
+    m_execProgress->setCancelButton(nullptr);  // DoXMLFile 无法中断，不提供取消按钮
+    m_execProgress->setMinimumDuration(0);
+    m_execProgress->show();
+
+    // 启动线程
+    m_workerThread->start();
+}
+
+// ====== 【2026-09-10】GDB 输入准备（阶段1：gdb→shp 转换）======
+// 在知识库 Link 里找 gdb2shp 转换步骤 → 用它作模板生成临时转换 XML（把实际 GDB
+// 目录与结果输出目录注入进去）→ 把该 Link 从综合步骤里剔除（阶段2 不再重复跑）。
+// 返回 false 表示已弹错，调用方直接 return。
+bool GeneralizationConfigDialog::prepareGdb2ShpStage(
+    const QString& gdbDir, const QString& outDir, bool isLinkContainer,
+    QVector<GeneralizationWorker::LinkEntry>& links, QString& tempXmlPath)
+{
+    if (!isLinkContainer) {
+        QMessageBox::warning(this, QString::fromUtf8("综合缩编"),
+            QString::fromUtf8("当前选择的是 GDB 目录，但所选知识库是直接格式（单个 XML）。\n\n"
+                              "GDB 输入需要 Link 容器形式的综合知识库，并在其中声明\n"
+                              "GDB→SHP 转换步骤（Link 指向的 XML 里 InputDataSource 的\n"
+                              "Provider 为 DatastoreType_EsriGDB）。"));
+        return false;
+    }
+
+    const QString xmlDir = QFileInfo(configXmlPath()).absolutePath();
+    const int idx = findGdb2ShpLinkIndex(xmlDir, links);
+    if (idx < 0) {
+        QMessageBox::warning(this, QString::fromUtf8("综合缩编"),
+            QString::fromUtf8("所选综合知识库未包含 GDB→SHP 转换步骤。\n\n"
+                              "请在知识库容器里加入一条 Link，指向 InputDataSource 的\n"
+                              "Provider 为 DatastoreType_EsriGDB 的转换 XML。"));
+        return false;
+    }
+
+    const QString tplRel = links[idx].path;
+    QString rel = tplRel;
+    rel.replace(QLatin1Char('\\'), QLatin1Char('/'));
+    const QString tplPath = QDir::cleanPath(xmlDir + "/" + rel);
+    links.removeAt(idx);   // 转换步骤由阶段1 单独执行，不再作为综合步骤
+
+    QString errMsg;
+    tempXmlPath = writeGdb2ShpTempXml(tplPath, gdbDir, outDir, errMsg);
+    if (tempXmlPath.isEmpty()) {
+        QMessageBox::warning(this, QString::fromUtf8("综合缩编"),
+            QString::fromUtf8("生成 GDB→SHP 转换配置失败：\n%1\n\n模板: %2")
+                .arg(errMsg, tplPath));
+        tempXmlPath.clear();
+        return false;
+    }
+
+    const QString s = QStringLiteral(
+        "GDB 输入准备：转换步骤=%1，临时 XML=%2，输入 GDB=%3，输出 SHP=%4，"
+        "并已从综合步骤中剔除该 Link")
+        .arg(tplRel, tempXmlPath, gdbDir, outDir);
+    QgsMessageLog::logMessage(s, LOG_TAG, Qgis::Info);
+    genDebugLog(s);
+    return true;
 }
 
 void GeneralizationConfigDialog::onExecute()
@@ -1074,7 +1515,25 @@ void GeneralizationConfigDialog::onExecute()
     genDebugLog(QStringLiteral("=== 综合缩编开始 数据目录=%1 XML=%2 输出=%3")
         .arg(shpDir, xmlPath, outDir));
 
+    // ====== 1b. 【2026-09-10】输入类型判定：SHP 目录 / FileGDB 目录 ======
+    QString kindDetail;
+    const InputKind kind = detectInputKind(shpDir, kindDetail);
+    {
+        const QString s = QStringLiteral("输入类型判定: %1 | %2").arg(shpDir, kindDetail);
+        QgsMessageLog::logMessage(s, LOG_TAG, Qgis::Info);
+        genDebugLog(s);
+    }
+    if (kind == InputKind::GdbInvalid) {
+        QMessageBox::warning(this, QString::fromUtf8("综合缩编"),
+            QString::fromUtf8("该目录不是有效的 FileGDB：\n%1\n\n%2").arg(shpDir, kindDetail));
+        return;
+    }
+    const bool gdbInput = (kind == InputKind::Gdb);
+
     // ====== 2. 复制源数据到输出目录 (主线程，速度快) ======
+    // 【2026-09-10】GDB 输入跳过本步：FileGDB 目录里没有 SHP 可拷，改由阶段1 的
+    // gdb→shp 转换把 SHP 产出到 outDir 根（综合子 XML 用裸文件名从 outDir 根读数据）。
+    if (!gdbInput)
     {
         QProgressDialog copyProgress(
             QString::fromUtf8("正在复制数据到输出目录..."), QString(), 0, 0, this);
@@ -1154,46 +1613,39 @@ void GeneralizationConfigDialog::onExecute()
         xmlDir = xmlPath;
     }
 
-    // ====== 4. 创建子线程 Worker ======
-    m_worker = new GeneralizationWorker(this);
-    m_worker->setXmlDir(xmlDir);
-    m_worker->setDataDir(dataDir);
-    m_worker->setDllDir(testDllDir);
-    m_worker->setLinks(links);
+    // ====== 3b. 【2026-09-10】GDB 输入：准备阶段1（gdb→shp 转换）并分流 ======
+    if (gdbInput) {
+        QString tempXml;
+        if (!prepareGdb2ShpStage(shpDir, outDir, isLinkContainer, links, tempXml))
+            return;   // 已弹错
 
-    m_workerThread = new QThread(this);
-    m_worker->moveToThread(m_workerThread);
+        // 阶段2（综合）参数先存好，等阶段1 的 finished 回调里启动
+        m_stage2XmlDir      = xmlDir;
+        m_stage2DataDir     = dataDir;
+        m_stage2DllDir      = testDllDir;
+        m_stage2Links       = links;   // prepareGdb2ShpStage 已剔除转换 Link
+        m_pendingGdb2ShpRun = true;
 
-    // 信号连接 (跨线程自动使用 QueuedConnection)
-    connect(m_workerThread, &QThread::started,
-            m_worker,       &GeneralizationWorker::process);
-    connect(m_worker, &GeneralizationWorker::progressChanged,
-            this,     &GeneralizationConfigDialog::onWorkerProgress);
-    connect(m_worker, &GeneralizationWorker::finished,
-            this,     &GeneralizationConfigDialog::onWorkerFinished);
-    connect(m_worker, &GeneralizationWorker::logMessage,
-            this,     [](const QString& msg, int level) {
-                QgsMessageLog::logMessage(msg, LOG_TAG,
-                    level == 2 ? Qgis::Critical : (level == 1 ? Qgis::Warning : Qgis::Info));
-                genDebugLog(msg);   // 同步写 /tmp 诊断日志（用户看不了 QGIS 面板）
-            });
-
-    // ====== 5. 显示进度条 ======
-    // 实际 Link 数可能少于 links.size()（有 run=false 的项）
-    int activeCount = 0;
-    for (const auto& link : links) {
-        if (link.run) activeCount++;
+        // 阶段1：单个 XML 直接跑（links 为空 → worker 把 xmlDir 当完整文件路径）
+        startWorkerRun(tempXml, outDir, QVector<GeneralizationWorker::LinkEntry>(),
+                       testDllDir, QString::fromUtf8("GDB→SHP 转换"));
+        return;
     }
-    if (activeCount == 0) activeCount = 1;
 
-    m_execProgress = new QProgressDialog(
-        QString::fromUtf8("正在执行综合缩编...\n\n处理时间取决于数据量和算法复杂度。\n请耐心等待，不要关闭此窗口。"),
-        QString(), 0, activeCount, this);
-    m_execProgress->setWindowModality(Qt::WindowModal);
-    m_execProgress->setCancelButton(nullptr);  // DoXMLFile 无法中断，不提供取消按钮
-    m_execProgress->setMinimumDuration(0);
-    m_execProgress->show();
+    // SHP 输入：若知识库声明了 gdb→shp 转换步骤，从综合步骤里剔除（输入不是 GDB，
+    // 跑它没有意义且会失败）。知识库没有该 Link 时此段什么都不做 → 与改造前一致。
+    {
+        const int gdbLinkIdx = findGdb2ShpLinkIndex(QFileInfo(xmlPath).absolutePath(), links);
+        if (gdbLinkIdx >= 0) {
+            const QString removed = links[gdbLinkIdx].path;
+            links.removeAt(gdbLinkIdx);
+            const QString s = QStringLiteral(
+                "SHP 输入：知识库含 GDB→SHP 转换 Link，已从综合步骤剔除: %1").arg(removed);
+            QgsMessageLog::logMessage(s, LOG_TAG, Qgis::Info);
+            genDebugLog(s);
+        }
+    }
 
-    // ====== 6. 启动线程 ======
-    m_workerThread->start();
+    // ====== 4. 创建子线程 Worker 并启动 ======
+    startWorkerRun(xmlDir, dataDir, links, testDllDir, QString::fromUtf8("综合缩编"));
 }

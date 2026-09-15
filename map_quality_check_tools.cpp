@@ -35,6 +35,7 @@
 #include "ui_class/merge_dialog.h"
 #include "ui_class/format_conversion_dialog.h"
 #include "ui_class/auto_edge_match_dialog.h"
+#include "ui_class/param_config_dialog.h"   // 【2026-09-10】参数配置独立菜单入口
 #include "map_check_backup_manager.h"
 
 // 地图成果管理
@@ -357,6 +358,19 @@ void CGarMap_MapQualityCheckToolsPlugin::initGui()
 	mQGisIface->addToolBarIcon(mActionMapDataDownload);
 	mQGisIface->addPluginToVectorMenu(tr("&地图数据下载"), mActionMapDataDownload);
 
+	/*【参数配置】—【2026-09-10】独立菜单入口，挂到地图智能综合菜单下（经 plugin_bindings.json）。
+	  刻意放在 initGui 最后一个创建：平台按 findChildren<QAction*> 的枚举序号做
+	  fallbackActionIndex，此处即第 15 个（0 基），不会顶掉前面已有的下标。*/
+	QIcon iconParamConfig;
+	QString strParamConfig = curExePath + "/resource/toolbox/theme_data_mapping.png";
+	iconParamConfig.addFile(strParamConfig);
+	mActionParamConfig = new QAction(iconParamConfig, tr("参数配置..."), this);
+	mActionParamConfig->setObjectName(QStringLiteral("mActionParamConfig"));
+	mActionParamConfig->setWhatsThis(tr("查看与修改综合缩编知识库 XML 的参数、路径与链接"));
+	connect(mActionParamConfig, &QAction::triggered, this, &CGarMap_MapQualityCheckToolsPlugin::ParamConfig);
+	mQGisIface->addToolBarIcon(mActionParamConfig);
+	mQGisIface->addPluginToVectorMenu(tr("&参数配置"), mActionParamConfig);
+
 	// 启动定时备份后台管理器（仅在启用时启动）
 	CMapCheckBackupManager::instance()->loadSettings();
 	if (CMapCheckBackupManager::instance()->isEnabled())
@@ -664,6 +678,18 @@ void CGarMap_MapQualityCheckToolsPlugin::MapDataDownload()
 	pDlg->show();
 }
 
+/*【2026-09-10】参数配置独立入口。
+  与"地图综合"对话框里的"参数配置"按钮的区别：这里没有前置的 XML 选择，
+  对话框打开后是空的，由用户自己点"打开XML"选文件；从地图综合进来时会自动带入
+  那边已选的 XML（见 generalization_config_dialog.cpp 的 btnParamConfig）。*/
+void CGarMap_MapQualityCheckToolsPlugin::ParamConfig()
+{
+	ParamConfigDialog* pDlg = new ParamConfigDialog(nullptr, Qt::WindowCloseButtonHint);
+	pDlg->setAttribute(Qt::WA_DeleteOnClose);
+	pDlg->setModal(false);
+	pDlg->show();
+}
+
 void CGarMap_MapQualityCheckToolsPlugin::unload()
 {
 	//// 去掉ui界面
@@ -783,6 +809,12 @@ void CGarMap_MapQualityCheckToolsPlugin::unload()
 		mQGisIface->removeToolBarIcon(mActionMapDataDownload);
 		delete mActionMapDataDownload;
 		mActionMapDataDownload = nullptr;
+	}
+	if (mActionParamConfig) {
+		mQGisIface->removePluginVectorMenu(tr("&参数配置"), mActionParamConfig);
+		mQGisIface->removeToolBarIcon(mActionParamConfig);
+		delete mActionParamConfig;
+		mActionParamConfig = nullptr;
 	}
 
 	// 停止定时备份管理器

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- M458 综合前后匹配参数（QGIS 本地缓冲匹配，成果为投影坐标，单位米）：
+     BufferDistance  缓冲匹配距离（米）
+     MinOverlapRatio 重叠面积/长度比低于该值视为未匹配（0~1）
+     MaxChangeRatio  面积/长度变化率超过该值视为显著变形（0~1，0.3=30%）
+     MaxVertexChange 顶点数变化超过该值视为显著变形（个） -->
+<MapGeneBatchProcessing>
+    <Mission id="458">
+        <Parameter>
+            <BufferDistance>10</BufferDistance>
+            <MinOverlapRatio>0.5</MinOverlapRatio>
+            <MaxChangeRatio>0.3</MaxChangeRatio>
+            <MaxVertexChange>10</MaxVertexChange>
+        </Parameter>
+    </Mission>
+</MapGeneBatchProcessing>

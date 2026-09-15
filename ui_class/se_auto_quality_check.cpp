@@ -11,7 +11,6 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QDateTime>
-#include <QProcess>
 #include <QCheckBox>
 #include <QGroupBox>
 #include <QVBoxLayout>
@@ -32,6 +31,7 @@
 #include <QDomElement>
 #include <QDomNodeList>
 #include <QRegularExpression>
+#include <QTemporaryDir>
 #include <memory>
 
 // ---- Mission 检查模块（需在QGIS头文件之前，避免json.hpp冲突） ----
@@ -43,6 +43,8 @@
 #include "se_mission457_check.h"
 #include "se_mission458_check.h"
 #include "se_mission459_check.h"
+#include "../ui_task/wuji_mission_runner.h"
+#include "../ui_task/wuji_engine_bridge.h"
 
 /*--------------QGIS---------------*/
 #include "qgssettings.h"
@@ -129,9 +131,6 @@ CSE_AutoQualityCheckDialog::CSE_AutoQualityCheckDialog(QWidget* parent, Qt::Wind
     // ---- 关闭 ----
     connect(ui.btn_Close, &QPushButton::clicked, this, &CSE_AutoQualityCheckDialog::onClose);
 
-    // ---- QProcess ----
-    m_chkProcess = new QProcess(this);
-
     // ---- 恢复上次参数 ----
     restoreState();
 
@@ -144,6 +143,17 @@ CSE_AutoQualityCheckDialog::CSE_AutoQualityCheckDialog(QWidget* parent, Qt::Wind
         loadDefaultMissionConfig();  // 兜底：用代码内置默认值
     }
     buildMissionUI();
+
+    // ---- 动态窗口标题（与集成版一致：综合成果自动化质检: X组Mission Y项检查）----
+    {
+        int totalItems = 0;
+        for (const auto& group : m_missionGroups) {
+            totalItems += group.items.size();
+        }
+        setWindowTitle(QString("综合成果自动化质检: %1组Mission %2项检查")
+                       .arg(m_missionGroups.size())
+                       .arg(totalItems));
+    }
 }
 
 CSE_AutoQualityCheckDialog::~CSE_AutoQualityCheckDialog()
@@ -263,7 +273,7 @@ static QString findExe()
     // 注意：无需硬编码路径，引擎在 exe 同级目录查找即可
 #ifdef Q_OS_WIN
     char buf[MAX_PATH];
-    HMODULE hm = GetModuleHandleA("map_quality_check_tools.dll");
+    HMODULE hm = GetModuleHandleA("plugin_auto_quality_check.dll");
     if (hm) {
         GetModuleFileNameA(hm, buf, MAX_PATH);
         QFileInfo fi(QString::fromLocal8Bit(buf));
@@ -277,42 +287,63 @@ static QString findExe()
 // ================================================================
 //  扫描 SHP 文件
 // ================================================================
-static QString findFirstShpName(const QString& dirPath, const QString& suffix = "")
-{
-    QDir dir(dirPath);
-    QStringList filters;
-    if (suffix.isEmpty())
-        filters << "*.shp";
-    else
-        filters << ("*" + suffix + ".shp");
-    QStringList files = dir.entryList(filters, QDir::Files, QDir::Name);
-    return files.isEmpty() ? QString() : files.first();
-}
-
 QStringList CSE_AutoQualityCheckDialog::scanShpFiles(const QString& dirPath)
 {
     QDir dir(dirPath);
     return dir.entryList({"*.shp"}, QDir::Files, QDir::Name);
 }
 
+// ---- 从错误消息文本中提取图层名称 ----
+// 消息格式约定：
+//   [图层名] ...                        （M458 匹配类）
+//   检查名(图层名)：详情                 （M453/454/455/456 拓扑类）
+//   图形规范性检查(图层名/模式名)：详情   （M459）
+static QString extractLayerNameFromMsg(const QString& msg)
+{
+    const int lb = msg.indexOf('[');
+    const int lp = msg.indexOf('(');
+    if (lb >= 0 && (lp < 0 || lb < lp)) {
+        const int rb = msg.indexOf(']', lb + 1);
+        if (rb > lb + 1) return msg.mid(lb + 1, rb - lb - 1);
+        return QString();
+    }
+    if (lp >= 0) {
+        const int rp = msg.indexOf(')', lp + 1);
+        if (rp > lp + 1) {
+            const int slash = msg.indexOf('/', lp + 1);
+            const int end = (slash > lp && slash < rp) ? slash : rp;
+            if (end > lp + 1) return msg.mid(lp + 1, end - lp - 1);
+        }
+    }
+    return QString();
+}
+
 // ---- 将错误列表写入 SHP 文件 ----
 // 生成两个文件：
-//   {outputDir}/{name}.shp    — 错误要素副本 + "error"字段
-//   {outputDir}/{name}_pt.shp — 错误位置点标记
+//   {outputDir}/{name}.shp    — 错误要素副本 + "error"字段 + "图层名"字段
+//   {outputDir}/{name}_pt.shp — 错误位置点标记（同样带图层名）
+// layerName 非空时整批写入该值；为空时逐条从错误消息中提取。
+// （DBF 字段名限 10 字节，"图层名称"12 字节会被截断，故用"图层名"）
 static QStringList writeErrorsToShp(const QString& outputDir, const QString& name,
     const QList<QPair<QgsFeature, QString>>& errors,
     const QgsCoordinateReferenceSystem& crs,
-    const QgsFields& layerFields)
+    const QgsFields& layerFields,
+    const QString& layerName = QString())
 {
     QStringList outFiles;
     if (errors.isEmpty()) return outFiles;
 
-    // ---- 用图层字段 + 追加 error 字段 ----
+    // ---- 用图层字段 + 追加 error / 图层名 字段 ----
     QgsFields featFields(layerFields);
     int errIdx = featFields.indexOf("error");
     if (errIdx < 0) {
         featFields.append(QgsField("error", QVariant::String, "String", 254));
         errIdx = featFields.size() - 1;
+    }
+    int layIdx = featFields.indexOf("图层名");
+    if (layIdx < 0) {
+        featFields.append(QgsField("图层名", QVariant::String, "String", 254));
+        layIdx = featFields.size() - 1;
     }
     QgsWkbTypes::Type gType = errors.first().first.geometry().wkbType();
 
@@ -337,6 +368,8 @@ static QStringList writeErrorsToShp(const QString& outputDir, const QString& nam
                 for (int f = 0; f < layerFields.size(); f++)
                     outFeat.setAttribute(f, pair.first.attribute(layerFields.at(f).name()));
                 outFeat.setAttribute(errIdx, pair.second);
+                outFeat.setAttribute(layIdx, layerName.isEmpty()
+                    ? extractLayerNameFromMsg(pair.second) : layerName);
                 featWriter->addFeature(outFeat);
             }
             featWriter.reset();
@@ -349,6 +382,7 @@ static QStringList writeErrorsToShp(const QString& outputDir, const QString& nam
         QgsFields ptFields;
         ptFields.append(QgsField("feature_id", QVariant::LongLong));
         ptFields.append(QgsField("error", QVariant::String, "String", 254));
+        ptFields.append(QgsField("图层名", QVariant::String, "String", 254));
 
         QString ptShp = outputDir + "/" + name + "_pt.shp";
         QgsVectorFileWriter::SaveVectorOptions opts;
@@ -370,6 +404,8 @@ static QStringList writeErrorsToShp(const QString& outputDir, const QString& nam
                 ptFeat.setGeometry(ptGeom);
                 ptFeat.setAttribute(0, (qlonglong)pair.first.id());
                 ptFeat.setAttribute(1, pair.second);
+                ptFeat.setAttribute(2, layerName.isEmpty()
+                    ? extractLayerNameFromMsg(pair.second) : layerName);
                 ptWriter->addFeature(ptFeat);
             }
             ptWriter.reset();
@@ -842,8 +878,8 @@ void CSE_AutoQualityCheckDialog::loadDefaultMissionConfig()
     struct { int id; QString name; QString cat; bool impl; QVector<QPair<QString,int>> items; } defs[] = {
         {453, "属性检查", "属性", true, {
             {"字段名称检查",1},{"数据类型检查",2},{"字段长度检查",4},{"精度检查",8},
-            {"枚举字段检查",16},{"约束条件检查",32},{"唯一约束检查",128},{"非空约束检查",256},
-            {"约束类型检查",512},{"约束组合检查",1024}
+            {"忽略字段检查",16},{"主键检查",32},{"唯一约束检查",128},{"非空约束检查",256},
+            {"约束类型检查",512},{"约束集检查",1024}
         }},
         {454, "点拓扑检查", "拓扑", true, {
             {"点必须重合",1},{"点必须分离",2},{"点被线端点覆盖",4},
@@ -885,6 +921,10 @@ void CSE_AutoQualityCheckDialog::loadDefaultMissionConfig()
             item.enabled = d.impl;  // 已实现的默认启用
             item.implemented = d.impl;
             item.applyTo = "all";
+            // 点依附性规则（点被线端点覆盖/点被线覆盖/点在面边界上）仅对
+            // 桥梁、界桩等依附性点适用，默认不勾选，避免对普通点图层大面积误报
+            if (d.id == 454 && (it.second == 4 || it.second == 8 || it.second == 32))
+                item.enabled = false;
             group.items.append(item);
         }
         m_missionGroups.append(group);
@@ -935,14 +975,14 @@ void CSE_AutoQualityCheckDialog::buildMissionUI()
 	            QCheckBox* cb = new QCheckBox(listHost);
 	            QString cbText = item.name;
 	            if (!item.implemented)
-	                cbText += " (待开发)";
+	            cbText += " (待开发)";
 	            cb->setText(cbText);
 	            cb->setChecked(item.enabled && item.implemented);
 	            cb->setEnabled(item.implemented);
 	            if (!item.note.isEmpty())
-	                cb->setToolTip(item.note);
+	            cb->setToolTip(item.note);
 	            cb->setStyleSheet("QCheckBox { padding: 2px 6px; }");
-
+	            
 	            item.checkbox = cb;
 	            gl->addWidget(cb, j / cols, j % cols);
 	        }
@@ -953,7 +993,7 @@ void CSE_AutoQualityCheckDialog::buildMissionUI()
 
 	        pageLayout->addWidget(scrollArea, 1); // 检查项占满剩余高度，超高时出现滚动条
 
-	        // 全选 / 取消全选（固定在滚动区下方，始终可见）
+	        // 全选 / 取消全选
 	        QHBoxLayout* btnLayout = new QHBoxLayout();
 	        btnLayout->addStretch();
 	        QPushButton* btnAll = new QPushButton("全选", page);
@@ -1012,219 +1052,13 @@ void CSE_AutoQualityCheckDialog::collectThresholdsFromSpinBoxes()
     m_thresholds["MinNodeDistance"] = ui.doubleSpinBox_MinNodeDist->value();
 }
 
-// ================================================================
-//  生成完整质检 Mission XML（453-459 全部生成）
-// ================================================================
-QString CSE_AutoQualityCheckDialog::generateMissionXml(const QString& dataDir, const QString& dataLabel)
-{
-    Q_UNUSED(dataLabel)
-    collectThresholdsFromSpinBoxes();
-
-    QString polyShp = findFirstShpName(dataDir, "_A");
-    if (polyShp.isEmpty()) polyShp = findFirstShpName(dataDir);
-    QString lineShp = findFirstShpName(dataDir, "_L");
-    QString ptShp  = findFirstShpName(dataDir, "_P");
-
-    double scale       = ui.spinBox_Scale->value();
-    double tolerance   = ui.doubleSpinBox_Tolerance->value();
-    double acuteAngle  = ui.doubleSpinBox_AcuteAngle->value();
-    double sliverArea  = ui.doubleSpinBox_SliverArea->value();
-    double narrowWidth = ui.doubleSpinBox_NarrowWidth->value();
-    double minNodeDist = ui.doubleSpinBox_MinNodeDist->value();
-
-    QString xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<MapGeneBatchProcessing>\n";
-    xml += "<RelativePath>" + dataDir + "</RelativePath>\n";
-    xml += "<WriteToConsole>true</WriteToConsole>\n";
-
-    for (const auto& group : m_missionGroups) {
-        int totalMode = 0;
-        for (const auto& item : group.items) {
-            if (item.checkbox && item.checkbox->isChecked() && item.implemented)
-                totalMode |= item.mode;
-        }
-        if (totalMode == 0) continue;
-
-        switch (group.id) {
-        case 453:
-            if (!polyShp.isEmpty()) {
-                xml += "<Mission id=\"453\" note=\"属性表检查\">\n<ParaIn>\n";
-                xml += "<Layers note=\"SourceDataStore\">\n<FilePath>"+polyShp+"</FilePath>\n</Layers>\n";
-                xml += "<Parameter>\n";
-                xml += QString("<ProcessMode note=\"1-Name 2-DataType 4-Length 8-Precision 16-Ignore 32-PrimaryKey 128-Unique 256-NotNULL 512-ConstraintType 1024-ConstraintSet\">%1</ProcessMode>\n").arg(totalMode);
-                xml += "<Encoding>Encoding_ASCII</Encoding>\n</Parameter>\n</ParaIn>\n";
-                xml += "<ParaOut>\n<Layers note=\"DstDataStores\">\n<FilePath editable=\"true\">errors_attr.shp</FilePath>\n</Layers>\n";
-                xml += "<Layers note=\"AllErrorDataStore\">\n<FilePath editable=\"true\">errors_attr_pt.shp</FilePath>\n</Layers>\n</ParaOut>\n</Mission>\n";
-            }
-            break;
-        case 454:
-            if (!ptShp.isEmpty()) {
-                xml += "<Mission id=\"454\" note=\"点拓扑规则\">\n<ParaIn>\n";
-                xml += "<Layers note=\"PointDataStore\">\n<FilePath>"+ptShp+"</FilePath>\n</Layers>\n";
-                if (!lineShp.isEmpty()) xml += "<Layers note=\"LineDataStore\">\n<FilePath>"+lineShp+"</FilePath>\n</Layers>\n";
-                if (!polyShp.isEmpty()) xml += "<Layers note=\"PolygonDataStore\">\n<FilePath>"+polyShp+"</FilePath>\n</Layers>\n";
-                xml += "<Parameter>\n";
-                xml += QString("<ProcessMode note=\"1-Coincident 2-Disjoint 4-CoveredByEndpoint 8-CoveredByLine 16-Inside 32-OnBoundary\">%1</ProcessMode>\n").arg(totalMode);
-                xml += QString("<FuzzyTolerance>%1</FuzzyTolerance>\n").arg(tolerance, 0, 'f', 6);
-                xml += "<IsGeographic>false</IsGeographic>\n</Parameter>\n</ParaIn>\n";
-                xml += "<ParaOut>\n<Layers note=\"PointDataStore\">\n<FilePath editable=\"true\">errors_point.shp</FilePath>\n</Layers>\n</ParaOut>\n</Mission>\n";
-            }
-            break;
-        case 455:
-            if (!lineShp.isEmpty()) {
-                xml += "<Mission id=\"455\" note=\"线拓扑规则\">\n<ParaIn>\n";
-                xml += "<Layers note=\"LineDataStore\">\n<FilePath>"+lineShp+"</FilePath>\n</Layers>\n";
-                if (!ptShp.isEmpty()) xml += "<Layers note=\"PointDataStore\">\n<FilePath>"+ptShp+"</FilePath>\n</Layers>\n";
-                if (!polyShp.isEmpty()) xml += "<Layers note=\"PolygonDataStore\">\n<FilePath>"+polyShp+"</FilePath>\n</Layers>\n";
-                xml += "<Parameter>\n";
-                xml += QString("<ProcessMode note=\"1-Dangles 2-Pseudos 4-SelfOverlap 8-SelfIntersect 16-SinglePart 32-Overlap 64-Intersect 4096-Inside\">%1</ProcessMode>\n").arg(totalMode);
-                xml += QString("<FuzzyTolerance>%1</FuzzyTolerance>\n").arg(tolerance, 0, 'f', 6);
-                xml += "<IsGeographic>false</IsGeographic>\n</Parameter>\n</ParaIn>\n";
-                xml += "<ParaOut>\n<Layers note=\"LineDataStore\">\n<FilePath editable=\"true\">errors_line.shp</FilePath>\n</Layers>\n";
-                xml += "<Layers note=\"PointDataStore\">\n<FilePath editable=\"true\">errors_line_pt.shp</FilePath>\n</Layers>\n</ParaOut>\n</Mission>\n";
-            }
-            break;
-        case 456:
-            if (!polyShp.isEmpty()) {
-                xml += "<Mission id=\"456\" note=\"面拓扑规则\">\n<ParaIn>\n";
-                xml += "<Layers note=\"PolygonDataStore\">\n<FilePath>"+polyShp+"</FilePath>\n</Layers>\n";
-                if (!lineShp.isEmpty()) xml += "<Layers note=\"LineDataStore\">\n<FilePath>"+lineShp+"</FilePath>\n</Layers>\n";
-                if (!ptShp.isEmpty()) xml += "<Layers note=\"PointDataStore\">\n<FilePath>"+ptShp+"</FilePath>\n</Layers>\n";
-                xml += "<Parameter>\n";
-                xml += QString("<ProcessMode note=\"1-Overlap 2-Gaps 4-ContainsPoint 32-BoundaryCoveredByLine 1024-LargerThanTolerance\">%1</ProcessMode>\n").arg(totalMode);
-                xml += QString("<FuzzyTolerance>%1</FuzzyTolerance>\n").arg(tolerance, 0, 'f', 6);
-                xml += "<IsGeographic>false</IsGeographic>\n</Parameter>\n</ParaIn>\n";
-                xml += "<ParaOut>\n<Layers note=\"PolygonDataStore\">\n<FilePath editable=\"true\">errors_poly.shp</FilePath>\n</Layers>\n";
-                xml += "<Layers note=\"LineDataStore\">\n<FilePath editable=\"true\">errors_poly_line.shp</FilePath>\n</Layers>\n";
-                xml += "<Layers note=\"PointDataStore\">\n<FilePath editable=\"true\">errors_poly_pt.shp</FilePath>\n</Layers>\n</ParaOut>\n</Mission>\n";
-            }
-            break;
-        case 457: {
-            // 关联表检查：需要原始数据+成果数据+图层映射+关联表
-            // 从图层映射中获取有GUID字段的图层对
-            if (!m_layerMappingItems.isEmpty()) {
-                xml += "<Mission id=\"457\" note=\"关联表检查\">\n<ParaIn>\n";
-
-                // SourceDataStore: 原始1w数据（从图层映射的源图层代码推断）
-                xml += "<Layers note=\"SourceDataStore\" note2=\"原始1w数据\">\n";
-                for (const auto& item : m_layerMappingItems) {
-                    if (item.actualShp.isEmpty() || item.sourceCode.isEmpty()) continue;
-                    // 查找原始数据目录中的对应SHP
-                    QString origShp = item.sourceCode + ".shp";
-                    xml += QString("<FilePath GUIDFieldName=\"ELEMID\">%1</FilePath>\n").arg(origShp);
-                }
-                xml += "</Layers>\n";
-
-                // ResDataStore: 结果5w数据（实际的综合后图层）
-                xml += "<Layers note=\"ResDataStore\" note2=\"结果5w数据\">\n";
-                for (const auto& item : m_layerMappingItems) {
-                    if (item.actualShp.isEmpty()) continue;
-                    xml += QString("<FilePath GUIDFieldName=\"ELEMID\">%1</FilePath>\n").arg(item.actualShp);
-                }
-                xml += "</Layers>\n";
-
-                xml += "<Parameter>\n";
-                xml += QString("<RelationTablePath note=\"关联表路径\">relation.db;Relation_1w_5w</RelationTablePath>\n");
-                xml += QString("<ProcessMode note=\"1-GUID正确性 2-5wGUID在关联表中 4-1wGUID在数据中 8-5wGUID在数据中 16-注记GUID不变\">%1</ProcessMode>\n").arg(totalMode);
-                xml += "<GUIDFieldName note=\"输入数据GUID字段名\">ELEMID</GUIDFieldName>\n";
-                xml += "<InfoFieldName note=\"输出信息字段名\">info_NM</InfoFieldName>\n";
-                xml += "</Parameter>\n</ParaIn>\n";
-
-                xml += "<ParaOut>\n<Layers note=\"DstDataStores\">\n";
-                xml += "<FilePath editable=\"true\">errors_assoc.shp</FilePath>\n</Layers>\n";
-                xml += "</ParaOut>\n</Mission>\n";
-            }
-            break;
-        }
-        case 458: {
-            // 综合前后缓冲匹配检查
-            if (!m_layerMappingItems.isEmpty()) {
-                xml += "<Mission id=\"458\" note=\"综合前后缓冲匹配检查\">\n<ParaIn>\n";
-
-                // AfterDataStores: 综合后数据
-                xml += "<Layers note=\"AfterDataStores\">\n";
-                for (const auto& item : m_layerMappingItems) {
-                    if (item.actualShp.isEmpty()) continue;
-                    xml += QString("<FilePath bufferDis=\"%1\">%2</FilePath>\n")
-                        .arg(m_thresholds.value("BufferDis", 0.0), 0, 'f', 1)
-                        .arg(item.actualShp);
-                }
-                xml += "</Layers>\n";
-
-                // BeforeDataStores: 综合前数据（源图层代码）
-                xml += "<Layers note=\"BeforeDataStores\">\n";
-                QStringList seenCodes;
-                for (const auto& item : m_layerMappingItems) {
-                    if (item.sourceCode.isEmpty() || seenCodes.contains(item.sourceCode)) continue;
-                    seenCodes.append(item.sourceCode);
-                    xml += QString("<FilePath>%1.shp</FilePath>\n").arg(item.sourceCode);
-                }
-                xml += "</Layers>\n";
-
-                double bufferDis = m_thresholds.value("BufferDis", 0.0);
-                double areaRatio = m_thresholds.value("AreaRatio", 0.5);
-                double lengthRatio = m_thresholds.value("LengthRatio", 0.5);
-
-                xml += "<Parameter>\n";
-                xml += "<IsGeographic note=\"是否为经纬度坐标\">false</IsGeographic>\n";
-                xml += QString("<Scale note=\"比例尺\">%1</Scale>\n").arg(static_cast<int>(scale));
-                xml += QString("<BufferDis note=\"缓冲阈值\">%1</BufferDis>\n").arg(bufferDis, 0, 'f', 1);
-                xml += "<IdentityField note=\"匹配数据读取字段名称\">ELEMID</IdentityField>\n";
-                xml += QString("<ProcessMode note=\"匹配模式\">%1</ProcessMode>\n").arg(totalMode);
-                xml += "<MatchStyle note=\"匹配风格\">0</MatchStyle>\n";
-                xml += QString("<AreaRatio note=\"面积比例\">%1</AreaRatio>\n").arg(areaRatio, 0, 'f', 2);
-                xml += QString("<LengthRatio note=\"长度比例\">%1</LengthRatio>\n").arg(lengthRatio, 0, 'f', 2);
-                xml += "<SelfAreaRatio note=\"自身面积比例\">0</SelfAreaRatio>\n";
-                xml += "<SelfLengthRatio note=\"自身长度比例\">0</SelfLengthRatio>\n";
-                xml += "<AssociationType note=\"关联规则\">3</AssociationType>\n";
-                xml += "<AbsoluteValue note=\"是否是绝对数值\">false</AbsoluteValue>\n";
-                xml += "<BufferGeoProcessSelfIntersect note=\"缓冲几何是否处理自相交\">true</BufferGeoProcessSelfIntersect>\n";
-                xml += "<MultiGeoToSingle note=\"是否将多几何转换为单几何\">true</MultiGeoToSingle>\n";
-                xml += QString("<FuzzyTolerance note=\"结点拟合\">%1</FuzzyTolerance>\n").arg(tolerance, 0, 'f', 6);
-                xml += "<IntersectionEpsilon note=\"线段相交容差\">0.00001</IntersectionEpsilon>\n";
-                xml += "<RedundancyVertexTolerance note=\"拓扑节点冗余容差\">0.001</RedundancyVertexTolerance>\n";
-                xml += "<RelationTablePath note=\"关联表路径\">relation.db;Relation_1w_5w</RelationTablePath>\n";
-                xml += "<MatchParameterXMLFile note=\"缓冲匹配阈值配置文件\">matchParameter.xml</MatchParameterXMLFile>\n";
-                xml += "</Parameter>\n</ParaIn>\n";
-
-                xml += "<ParaOut>\n<Layers note=\"AfterDataStores\">\n";
-                xml += "<FilePath>errors_match.shp</FilePath>\n</Layers>\n";
-                xml += "</ParaOut>\n</Mission>\n";
-            }
-            break;
-        }
-        case 459:
-            if (!polyShp.isEmpty() || !lineShp.isEmpty()) {
-                QString shp = !polyShp.isEmpty() ? polyShp : lineShp;
-                xml += "<Mission id=\"459\" note=\"图形规范性检查\">\n<ParaIn>\n";
-                xml += "<Layers note=\"SourceDataStore\">\n<FilePath>"+shp+"</FilePath>\n</Layers>\n";
-                xml += "<Parameter>\n";
-                xml += "<IsGeographic>false</IsGeographic>\n";
-                xml += QString("<Scale>%1</Scale>\n").arg(static_cast<int>(scale));
-                xml += QString("<FuzzyTolerance>%1</FuzzyTolerance>\n").arg(tolerance, 0, 'f', 6);
-                xml += QString("<ProcessMode note=\"1-MultiPart 2-Empty 4-AcuteAngle 8-Sliver 16-Narrow 32-SmallArea 64-AvgNodeDensity 128-NodeDensity 256-SelfIntersect 512-MinNodeDistance\">%1</ProcessMode>\n").arg(totalMode);
-                xml += QString("<AcuteAngle>%1</AcuteAngle>\n").arg(acuteAngle, 0, 'f', 1);
-                xml += QString("<SliverArea>%1</SliverArea>\n").arg(sliverArea, 0, 'f', 2);
-                xml += QString("<LongNarrowWidth>%1</LongNarrowWidth>\n").arg(narrowWidth, 0, 'f', 2);
-                xml += QString("<MinNodeLength>%1</MinNodeLength>\n").arg(minNodeDist, 0, 'f', 6);
-                xml += "<FlagField>error</FlagField>\n";
-                xml += "</Parameter>\n</ParaIn>\n";
-                xml += "<ParaOut>\n<Layers note=\"DstDataStores\">\n<FilePath editable=\"true\">errors_geom.shp</FilePath>\n</Layers>\n";
-                xml += "<Layers note=\"PointDataStore\">\n<FilePath editable=\"true\">errors_geom_pt.shp</FilePath>\n</Layers>\n</ParaOut>\n</Mission>\n";
-            }
-            break;
-        }
-    }
-
-    xml += "</MapGeneBatchProcessing>\n";
-    return xml;
-}
-
-// ================================================================
 //  浏览按钮
 // ================================================================
 void CSE_AutoQualityCheckDialog::onBrowseOrigData()
 {
-    QString d = QFileDialog::getExistingDirectory(this, "原始数据目录", m_qstrOrigDataPath);
+    // 综合前数据支持 SHP 目录或 FileGDB：FileGDB 本质是文件夹（xxx.gdb），
+    // 目录选择框可直接选中；选中后自动按 .gdb 后缀识别
+    QString d = QFileDialog::getExistingDirectory(this, "原始数据目录（SHP目录或FileGDB）", m_qstrOrigDataPath);
     if (!d.isEmpty()) { m_qstrOrigDataPath = d; ui.lineEdit_OrigDataPath->setText(d); }
 }
 void CSE_AutoQualityCheckDialog::onBrowseResultData()
@@ -1276,6 +1110,17 @@ void CSE_AutoQualityCheckDialog::onDeselectAll()
 // ================================================================
 void CSE_AutoQualityCheckDialog::onStartCheck()
 {
+    // 读回输入框文本（支持手动输入/粘贴路径，不依赖浏览按钮）
+    m_qstrOrigDataPath   = ui.lineEdit_OrigDataPath->text().trimmed();
+    m_qstrResultDataPath = ui.lineEdit_ResultDataPath->text().trimmed();
+    m_qstrOutputDir      = ui.lineEdit_OutputDir->text().trimmed();
+    const QString typedMissionXml = ui.lineEdit_MissionXml->text().trimmed();
+    if (!typedMissionXml.isEmpty() && typedMissionXml != m_qstrMissionXmlPath) {
+        m_qstrMissionXmlPath = typedMissionXml;
+        loadMissionConfig(typedMissionXml);
+        buildMissionUI();
+    }
+
     // 校验
     if (m_qstrOrigDataPath.isEmpty() && m_qstrResultDataPath.isEmpty()) {
         QMessageBox::warning(this, "警告", "请至少选择一个数据源（原始数据或成果数据）");
@@ -1305,16 +1150,38 @@ void CSE_AutoQualityCheckDialog::onStartCheck()
     ui.progressBar->setValue(0);
     ui.label_Status->setText("状态：质检中...");
 
-    // 构建任务列表：原始数据 + 成果数据（各自独立）
+    // 构建任务列表：原始数据 + 成果数据（各自独立）。
+    // FileGDB（综合前）不单独跑成果类检查（453/454/455/456/459），
+    // 仅作为 457/458 综合前后对照的参照侧（在 Mission 内部处理）。
+    const bool origIsGdb = WujiMissionRunner::isFileGdbSource(m_qstrOrigDataPath);
+    const bool resultIsGdb = WujiMissionRunner::isFileGdbSource(m_qstrResultDataPath);
+    if (origIsGdb && m_qstrResultDataPath.isEmpty()) {
+        QMessageBox::warning(this, "警告",
+            "原始数据为FileGDB时，需要同时选择成果数据(SHP)目录才能执行检查");
+        return;
+    }
+    if (resultIsGdb) {
+        QMessageBox::warning(this, "警告", "成果数据暂不支持FileGDB，请选择SHP目录");
+        return;
+    }
     struct { QString path; QString label; } tasks[2];
     int n = 0;
-    if (!m_qstrOrigDataPath.isEmpty())
+    if (!m_qstrOrigDataPath.isEmpty() && !origIsGdb)
         tasks[n++] = {m_qstrOrigDataPath, "原始数据"};
     if (!m_qstrResultDataPath.isEmpty())
         tasks[n++] = {m_qstrResultDataPath, "成果数据"};
 
     QStringList allLogPaths;
+    // 所有数据源的检查结果汇总，最终合并写一份"综合成果质检"日志
+    QStringList combinedErrs, combinedCks, combinedOutputs;
     collectThresholdsFromSpinBoxes();
+
+    // 引擎可用性提示（仅记一次）：454/455/456 点线面拓扑检查正常走引擎子进程，
+    // 引擎可执行文件不存在时（如麒麟）自动回退本地 QGIS 实现，结果照常输出。
+    if (!WujiEngineBridge::engineAvailable()) {
+        combinedCks.append(QStringLiteral(
+            "提示：未找到无极引擎(MapBatchProcessing.exe)，点/线/面拓扑检查(454/455/456)已回退本地实现"));
+    }
 
     for (int i = 0; i < n; i++) {
         ui.progressBar->setValue(10 + (i * 40) / n);
@@ -1334,9 +1201,19 @@ void CSE_AutoQualityCheckDialog::onStartCheck()
             polyShps = getMappedShpByType("面");
             lineShps = getMappedShpByType("线");
             ptShps   = getMappedShpByType("点");
+
+            // 过滤映射中在当前数据目录里不存在的文件
+            auto filterExist = [&](QStringList& lst) {
+                for (int i = lst.size() - 1; i >= 0; --i)
+                    if (!QFileInfo::exists(dataDir + "/" + lst[i]))
+                        lst.removeAt(i);
+            };
+            filterExist(polyShps);
+            filterExist(lineShps);
+            filterExist(ptShps);
         }
 
-        // 回退：如果映射为空，扫描目录中所有SHP
+        // 回退：如果映射为空或全部失效，扫描目录中所有SHP
         if (polyShps.isEmpty() && lineShps.isEmpty() && ptShps.isEmpty()) {
             QStringList allShps = scanShpFiles(dataDir);
             for (const auto& s : allShps) {
@@ -1353,7 +1230,7 @@ void CSE_AutoQualityCheckDialog::onStartCheck()
                 else
                     polyShps.append(s); // 默认当面处理
             }
-            cks.append("注意：未配置图层映射，使用名称关键词自动分类（可能不准确）");
+            cks.append("图层归类说明：未配置图层映射，按名称关键词自动分类");
         }
 
         // 打开图层函数
@@ -1395,17 +1272,87 @@ void CSE_AutoQualityCheckDialog::onStartCheck()
             }
         }
 
-        // 为向后兼容保留首图层指针
+        // ---- 按实际几何类型重新归类（图层映射只作参考，不一致时以数据为准） ----
+        // 甲方成果数据中部分注记图层（如 *_名称、*代码、隧道口）在映射里被标为线，
+        // 实际几何是点：喂给 455 线槽会被引擎立即拒绝（线拓扑规则任务执行失败）。
+        {
+            QStringList movedToPt, movedToLine, movedToPoly;
+            auto fixList = [&](QList<QgsVectorLayer*>& list, QgsWkbTypes::GeometryType want) {
+                for (int i = list.size() - 1; i >= 0; --i) {
+                    QgsVectorLayer* lyr = list.at(i);
+                    if (lyr->geometryType() == want) continue;
+                    const QString base = QFileInfo(lyr->source()).completeBaseName();
+                    if (lyr->geometryType() == QgsWkbTypes::PointGeometry) {
+                        allPtLayers.append(lyr);
+                        movedToPt.append(base);
+                    } else if (lyr->geometryType() == QgsWkbTypes::LineGeometry) {
+                        allLineLayers.append(lyr);
+                        movedToLine.append(base);
+                    } else {
+                        allPolyLayers.append(lyr);
+                        movedToPoly.append(base);
+                    }
+                    list.removeAt(i);
+                }
+            };
+            fixList(allPolyLayers, QgsWkbTypes::PolygonGeometry);
+            fixList(allLineLayers, QgsWkbTypes::LineGeometry);
+            fixList(allPtLayers, QgsWkbTypes::PointGeometry);
+            if (!movedToPt.isEmpty())
+                cks.append(QStringLiteral("图层归类说明：以下图层按实际几何类型以点参与检查：%1").arg(movedToPt.join(QStringLiteral("、"))));
+            if (!movedToLine.isEmpty())
+                cks.append(QStringLiteral("图层归类说明：以下图层按实际几何类型以线参与检查：%1").arg(movedToLine.join(QStringLiteral("、"))));
+            if (!movedToPoly.isEmpty())
+                cks.append(QStringLiteral("图层归类说明：以下图层按实际几何类型以面参与检查：%1").arg(movedToPoly.join(QStringLiteral("、"))));
+        }
+
+        // 重新归类后刷新字段回退（首图层可能已被移动）
+        polyFields = allPolyLayers.isEmpty() ? QgsFields() : allPolyLayers.first()->fields();
+        lineFields = allLineLayers.isEmpty() ? QgsFields() : allLineLayers.first()->fields();
+        ptFields   = allPtLayers.isEmpty()   ? QgsFields() : allPtLayers.first()->fields();
+
+        // 为向后兼容保留首图层指针（结果输出字段回退用）
         QgsVectorLayer* polyLayer = allPolyLayers.isEmpty() ? nullptr : allPolyLayers.first();
         QgsVectorLayer* lineLayer = allLineLayers.isEmpty() ? nullptr : allLineLayers.first();
-        QgsVectorLayer* ptLayer   = allPtLayers.isEmpty()   ? nullptr : allPtLayers.first();
+
+        // 注记类图层（名称注记点、代码点、表面注记面）不参与 454/455/456 拓扑检查：
+        // 既不作检查目标，也不作参考图层——它们是制图注记，空间关系规则对它们无意义。
+        // 隧道口/方向点/铁路休止符等符号点有真实地物含义，按普通点参与 454 检查。
+        auto isAnnotationLayer = [](QgsVectorLayer* lyr) -> bool {
+            const QString base = QFileInfo(lyr->source()).completeBaseName();
+            return base.contains(QStringLiteral("名称")) || base.contains(QStringLiteral("代码"))
+                || base.contains(QStringLiteral("注记"));
+        };
+        QList<QgsVectorLayer*> topoPtLayers, topoLineLayers, topoPolyLayers;
+        QStringList annotationNames;
+        for (auto* lyr : allPtLayers) {
+            if (isAnnotationLayer(lyr))
+                annotationNames.append(QFileInfo(lyr->source()).completeBaseName());
+            else
+                topoPtLayers.append(lyr);
+        }
+        for (auto* lyr : allLineLayers) {
+            if (isAnnotationLayer(lyr))
+                annotationNames.append(QFileInfo(lyr->source()).completeBaseName());
+            else
+                topoLineLayers.append(lyr);
+        }
+        for (auto* lyr : allPolyLayers) {
+            if (isAnnotationLayer(lyr))
+                annotationNames.append(QFileInfo(lyr->source()).completeBaseName());
+            else
+                topoPolyLayers.append(lyr);
+        }
+        if (!annotationNames.isEmpty())
+            cks.append(QStringLiteral("注记/代码类图层按制图规范不参与拓扑检查：%1").arg(annotationNames.join(QStringLiteral("、"))));
 
         if (allPolyLayers.isEmpty() && allLineLayers.isEmpty() && allPtLayers.isEmpty()) {
             errs.append("错误：数据目录中未找到有效SHP文件");
-            QString logPath = m_qstrOutputDir + "/" + tasks[i].label + "_质检日志_"
-                + QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss") + ".json";
-            allLogPaths.append(logPath);
-            writeJsonLog(logPath, tasks[i].label, 0, errs, cks, allOutputFiles);
+            // 无图层数据也进入统一日志，按数据源分节
+            combinedErrs.append(QString("======== %1 ========").arg(tasks[i].label));
+            combinedErrs.append(errs);
+            combinedCks.append(QString("======== %1 ========").arg(tasks[i].label));
+            combinedCks.append(cks);
             continue;
         }
 
@@ -1427,35 +1374,102 @@ void CSE_AutoQualityCheckDialog::onStartCheck()
 
             switch (group.id) {
             case 453: {
-                // 属性检查：从XML加载字段定义（attribute_check_config.xml）
-                if (!polyLayer && !lineLayer) break;
-                QgsVectorLayer* lyr = polyLayer ? polyLayer : lineLayer;
-                QList<FieldDefinition> fieldDefs;
-                // 从mission_config.xml同目录下的attribute_check_config.xml加载字段定义
-                QString attrXmlPath = QFileInfo(m_qstrMissionXmlPath).absolutePath() + "/attribute_check_config.xml";
-                fieldDefs = Mission453::loadFieldDefs(attrXmlPath);
-                if (fieldDefs.isEmpty()) {
-                    executed.append("属性检查(跳过：未找到字段定义XML或XML为空)");
+                // 属性检查：逐图层对照标准字段结构（随包config/FeatureSchema/<图层名>.xml）
+                if (QDir::cleanPath(dataDir) != QDir::cleanPath(m_qstrResultDataPath)) {
+                    executed.append("属性检查：本次仅对成果数据执行");
                     break;
                 }
-                Mission453::execute(lyr, fieldDefs, totalMode,
-                    allErrs, executed);
+                const QString schemaDir = QFileInfo(m_qstrMissionXmlPath).absolutePath() + "/FeatureSchema";
+                QList<QgsVectorLayer*> attrLayers;
+                attrLayers += allPolyLayers; attrLayers += allLineLayers; attrLayers += allPtLayers;
+                if (attrLayers.isEmpty()) {
+                    executed.append("属性检查：无图层数据，本次不涉及");
+                    break;
+                }
+                for (QgsVectorLayer* lyr : attrLayers) {
+                    QString base = QFileInfo(lyr->source()).completeBaseName();
+                    Mission453::execute(lyr, schemaDir + "/" + base + ".xml",
+                        totalMode, allErrs, executed);
+                }
                 break;
             }
-            case 454:
-                Mission454::execute(ptLayer, lineLayer, polyLayer, nullptr,
-                    totalMode, m_thresholds, allErrs, executed);
+            case 454: {
+                // 点拓扑检查：每个点图层单独一次引擎调用（全部图层逐层检查，注记类除外）；
+                // 参考图层 = 全部线图层合并 + 全部面图层合并（纯几何，合并一次复用）
+                if (topoPtLayers.isEmpty()) {
+                    executed.append(QStringLiteral("点拓扑检查：无点要素图层，本次不涉及"));
+                    break;
+                }
+                QString refLineShp, refPolyShp;
+                QTemporaryDir refWork;
+                if (refWork.isValid()) {
+                    QString refErr;
+                    refLineShp = WujiMissionRunner::mergeLayersShp(
+                        topoLineLayers, refWork.path(), QStringLiteral("ref_lines"), &refErr);
+                    refPolyShp = WujiMissionRunner::mergeLayersShp(
+                        topoPolyLayers, refWork.path(), QStringLiteral("ref_polys"), &refErr);
+                }
+                // 各点图层的错误统一汇总进 allErrs，最后合并写一份 errors_point.shp
+                // （每条错误带"图层名"字段，标明来自哪个图层）
+                for (auto* t : topoPtLayers) {
+                    Mission454::execute(t, refLineShp, refPolyShp, totalMode,
+                                        m_thresholds, allErrs, executed);
+                }
                 break;
-            case 455:
-                Mission455::execute(lineLayer, ptLayer, polyLayer, nullptr,
-                    totalMode, m_thresholds, allErrs, executed);
+            }
+            case 455: {
+                // 线拓扑检查：每个线图层单独一次引擎调用（注记类除外）；
+                // 参考图层 = 全部点图层合并 + 全部面图层合并
+                if (topoLineLayers.isEmpty()) {
+                    executed.append(QStringLiteral("线拓扑检查：无线要素图层，本次不涉及"));
+                    break;
+                }
+                QString refPointShp, refPolyShp;
+                QTemporaryDir refWork;
+                if (refWork.isValid()) {
+                    QString refErr;
+                    refPointShp = WujiMissionRunner::mergeLayersShp(
+                        topoPtLayers, refWork.path(), QStringLiteral("ref_points"), &refErr);
+                    refPolyShp = WujiMissionRunner::mergeLayersShp(
+                        topoPolyLayers, refWork.path(), QStringLiteral("ref_polys"), &refErr);
+                }
+                // 各线图层的错误统一汇总进 allErrs，最后合并写一份 errors_line.shp
+                // （每条错误带"图层名"字段，标明来自哪个图层）
+                for (auto* t : topoLineLayers) {
+                    Mission455::execute(t, refPointShp, refPolyShp, totalMode,
+                                        m_thresholds, allErrs, executed);
+                }
                 break;
-            case 456:
-                Mission456::execute(polyLayer, lineLayer, ptLayer, nullptr,
-                    totalMode, m_thresholds, allErrs, executed);
+            }
+            case 456: {
+                // 面拓扑检查：每个面图层单独一次引擎调用（注记类除外）；
+                // 参考图层 = 全部线图层合并 + 全部点图层合并
+                if (topoPolyLayers.isEmpty()) {
+                    executed.append(QStringLiteral("面拓扑检查：无面要素图层，本次不涉及"));
+                    break;
+                }
+                QString refLineShp, refPointShp;
+                QTemporaryDir refWork;
+                if (refWork.isValid()) {
+                    QString refErr;
+                    refLineShp = WujiMissionRunner::mergeLayersShp(
+                        topoLineLayers, refWork.path(), QStringLiteral("ref_lines"), &refErr);
+                    refPointShp = WujiMissionRunner::mergeLayersShp(
+                        topoPtLayers, refWork.path(), QStringLiteral("ref_points"), &refErr);
+                }
+                // 各面图层的错误统一汇总进 allErrs，最后合并写一份 errors_poly.shp
+                // （每条错误带"图层名"字段，标明来自哪个图层）
+                for (auto* t : topoPolyLayers) {
+                    Mission456::execute(t, refLineShp, refPointShp, totalMode,
+                                        m_thresholds, allErrs, executed);
+                }
                 break;
+            }
             case 457: {
-                // 关联表检查：需要同一数据目录内的多个图层（自动探测关联字段）
+                // 关联表检查（本工程本地实现：需要同一数据目录内的多个图层，自动探测关联字段）
+                // 注：高版本的 457 是 relation.db 关联表检查，本工程未采用（配置中该组已整组注释），
+                //     故此处仍走本工程的 4 参数接口。若将来恢复关联表检查，需同步替换
+                //     se_mission457_check.h/.cpp 并改回 5 参数调用。
                 Mission457::execute(dataDir, totalMode, allErrs, executed);
                 break;
             }
@@ -1468,22 +1482,47 @@ void CSE_AutoQualityCheckDialog::onStartCheck()
                         if (!item.sourceCode.isEmpty())
                             layerHashMap[item.stdName] = item.sourceCode;
                     }
+                    const QString matchParamPath =
+                        QFileInfo(m_qstrMissionXmlPath).absolutePath() + QStringLiteral("/matchParameter.xml");
                     if (!layerHashMap.isEmpty()) {
                         Mission458::executeWithMapping(m_qstrOrigDataPath, m_qstrResultDataPath,
-                            totalMode, layerHashMap, allErrs, executed);
+                            totalMode, layerHashMap, allErrs, executed, matchParamPath);
                     } else {
                         Mission458::execute(m_qstrOrigDataPath, m_qstrResultDataPath,
-                            totalMode, allErrs, executed);
+                            totalMode, allErrs, executed, nullptr, matchParamPath);
                     }
                 } else {
-                    executed.append("综合前后匹配(跳过：需要同时选择原始数据和成果数据两个数据源)");
+                    executed.append("综合前后匹配：需同时提供原始数据与成果数据，本次未执行");
                 }
                 break;
             }
             case 459: {
-                QgsVectorLayer* lyr = polyLayer ? polyLayer : lineLayer;
-                if (lyr)
-                    Mission459::execute(lyr, totalMode, m_thresholds, allErrs, executed);
+                // 图形规范性检查：纯本地 QGIS 实现，面图层跑面适用项、线图层跑线适用项，
+                // 模式按 CheckItem 的 applyTo 过滤，覆盖全部面/线图层
+                // （此前只查每类第一个图层，其余图层被漏掉）
+                auto modeFor = [&](QgsVectorLayer* lyr) -> int {
+                    if (!lyr) return 0;
+                    const QString geoType =
+                        (lyr->geometryType() == QgsWkbTypes::PolygonGeometry)
+                        ? QStringLiteral("polygon") : QStringLiteral("line");
+                    int m = 0;
+                    for (const auto& item : group.items) {
+                        if (!(item.checkbox && item.checkbox->isChecked() && item.implemented))
+                            continue;
+                        if (item.applyTo.contains(QStringLiteral("all"))
+                            || item.applyTo.contains(geoType))
+                            m |= item.mode;
+                    }
+                    return m;
+                };
+                for (auto* lyr : allPolyLayers) {
+                    const int m = modeFor(lyr);
+                    if (m) Mission459::execute(lyr, m, m_thresholds, allErrs, executed);
+                }
+                for (auto* lyr : allLineLayers) {
+                    const int m = modeFor(lyr);
+                    if (m) Mission459::execute(lyr, m, m_thresholds, allErrs, executed);
+                }
                 break;
             }
             default:
@@ -1505,13 +1544,10 @@ void CSE_AutoQualityCheckDialog::onStartCheck()
                     }
                     errs.append(QString("M453 检测到 %1 处异常（属性/字段检查，非空间错误）：").arg(allErrs.size()));
                     for (auto it = errGroups.constBegin(); it != errGroups.constEnd(); ++it) {
-                        if (it.value().size() <= 5) {
-                            QStringList ids;
-                            for (auto id : it.value()) ids.append(QString::number(id));
-                            errs.append(QString("  %1（涉及要素: %2）").arg(it.key(), ids.join(",")));
-                        } else {
-                            errs.append(QString("  %1（涉及 %2 个要素）").arg(it.key()).arg(it.value().size()));
-                        }
+                        if (it.value().size() > 1)
+                            errs.append(QString("  %1（%2个图层）").arg(it.key()).arg(it.value().size()));
+                        else
+                            errs.append(QString("  %1").arg(it.key()));
                     }
                 } else {
                     QString shpBase;
@@ -1545,12 +1581,21 @@ void CSE_AutoQualityCheckDialog::onStartCheck()
         for (auto* lyr : allLineLayers) delete lyr;
         for (auto* lyr : allPtLayers)   delete lyr;
 
-        // 写 JSON 日志
-        QString logPath = m_qstrOutputDir + "/" + tasks[i].label + "_质检日志_"
-            + QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss") + ".json";
-        allLogPaths.append(logPath);
-        writeJsonLog(logPath, tasks[i].label, 0, errs, cks, allOutputFiles);
+        // 汇总到统一日志（所有数据源合并为一份"综合成果质检"日志）
+        combinedErrs.append(QString("======== %1 ========").arg(tasks[i].label));
+        combinedErrs.append(errs);
+        combinedCks.append(QString("======== %1 ========").arg(tasks[i].label));
+        combinedCks.append(cks);
+        combinedOutputs.append(allOutputFiles);
     }
+
+    // 写统一的 JSON 日志：不再按数据源分别输出，合并为一份"综合成果质检"日志
+    if (origIsGdb)
+        combinedCks.append(QStringLiteral("原始数据为FileGDB(综合前)格式，作为综合前后匹配的对照数据源参与检查"));
+    QString logPath = m_qstrOutputDir + "/综合成果质检_质检日志_"
+        + QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss") + ".json";
+    allLogPaths.append(logPath);
+    writeJsonLog(logPath, QStringLiteral("综合成果质检"), 0, combinedErrs, combinedCks, combinedOutputs);
 
     ui.progressBar->setValue(100);
     ui.label_Status->setText("状态：质检完成");
@@ -1571,8 +1616,16 @@ void CSE_AutoQualityCheckDialog::writeJsonLog(const QString& logPath, const QStr
     QJsonObject root;
     root["dataType"]    = dataType;
     root["timestamp"]   = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
-    root["engine"]      = "MapBatchProcessing.exe (无极 WJ)";
-    root["inputPaths"]  = (dataType.contains("原始") ? m_qstrOrigDataPath : m_qstrResultDataPath);
+    root["engine"]      = "QGIS 本地检查 + 引擎子进程(MapBatchProcessing.exe)";
+    if (dataType.contains("综合")) {
+        // 合并日志：原始数据 + 成果数据两个输入都记录
+        QStringList paths;
+        if (!m_qstrOrigDataPath.isEmpty())   paths << m_qstrOrigDataPath;
+        if (!m_qstrResultDataPath.isEmpty()) paths << m_qstrResultDataPath;
+        root["inputPaths"] = paths.join(" ; ");
+    } else {
+        root["inputPaths"] = (dataType.contains("原始") ? m_qstrOrigDataPath : m_qstrResultDataPath);
+    }
     root["outputPath"]  = m_qstrOutputDir;
 
     // 记录引擎输出文件（拷贝到输出目录的SHP）
@@ -1613,15 +1666,6 @@ void CSE_AutoQualityCheckDialog::writeJsonLog(const QString& logPath, const QStr
         f.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
         f.close();
     }
-}
-
-// ================================================================
-//  其他槽
-// ================================================================
-void CSE_AutoQualityCheckDialog::onChkProcessFinished(int exitCode, QProcess::ExitStatus status)
-{
-    Q_UNUSED(exitCode); Q_UNUSED(status);
-    // 同步等待模式，此回调不使用
 }
 
 void CSE_AutoQualityCheckDialog::onClose()

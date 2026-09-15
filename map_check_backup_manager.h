@@ -132,6 +132,44 @@ private:
     // 写入日志文件
     void writeLog(const QString& msg);
 
+    // 【2026-09-11】解析 PostgreSQL 客户端工具（pg_dump / pg_restore / psql）的可用路径。
+    //
+    // 背景：原来 databaseBackup() 用一张写死的候选表找 pg_dump，第一条是开发者本机的
+    // 安装位置；客户机上命中不了就退化成裸 "pg_dump" 交给 PATH 解析，而 LTZK 的
+    // start_LTZK.bat 把自带 OSGeo4W 的 bin 前置到 PATH，于是抓到的是 15.2。客户机
+    // 的数据库服务器是 18.6，pg_dump 不允许用低版本客户端连高版本服务器，备份在连接
+    // 阶段就被驳回（"aborting because of server version mismatch"）。恢复侧的
+    // pg_restore 更是一点路径查找都没有，直接裸调。
+    //
+    // 现在的策略（逐级降级，与盘符无关）：
+    //   1) 用 libpq 连一次数据库问出服务器大版本号（连不上则跳过版本校验）；
+    //   2) 收集候选 bin 目录：
+    //      a. 注册表 HKLM\SOFTWARE\PostgreSQL\Installations\<实例> 的 "Base Directory"
+    //         —— 官方安装器无论装在 C 盘还是 D 盘都会如实写在这里，是解决"不知道装哪"
+    //         的主路径；
+    //      b. 兜底：服务 HKLM\SYSTEM\CurrentControlSet\Services\postgresql-x64-<n> 的
+    //         ImagePath（形如 "D:\...\bin\pg_ctl.exe" runservice ...），从 pg_ctl.exe
+    //         反推 bin 目录；
+    //      c. 各盘符的常见安装位置（C..Z:\Program Files\PostgreSQL\<版本>\bin 等）；
+    //      d. 历史硬编码路径 + PATH 上的同名工具；
+    //   3) 对每个候选跑一次 `<工具> --version`，只接受大版本 >= 服务器大版本的，并在
+    //      够用的里面挑最贴近服务器的那个（同版本最稳）。
+    //
+    // 返回值语义：
+    //   - 非空 = 可直接启动的绝对路径；此时 errMsg 若不为空，是一条"降级说明"，调用方
+    //     记日志即可，流程继续；
+    //   - 空串 = 确实没有可用工具，errMsg 是给用户看的完整中文原因（含本机已找到的版本
+    //     清单），调用方应据此失败并提示。
+    // enforceVersionGate：是否执行"工具大版本 >= 服务器大版本"的闸门。
+    //   - pg_dump / pg_restore 必须为 true：它们遇到更高版本的服务器/存档会直接拒绝工作。
+    //   - psql 传 false：psql 只是执行 SQL 文本的客户端，官方允许它连接任意版本的服务器，
+    //     套闸门反而会在"本机只有旧 psql"时把原本能跑通的恢复挡掉（行为回归）。
+    QString resolvePgClientTool(const QString& toolName,
+                                const QString& host, int port, const QString& dbName,
+                                const QString& user, const QString& password,
+                                QString& errMsg,
+                                bool enforceVersionGate = true);
+
 private:
     QTimer* m_pCheckTimer = nullptr;
 

@@ -3,585 +3,375 @@
 #include "qgsvectorlayer.h"
 #include "qgsfeature.h"
 #include "qgsgeometry.h"
+#include "qgspoint.h"
 #include "qgspointxy.h"
-#include "qgspolygon.h"
-#include "qgslinestring.h"
-#include "qgsmultipolygon.h"
-#include "qgsmessagelog.h"
+#include "qgswkbtypes.h"
+#include "qgsgeometryutils.h"
 
-#include <QFile>
-#include <QFileInfo>
 #include <QDir>
-#include <QDateTime>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QTextStream>
+#include <QFileInfo>
+
 #include <cmath>
+#include <limits>
 
-using namespace Mission459;
+namespace {
 
-// ============================================================================
-// 模式1: 多部件检查 — Must be single part
-// ============================================================================
-void Mission459::checkMultiPart(QgsVectorLayer* layer,
-    QList<QPair<QgsFeature, QString>>& errors,
-    double fuzzyTolerance)
+// 2026-08-23 全部改为 QGIS 本地实现，不再调用引擎：
+// 引擎 7-19/8-22 两个版本对 2/4/16/32/256/512 均"任务执行失败"，模式1在成果数据上
+// 同样失败，且引擎对线图层喂面检查会段错误/挂死（靠子进程隔离）。本地口径按配置：
+// 1多部件=几何含多个部件；8碎面=面积小于 SliverArea 阈值（检测面积小于阈值的碎面）。
+// 模式64节点平均密度=每要素边界节点数/边界长度（个/米），阈值 AvgNodeDensityUpper/Lower；
+// 模式128节点密度=每要素节点总数，阈值 NodeDensityUpper/Lower；阈值0表示该侧不启用。
+const int kNativeModes = 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 | 512;
+const int kEngineModes = 0;
+
+const double kPi = std::acos(-1.0);
+
+QString modeName(int mode)
 {
-    Q_UNUSED(fuzzyTolerance);
-    if (!layer) return;
-
-    QgsFeatureIterator it = layer->getFeatures();
-    QgsFeature feat;
-    while (it.nextFeature(feat)) {
-        QgsGeometry geom = feat.geometry();
-        if (!geom.isNull() && geom.isMultipart()) {
-            errors.append(qMakePair(feat,
-                QStringLiteral("多部件几何：要素由多个不连通的部分组成，应拆分为独立要素")));
-        }
+    switch (mode) {
+    case 1:   return QStringLiteral("多部件检查");
+    case 2:   return QStringLiteral("空图形检查");
+    case 4:   return QStringLiteral("尖锐角检查");
+    case 8:   return QStringLiteral("碎面检查");
+    case 16:  return QStringLiteral("狭长面检查");
+    case 32:  return QStringLiteral("小面积检查");
+    case 64:  return QStringLiteral("节点平均密度检查");
+    case 128: return QStringLiteral("节点密度检查");
+    case 256: return QStringLiteral("自相交检查");
+    case 512: return QStringLiteral("节点最小距离检查");
     }
+    return QString();
 }
 
-// ============================================================================
-// 模式2: 空图形检查 — 检查几何为NULL或EMPTY
-// ============================================================================
-void Mission459::checkEmptyGeometry(QgsVectorLayer* layer,
-    QList<QPair<QgsFeature, QString>>& errors)
-{
-    if (!layer) return;
+// ---- 尖锐角（顶点处两相邻边的夹角，度） ----
 
-    QgsFeatureIterator it = layer->getFeatures();
-    QgsFeature feat;
-    while (it.nextFeature(feat)) {
-        QgsGeometry geom = feat.geometry();
-        if (geom.isNull()) {
-            errors.append(qMakePair(feat, QStringLiteral("空图形：要素几何为NULL")));
-        } else if (geom.isEmpty()) {
-            errors.append(qMakePair(feat, QStringLiteral("空图形：要素几何为EMPTY")));
-        }
-    }
+double angleAtVertexDeg(const QgsPointXY& a, const QgsPointXY& b, const QgsPointXY& c)
+{
+    const double vx1 = a.x() - b.x(), vy1 = a.y() - b.y();
+    const double vx2 = c.x() - b.x(), vy2 = c.y() - b.y();
+    const double len1 = std::sqrt(vx1 * vx1 + vy1 * vy1);
+    const double len2 = std::sqrt(vx2 * vx2 + vy2 * vy2);
+    if (len1 <= 0.0 || len2 <= 0.0)
+        return 180.0; // 重复顶点，跳过
+    const double cosv = qBound(-1.0, (vx1 * vx2 + vy1 * vy2) / (len1 * len2), 1.0);
+    return std::acos(cosv) * 180.0 / kPi;
 }
 
-// ============================================================================
-// 模式4: 尖锐角检查 — 检查面要素是否存在过于尖锐的内角
-// ============================================================================
-void Mission459::checkAcuteAngle(QgsVectorLayer* layer,
-    QList<QPair<QgsFeature, QString>>& errors,
-    double acuteAngleThreshold)
+// line：中间顶点处夹角；ring：全部顶点处夹角（末点与首点闭合）
+double minAngleDeg(const QgsPolylineXY& pts, bool isRing)
 {
-    if (!layer) return;
-    if (acuteAngleThreshold <= 0.0) acuteAngleThreshold = 10.0; // 默认10度
+    const int n = pts.size();
+    double worst = 180.0;
+    if (isRing) {
+        const int m = n - 1; // 去掉闭合点
+        if (m < 3) return 180.0;
+        for (int i = 0; i < m; ++i) {
+            const QgsPointXY& a = pts[(i + m - 1) % m];
+            const QgsPointXY& b = pts[i];
+            const QgsPointXY& c = pts[(i + 1) % m];
+            worst = qMin(worst, angleAtVertexDeg(a, b, c));
+        }
+    } else {
+        for (int i = 1; i + 1 < n; ++i)
+            worst = qMin(worst, angleAtVertexDeg(pts[i - 1], pts[i], pts[i + 1]));
+    }
+    return worst;
+}
 
-    QgsFeatureIterator it = layer->getFeatures();
-    QgsFeature feat;
-    while (it.nextFeature(feat)) {
-        QgsGeometry geom = feat.geometry();
-        if (geom.isNull() || geom.isEmpty()) continue;
+// ---- 自相交（线段对两两检测，跳过相邻段与环首尾闭合对） ----
 
-        // 对于面几何，提取外环和内环的所有顶点
-        QList<QgsPointXY> vertices;
-        if (geom.type() == QgsWkbTypes::PolygonGeometry) {
-            QgsMultiPolygonXY multiPoly = geom.asMultiPolygon();
-            for (const QgsPolygonXY& poly : multiPoly) {
-                for (const QgsPolylineXY& ring : poly) {
-                    for (const QgsPointXY& pt : ring) {
-                        vertices.append(pt);
-                    }
+bool segmentsSelfIntersect(const QgsPolylineXY& pts, bool isRing)
+{
+    const int segCount = pts.size() - 1;
+    if (segCount < 4) return false; // 少于 4 段不存在不相邻段相交
+    for (int i = 0; i < segCount; ++i) {
+        for (int j = i + 1; j < segCount; ++j) {
+            if (j == i + 1) continue;                              // 相邻段共享端点
+            if (isRing && i == 0 && j == segCount - 1) continue;   // 环首尾段共享闭合点
+            QgsPoint ip;
+            bool isIntersection = false;
+            const bool ok = QgsGeometryUtils::segmentIntersection(
+                QgsPoint(pts[i].x(), pts[i].y()), QgsPoint(pts[i + 1].x(), pts[i + 1].y()),
+                QgsPoint(pts[j].x(), pts[j].y()), QgsPoint(pts[j + 1].x(), pts[j + 1].y()),
+                ip, isIntersection, 1e-8, false);
+            if (ok && isIntersection)
+                return true;
+        }
+    }
+    return false;
+}
+
+// ---- 节点最小距离（不相邻顶点对；环排除闭合对） ----
+
+double minVertexDistance(const QgsPolylineXY& pts, bool isRing)
+{
+    const int n = pts.size();
+    const int m = isRing ? n - 1 : n;
+    double best = std::numeric_limits<double>::max();
+    for (int i = 0; i < m; ++i) {
+        for (int j = i + 1; j < m; ++j) {
+            if (j == i + 1) continue;                           // 相邻顶点
+            if (isRing && i == 0 && j == m - 1) continue;       // 环闭合对
+            best = qMin(best, pts[i].distance(pts[j].x(), pts[j].y()));
+        }
+    }
+    return best;
+}
+
+// ---- 各模式检查（返回错误描述，空串 = 通过） ----
+
+// 模式1：多部件检查
+QString checkMultipart(const QgsGeometry& g)
+{
+    if (g.isMultipart())
+        return QStringLiteral("几何为多部件（必须是单部件）");
+    return QString();
+}
+
+// 模式2：空图形检查
+QString checkEmpty(const QgsFeature& f)
+{
+    if (!f.hasGeometry() || f.geometry().isNull() || f.geometry().isEmpty())
+        return QStringLiteral("要素无几何或几何为空");
+    return QString();
+}
+
+// 模式4：尖锐角检查（阈值：AcuteAngle，度）
+QString checkAcuteAngle(const QgsGeometry& g, double thr)
+{
+    double worst = 180.0;
+    if (g.type() == QgsWkbTypes::LineGeometry) {
+        const QgsMultiPolylineXY parts = g.asMultiPolyline();
+        for (const QgsPolylineXY& p : parts)
+            worst = qMin(worst, minAngleDeg(p, false));
+    } else {
+        const QgsMultiPolygonXY parts = g.asMultiPolygon();
+        for (const QgsPolygonXY& poly : parts) {
+            worst = qMin(worst, minAngleDeg(poly.at(0), true));
+            for (int r = 1; r < poly.size(); ++r)
+                worst = qMin(worst, minAngleDeg(poly.at(r), true));
+        }
+    }
+    if (worst < thr)
+        return QStringLiteral("最小夹角 %1° 小于阈值 %2°").arg(worst, 0, 'f', 2).arg(thr, 0, 'f', 2);
+    return QString();
+}
+
+// 模式8：碎面检查（阈值：SliverArea；仅面图层适用，面积小于阈值即碎面）
+QString checkSliverArea(const QgsGeometry& g, double thr)
+{
+    if (g.type() != QgsWkbTypes::PolygonGeometry)
+        return QString();
+    const double area = g.area();
+    if (area > 0.0 && area < thr)
+        return QStringLiteral("面积 %1 小于碎面阈值 %2").arg(area, 0, 'f', 3).arg(thr, 0, 'f', 3);
+    return QString();
+}
+
+// 模式16：狭长面检查（阈值：NarrowWidth，最小外接矩形短边 < 阈值；仅面图层适用）
+QString checkNarrowPolygon(const QgsGeometry& g, double thr)
+{
+    if (g.type() != QgsWkbTypes::PolygonGeometry)
+        return QString();
+    const QgsMultiPolygonXY parts = g.asMultiPolygon();
+    double minWidth = std::numeric_limits<double>::max();
+    for (const QgsPolygonXY& poly : parts) {
+        const QgsGeometry partGeom = QgsGeometry::fromPolygonXY(poly);
+        const QgsGeometry obb = partGeom.orientedMinimumBoundingBox();
+        if (obb.isEmpty())
+            continue;
+        const QgsPolylineXY ring = obb.asPolygon().at(0);
+        if (ring.size() < 4)
+            continue;
+        const double w = ring[0].distance(ring[1].x(), ring[1].y());
+        const double h = ring[1].distance(ring[2].x(), ring[2].y());
+        minWidth = qMin(minWidth, qMin(w, h));
+    }
+    if (minWidth < thr)
+        return QStringLiteral("最小宽度 %1 小于阈值 %2").arg(minWidth, 0, 'f', 3).arg(thr, 0, 'f', 3);
+    return QString();
+}
+
+// 模式32：小面积检查（阈值：MinArea；仅面图层适用）
+QString checkSmallArea(const QgsGeometry& g, double thr)
+{
+    if (g.type() != QgsWkbTypes::PolygonGeometry)
+        return QString();
+    const double area = g.area();
+    if (area > 0.0 && area < thr)
+        return QStringLiteral("面积 %1 小于阈值 %2").arg(area, 0, 'f', 3).arg(thr, 0, 'f', 3);
+    return QString();
+}
+
+// 模式256：自相交检查（线：线段自相交；面：边界环自相交）
+QString checkSelfIntersect(const QgsGeometry& g)
+{
+    if (g.type() == QgsWkbTypes::LineGeometry) {
+        const QgsMultiPolylineXY parts = g.asMultiPolyline();
+        for (const QgsPolylineXY& p : parts)
+            if (segmentsSelfIntersect(p, false))
+                return QStringLiteral("几何存在自相交");
+    } else {
+        const QgsMultiPolygonXY parts = g.asMultiPolygon();
+        for (const QgsPolygonXY& poly : parts) {
+            if (segmentsSelfIntersect(poly.at(0), true))
+                return QStringLiteral("边界存在自相交");
+            for (int r = 1; r < poly.size(); ++r)
+                if (segmentsSelfIntersect(poly.at(r), true))
+                    return QStringLiteral("边界存在自相交");
+        }
+    }
+    return QString();
+}
+
+// 模式512：节点最小距离检查（阈值：MinNodeDistance，节点绝对距离）
+QString checkMinNodeDistance(const QgsGeometry& g, double thr)
+{
+    double best = std::numeric_limits<double>::max();
+    if (g.type() == QgsWkbTypes::LineGeometry) {
+        const QgsMultiPolylineXY parts = g.asMultiPolyline();
+        for (const QgsPolylineXY& p : parts)
+            best = qMin(best, minVertexDistance(p, false));
+    } else {
+        const QgsMultiPolygonXY parts = g.asMultiPolygon();
+        for (const QgsPolygonXY& poly : parts) {
+            best = qMin(best, minVertexDistance(poly.at(0), true));
+            for (int r = 1; r < poly.size(); ++r)
+                best = qMin(best, minVertexDistance(poly.at(r), true));
+        }
+    }
+    if (best < thr)
+        return QStringLiteral("节点最小距离 %1 小于阈值 %2").arg(best, 0, 'f', 4).arg(thr, 0, 'f', 4);
+    return QString();
+}
+
+// ---- 节点密度相关（模式64/128） ----
+
+// 统计几何顶点数（多部件递归；环去掉闭合重复点，闭合线同样去重）
+int vertexCount(const QgsGeometry& g)
+{
+    int n = 0;
+    if (g.type() == QgsWkbTypes::LineGeometry) {
+        const QgsMultiPolylineXY parts = g.asMultiPolyline();
+        for (const QgsPolylineXY& p : parts) {
+            int m = p.size();
+            if (m >= 2 && p[0].x() == p[m - 1].x() && p[0].y() == p[m - 1].y())
+                m--;
+            n += qMax(0, m);
+        }
+    } else if (g.type() == QgsWkbTypes::PolygonGeometry) {
+        const QgsMultiPolygonXY parts = g.asMultiPolygon();
+        for (const QgsPolygonXY& poly : parts)
+            for (const QgsPolylineXY& r : poly)
+                n += qMax(0, r.size() - 1); // 环首尾闭合点重复
+    }
+    return n;
+}
+
+// 模式64：节点平均密度检查（边界节点数/边界长度，个/米；仅面图层适用。
+// 阈值 AvgNodeDensityUpper/Lower 为绝对上下界，0 表示该侧不启用）
+QString checkAvgNodeDensity(const QgsGeometry& g, double upper, double lower)
+{
+    if (g.type() != QgsWkbTypes::PolygonGeometry)
+        return QString();
+    const double len = g.length();
+    if (len <= 0.0)
+        return QString();
+    const double density = static_cast<double>(vertexCount(g)) / len;
+    if (upper > 0.0 && density > upper)
+        return QStringLiteral("节点平均密度 %1 个/米 超过上界 %2")
+            .arg(density, 0, 'f', 4).arg(upper, 0, 'f', 4);
+    if (lower > 0.0 && density < lower)
+        return QStringLiteral("节点平均密度 %1 个/米 低于下界 %2")
+            .arg(density, 0, 'f', 4).arg(lower, 0, 'f', 4);
+    return QString();
+}
+
+// 模式128：节点密度检查（每要素节点总数；阈值 NodeDensityUpper/Lower 为绝对上下界，
+// 0 表示该侧不启用）
+QString checkNodeDensity(const QgsGeometry& g, double upper, double lower)
+{
+    const int n = vertexCount(g);
+    if (n == 0)
+        return QString();
+    if (upper > 0.0 && n > upper)
+        return QStringLiteral("节点总数 %1 超过上界 %2").arg(n).arg(static_cast<int>(upper));
+    if (lower > 0.0 && n < lower)
+        return QStringLiteral("节点总数 %1 低于下界 %2").arg(n).arg(static_cast<int>(lower));
+    return QString();
+}
+
+} // namespace
+
+namespace Mission459 {
+
+void execute(QgsVectorLayer* layer, int processMode,
+             const QHash<QString, double>& thresholds,
+             QList<QPair<QgsFeature, QString>>& allErrors, QStringList& executedChecks)
+{
+    if (!layer) {
+        executedChecks.append(QStringLiteral("图形规范性检查：无图层，本次不涉及"));
+        return;
+    }
+
+    // 错误消息带图层名，如"图形规范性检查(A级景区/尖锐角检查)：..."，供合并输出时提取
+    const QString base = QFileInfo(layer->source()).completeBaseName();
+
+    const int nativeMask = processMode & kNativeModes;
+
+    // ---- 本地 QGIS 检查 ----
+    if (nativeMask) {
+        const double acuteThr = thresholds.value(QStringLiteral("AcuteAngle"), 10.0);
+        const double sliverThr = thresholds.value(QStringLiteral("SliverArea"), 1.0);
+        const double narrowThr = thresholds.value(QStringLiteral("NarrowWidth"), 0.5);
+        const double minAreaThr = thresholds.value(QStringLiteral("MinArea"), 1.0);
+        const double minNodeThr = thresholds.value(QStringLiteral("MinNodeDistance"), 0.001);
+        const double avgDensUpper = thresholds.value(QStringLiteral("AvgNodeDensityUpper"), 0.0);
+        const double avgDensLower = thresholds.value(QStringLiteral("AvgNodeDensityLower"), 0.0);
+        const double nodeDensUpper = thresholds.value(QStringLiteral("NodeDensityUpper"), 0.0);
+        const double nodeDensLower = thresholds.value(QStringLiteral("NodeDensityLower"), 0.0);
+
+        const int modes[] = { 1, 2, 4, 8, 16, 32, 64, 128, 256, 512 };
+        QHash<int, int> counts;
+        QgsFeature f;
+        QgsFeatureIterator it = layer->getFeatures();
+        while (it.nextFeature(f)) {
+            for (const int m : modes) {
+                if (!(nativeMask & m)) continue;
+                QString detail;
+                switch (m) {
+                case 1:   detail = checkMultipart(f.geometry()); break;
+                case 2:   detail = checkEmpty(f); break;
+                case 4:   detail = checkAcuteAngle(f.geometry(), acuteThr); break;
+                case 8:   detail = checkSliverArea(f.geometry(), sliverThr); break;
+                case 16:  detail = checkNarrowPolygon(f.geometry(), narrowThr); break;
+                case 32:  detail = checkSmallArea(f.geometry(), minAreaThr); break;
+                case 64:  detail = checkAvgNodeDensity(f.geometry(), avgDensUpper, avgDensLower); break;
+                case 128: detail = checkNodeDensity(f.geometry(), nodeDensUpper, nodeDensLower); break;
+                case 256: detail = checkSelfIntersect(f.geometry()); break;
+                case 512: detail = checkMinNodeDistance(f.geometry(), minNodeThr); break;
+                }
+                if (!detail.isEmpty()) {
+                    allErrors.append(qMakePair(f,
+                        QStringLiteral("图形规范性检查(%1/%2)：%3").arg(base, modeName(m), detail)));
+                    counts[m]++;
                 }
             }
-        } else {
-            // 对于线几何，直接取顶点
-            QgsVertexIterator vIt = geom.vertices();
-            while (vIt.hasNext()) {
-                vertices.append(QgsPointXY(vIt.next()));
-            }
         }
-
-        if (vertices.size() < 3) continue;
-
-        // 遍历每个顶点，计算角度
-        QStringList acuteAngles;
-        int n = vertices.size();
-        for (int i = 0; i < n; i++) {
-            const QgsPointXY& p0 = vertices[(i - 1 + n) % n];
-            const QgsPointXY& p1 = vertices[i];
-            const QgsPointXY& p2 = vertices[(i + 1) % n];
-
-            // 向量 v1 = p0→p1, v2 = p2→p1
-            double v1x = p1.x() - p0.x();
-            double v1y = p1.y() - p0.y();
-            double v2x = p1.x() - p2.x();
-            double v2y = p1.y() - p2.y();
-
-            double len1 = std::sqrt(v1x * v1x + v1y * v1y);
-            double len2 = std::sqrt(v2x * v2x + v2y * v2y);
-            if (len1 < 1e-15 || len2 < 1e-15) continue;
-
-            double dot = v1x * v2x + v1y * v2y;
-            double cosAngle = dot / (len1 * len2);
-            // 限制范围防止浮点误差
-            if (cosAngle > 1.0) cosAngle = 1.0;
-            if (cosAngle < -1.0) cosAngle = -1.0;
-            double angle = std::acos(cosAngle) * 180.0 / M_PI;
-
-            if (angle < acuteAngleThreshold && angle > 0.01) {
-                acuteAngles.append(QString("顶点%1: %2°").arg(i).arg(angle, 0, 'f', 2));
-            }
+        // 汇总：检出异常的模式逐条列出，最后按图层给一条总结果
+        int total = 0;
+        for (const int m : modes) {
+            if (!(nativeMask & m) || counts.value(m, 0) == 0) continue;
+            executedChecks.append(QStringLiteral("图形规范性检查(%1/%2)：检出异常%3处")
+                .arg(base, modeName(m)).arg(counts.value(m, 0)));
+            total += counts.value(m, 0);
         }
-
-        if (!acuteAngles.isEmpty()) {
-            errors.append(qMakePair(feat,
-                QString("尖锐角：%1处角度<%2° — %3")
-                    .arg(acuteAngles.size())
-                    .arg(acuteAngleThreshold, 0, 'f', 1)
-                    .arg(acuteAngles.mid(0, 3).join(", "))));
-        }
+        executedChecks.append(QStringLiteral("图形规范性检查(%1)：%2")
+            .arg(base)
+            .arg(total == 0 ? QStringLiteral("未检出异常")
+                            : QStringLiteral("检出异常%1处").arg(total)));
     }
 }
 
-// ============================================================================
-// 模式8: 碎面检查 — 检查面积过小的多边形（使用QGIS内置面积计算）
-// ============================================================================
-void Mission459::checkSliverPolygon(QgsVectorLayer* layer,
-    QList<QPair<QgsFeature, QString>>& errors,
-    double sliverArea, double fuzzyTolerance)
-{
-    Q_UNUSED(fuzzyTolerance);
-    if (!layer) return;
-
-    QgsFeatureIterator it = layer->getFeatures();
-    QgsFeature feat;
-    while (it.nextFeature(feat)) {
-        QgsGeometry geom = feat.geometry();
-        if (geom.isNull() || geom.isEmpty()) continue;
-
-        double area = geom.area();
-        if (sliverArea > 0.0 && area < sliverArea && area > 0.0) {
-            errors.append(qMakePair(feat,
-                QStringLiteral("碎面：面积%1小于阈值%2").arg(area, 0, 'f', 4).arg(sliverArea, 0, 'f', 4)));
-        }
-    }
-}
-
-// ============================================================================
-// 模式16: 狭长碎面检查 — 检查宽度过窄的狭长面
-// 使用面积/周长比估算宽度（对于细长形状，宽度≈2*面积/周长）
-// ============================================================================
-void Mission459::checkNarrowPolygon(QgsVectorLayer* layer,
-    QList<QPair<QgsFeature, QString>>& errors,
-    double narrowWidth)
-{
-    if (!layer || narrowWidth <= 0.0) return;
-
-    QgsFeatureIterator it = layer->getFeatures();
-    QgsFeature feat;
-    while (it.nextFeature(feat)) {
-        QgsGeometry geom = feat.geometry();
-        if (geom.isNull() || geom.isEmpty()) continue;
-
-        double area = geom.area();
-        double perimeter = 0.0;
-
-        // 计算周长
-        if (geom.type() == QgsWkbTypes::PolygonGeometry) {
-            QgsMultiPolygonXY multiPoly = geom.asMultiPolygon();
-            for (const QgsPolygonXY& poly : multiPoly) {
-                for (const QgsPolylineXY& ring : poly) {
-                    for (int i = 0; i < ring.size() - 1; i++) {
-                        double dx = ring[i + 1].x() - ring[i].x();
-                        double dy = ring[i + 1].y() - ring[i].y();
-                        perimeter += std::sqrt(dx * dx + dy * dy);
-                    }
-                }
-            }
-        }
-
-        if (perimeter > 1e-15) {
-            double estimatedWidth = 2.0 * area / perimeter;
-            if (estimatedWidth < narrowWidth) {
-                errors.append(qMakePair(feat,
-                    QStringLiteral("狭长面：估算宽度%1小于阈值%2").arg(estimatedWidth, 0, 'f', 4).arg(narrowWidth, 0, 'f', 4)));
-            }
-        }
-    }
-}
-
-// ============================================================================
-// 模式32: 小面积碎面检查 — Must be larger than cluster tolerance
-// ============================================================================
-void Mission459::checkSmallArea(QgsVectorLayer* layer,
-    QList<QPair<QgsFeature, QString>>& errors,
-    double minArea)
-{
-    if (!layer || minArea <= 0.0) return;
-
-    QgsFeatureIterator it = layer->getFeatures();
-    QgsFeature feat;
-    while (it.nextFeature(feat)) {
-        QgsGeometry geom = feat.geometry();
-        if (geom.isNull() || geom.isEmpty()) continue;
-
-        double area = geom.area();
-        if (area > 0.0 && area < minArea) {
-            errors.append(qMakePair(feat,
-                QStringLiteral("小面积：面积%1小于阈值%2").arg(area, 0, 'f', 4).arg(minArea, 0, 'f', 4)));
-        }
-    }
-}
-
-// ============================================================================
-// 模式64: 节点平均密度检查 — 检查面的节点平均密度是否在合理范围
-// 密度 = 节点数 / 面积 或 节点数 / 周长
-// ============================================================================
-void Mission459::checkAvgNodeDensity(QgsVectorLayer* layer,
-    QList<QPair<QgsFeature, QString>>& errors,
-    double upperBound, double lowerBound)
-{
-    if (!layer) return;
-
-    QgsFeatureIterator it = layer->getFeatures();
-    QgsFeature feat;
-    while (it.nextFeature(feat)) {
-        QgsGeometry geom = feat.geometry();
-        if (geom.isNull() || geom.isEmpty()) continue;
-
-        int nodeCount = 0;
-        QgsVertexIterator vIt = geom.vertices();
-        while (vIt.hasNext()) {
-            vIt.next();
-            nodeCount++;
-        }
-
-        double area = geom.area();
-        if (area > 1e-15) {
-            double density = nodeCount / area;
-            if (upperBound > 0.0 && density > upperBound) {
-                errors.append(qMakePair(feat,
-                    QStringLiteral("节点平均密度偏高：%1节点/平方米(上界%2)").arg(density, 0, 'f', 6).arg(upperBound, 0, 'f', 6)));
-            }
-            if (lowerBound > 0.0 && density < lowerBound) {
-                errors.append(qMakePair(feat,
-                    QStringLiteral("节点平均密度偏低：%1节点/平方米(下界%2)").arg(density, 0, 'f', 6).arg(lowerBound, 0, 'f', 6)));
-            }
-        }
-    }
-}
-
-// ============================================================================
-// 模式128: 节点密度检查 — 检查面边界的节点间距密度
-// ============================================================================
-void Mission459::checkNodeDensity(QgsVectorLayer* layer,
-    QList<QPair<QgsFeature, QString>>& errors,
-    double upperBound, double lowerBound)
-{
-    if (!layer) return;
-
-    QgsFeatureIterator it = layer->getFeatures();
-    QgsFeature feat;
-    while (it.nextFeature(feat)) {
-        QgsGeometry geom = feat.geometry();
-        if (geom.isNull() || geom.isEmpty()) continue;
-
-        // 计算周长上的平均节点间距
-        int nodeCount = 0;
-        double perimeter = 0.0;
-        QgsPointXY prevPt;
-        bool first = true;
-
-        QgsVertexIterator vIt = geom.vertices();
-        while (vIt.hasNext()) {
-            QgsPointXY pt(vIt.next());
-            if (!first) {
-                double dx = pt.x() - prevPt.x();
-                double dy = pt.y() - prevPt.y();
-                perimeter += std::sqrt(dx * dx + dy * dy);
-            }
-            prevPt = pt;
-            first = false;
-            nodeCount++;
-        }
-
-        if (nodeCount > 1 && perimeter > 1e-15) {
-            double avgSpacing = perimeter / (nodeCount - 1);
-            if (upperBound > 0.0 && avgSpacing > upperBound) {
-                errors.append(qMakePair(feat,
-                    QStringLiteral("节点间距过大：平均%1(上界%2)").arg(avgSpacing, 0, 'f', 4).arg(upperBound, 0, 'f', 4)));
-            }
-            if (lowerBound > 0.0 && avgSpacing < lowerBound) {
-                errors.append(qMakePair(feat,
-                    QStringLiteral("节点间距过小：平均%1(下界%2)").arg(avgSpacing, 0, 'f', 4).arg(lowerBound, 0, 'f', 4)));
-            }
-        }
-    }
-}
-
-// ============================================================================
-// 模式256: 线自相交检查 — Must not self-intersect
-// 对多边形边界和线要素都适用
-// ============================================================================
-void Mission459::checkSelfIntersect(QgsVectorLayer* layer,
-    QList<QPair<QgsFeature, QString>>& errors)
-{
-    if (!layer) return;
-
-    QgsFeatureIterator it = layer->getFeatures();
-    QgsFeature feat;
-    while (it.nextFeature(feat)) {
-        QgsGeometry geom = feat.geometry();
-        if (geom.isNull() || geom.isEmpty()) continue;
-
-        // 使用QGIS内置的几何验证
-        QVector<QgsGeometry::Error> geomErrors;
-        geom.validateGeometry(geomErrors);
-
-        bool hasSelfIntersect = false;
-        QStringList details;
-        for (const QgsGeometry::Error& err : geomErrors) {
-            if (err.what().contains("self", Qt::CaseInsensitive) ||
-                err.what().contains("intersect", Qt::CaseInsensitive)) {
-                hasSelfIntersect = true;
-                details.append(err.what());
-            }
-        }
-
-        // 额外检查：使用isSimple判断
-        if (!hasSelfIntersect && !geom.isSimple()) {
-            hasSelfIntersect = true;
-            details.append(QStringLiteral("几何不是简单几何（可能自相交）"));
-        }
-
-        if (hasSelfIntersect) {
-            errors.append(qMakePair(feat,
-                QStringLiteral("自相交：%1").arg(details.join("; "))));
-        }
-    }
-}
-
-// ============================================================================
-// 模式512: 节点最小距离检查 — 检查相邻节点间距是否过小
-// ============================================================================
-void Mission459::checkMinNodeDistance(QgsVectorLayer* layer,
-    QList<QPair<QgsFeature, QString>>& errors,
-    double minDistance)
-{
-    if (!layer || minDistance <= 0.0) return;
-
-    QgsFeatureIterator it = layer->getFeatures();
-    QgsFeature feat;
-    while (it.nextFeature(feat)) {
-        QgsGeometry geom = feat.geometry();
-        if (geom.isNull() || geom.isEmpty()) continue;
-
-        QStringList closeNodes;
-        QgsPointXY prevPt;
-        bool first = true;
-        int nodeIdx = 0;
-
-        QgsVertexIterator vIt = geom.vertices();
-        while (vIt.hasNext()) {
-            QgsPointXY pt(vIt.next());
-            if (!first) {
-                double dx = pt.x() - prevPt.x();
-                double dy = pt.y() - prevPt.y();
-                double dist = std::sqrt(dx * dx + dy * dy);
-                if (dist < minDistance && dist > 1e-20) {
-                    closeNodes.append(QString("节点%1-%2: 距离%3")
-                        .arg(nodeIdx - 1).arg(nodeIdx).arg(dist, 0, 'f', 6));
-                }
-            }
-            prevPt = pt;
-            first = false;
-            nodeIdx++;
-        }
-
-        if (!closeNodes.isEmpty()) {
-            errors.append(qMakePair(feat,
-                QStringLiteral("节点过近(<%1)：%2")
-                    .arg(minDistance, 0, 'f', 4)
-                    .arg(closeNodes.mid(0, 5).join(", "))));
-        }
-    }
-}
-
-// ============================================================================
-// 主入口：根据processMode位掩码执行启用的检查项
-// ============================================================================
-void Mission459::execute(QgsVectorLayer* layer,
-    int processMode,
-    const QHash<QString, double>& thresholds,
-    QList<QPair<QgsFeature, QString>>& allErrors,
-    QStringList& executedChecks)
-{
-    if (!layer || !layer->isValid()) return;
-
-    // processMode == 0 表示全部启用
-    bool allEnabled = (processMode == 0);
-
-    auto enabled = [&](int mode) -> bool {
-        return allEnabled || (processMode & mode);
-    };
-
-    auto getThreshold = [&](const QString& key, double defaultVal) -> double {
-        return thresholds.value(key, defaultVal);
-    };
-
-    // 1: 多部件检查
-    if (enabled(1)) {
-        QList<QPair<QgsFeature, QString>> errs;
-        checkMultiPart(layer, errs);
-        allErrors.append(errs);
-        executedChecks.append(QStringLiteral("多部件检查(%1个错误)").arg(errs.size()));
-    }
-
-    // 2: 空图形检查
-    if (enabled(2)) {
-        QList<QPair<QgsFeature, QString>> errs;
-        checkEmptyGeometry(layer, errs);
-        allErrors.append(errs);
-        executedChecks.append(QStringLiteral("空图形检查(%1个错误)").arg(errs.size()));
-    }
-
-    // 4: 尖锐角检查
-    if (enabled(4)) {
-        QList<QPair<QgsFeature, QString>> errs;
-        double threshold = getThreshold("acuteAngle", 10.0);
-        checkAcuteAngle(layer, errs, threshold);
-        allErrors.append(errs);
-        executedChecks.append(QStringLiteral("尖锐角检查(%1个错误,阈值%2°)").arg(errs.size()).arg(threshold));
-    }
-
-    // 8: 碎面检查
-    if (enabled(8)) {
-        QList<QPair<QgsFeature, QString>> errs;
-        double threshold = getThreshold("sliverArea", 0.0);
-        checkSliverPolygon(layer, errs, threshold);
-        allErrors.append(errs);
-        executedChecks.append(QStringLiteral("碎面检查(%1个错误,阈值%2)").arg(errs.size()).arg(threshold));
-    }
-
-    // 16: 狭长碎面检查
-    if (enabled(16)) {
-        QList<QPair<QgsFeature, QString>> errs;
-        double threshold = getThreshold("narrowWidth", 0.0);
-        checkNarrowPolygon(layer, errs, threshold);
-        allErrors.append(errs);
-        executedChecks.append(QStringLiteral("狭长碎面检查(%1个错误,阈值%2)").arg(errs.size()).arg(threshold));
-    }
-
-    // 32: 小面积碎面检查
-    if (enabled(32)) {
-        QList<QPair<QgsFeature, QString>> errs;
-        double threshold = getThreshold("minArea", 0.0);
-        checkSmallArea(layer, errs, threshold);
-        allErrors.append(errs);
-        executedChecks.append(QStringLiteral("小面积检查(%1个错误,阈值%2)").arg(errs.size()).arg(threshold));
-    }
-
-    // 64: 节点平均密度检查
-    if (enabled(64)) {
-        QList<QPair<QgsFeature, QString>> errs;
-        double upper = getThreshold("avgNodeDensityUpper", 0.0);
-        double lower = getThreshold("avgNodeDensityLower", 0.0);
-        checkAvgNodeDensity(layer, errs, upper, lower);
-        allErrors.append(errs);
-        executedChecks.append(QStringLiteral("节点平均密度检查(%1个错误)").arg(errs.size()));
-    }
-
-    // 128: 节点密度检查
-    if (enabled(128)) {
-        QList<QPair<QgsFeature, QString>> errs;
-        double upper = getThreshold("nodeDensityUpper", 0.0);
-        double lower = getThreshold("nodeDensityLower", 0.0);
-        checkNodeDensity(layer, errs, upper, lower);
-        allErrors.append(errs);
-        executedChecks.append(QStringLiteral("节点密度检查(%1个错误)").arg(errs.size()));
-    }
-
-    // 256: 线自相交检查
-    if (enabled(256)) {
-        QList<QPair<QgsFeature, QString>> errs;
-        checkSelfIntersect(layer, errs);
-        allErrors.append(errs);
-        executedChecks.append(QStringLiteral("自相交检查(%1个错误)").arg(errs.size()));
-    }
-
-    // 512: 节点最小距离检查
-    if (enabled(512)) {
-        QList<QPair<QgsFeature, QString>> errs;
-        double threshold = getThreshold("minNodeDistance", 0.0);
-        checkMinNodeDistance(layer, errs, threshold);
-        allErrors.append(errs);
-        executedChecks.append(QStringLiteral("节点最小距离检查(%1个错误,阈值%2)").arg(errs.size()).arg(threshold));
-    }
-}
-
-// ============================================================================
-// 日志输出工具 — 突破SHP 254字符限制
-// ============================================================================
-QString QualityCheckLogger::timestamp()
-{
-    return QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss.zzz");
-}
-
-bool QualityCheckLogger::writeCheckLog(const QString& logFilePath,
-    const QString& checkItemName,
-    const QString& layerName,
-    int totalFeatures,
-    const QList<QPair<QgsFeature, QString>>& errors,
-    const QStringList& executedChecks)
-{
-    QJsonObject root;
-    root["checkItem"] = checkItemName;
-    root["layerName"] = layerName;
-    root["timestamp"] = timestamp();
-    root["totalFeatures"] = totalFeatures;
-    root["errorCount"] = errors.size();
-    root["passRate"] = totalFeatures > 0
-        ? QString("%1%").arg(100.0 * (totalFeatures - errors.size()) / totalFeatures, 0, 'f', 1)
-        : "N/A";
-
-    // 执行摘要
-    QJsonArray checksArray;
-    for (const QString& check : executedChecks) {
-        checksArray.append(check);
-    }
-    root["executedChecks"] = checksArray;
-
-    // 详细错误列表
-    QJsonArray errorsArray;
-    for (const auto& pair : errors) {
-        QJsonObject errObj;
-        errObj["featureId"] = (qint64)pair.first.id();
-        errObj["errorMessage"] = pair.second;
-
-        // 附加几何信息（WKT格式，用于定位）
-        QgsGeometry geom = pair.first.geometry();
-        if (!geom.isNull()) {
-            errObj["geometryType"] = QgsWkbTypes::displayString(geom.wkbType());
-            errObj["centroidX"] = geom.centroid().asPoint().x();
-            errObj["centroidY"] = geom.centroid().asPoint().y();
-        }
-
-        // 附加属性信息（前5个字段）
-        QgsFields fields = pair.first.fields();
-        QJsonObject attrs;
-        for (int i = 0; i < qMin(fields.size(), 5); i++) {
-            attrs[fields.at(i).name()] = pair.first.attribute(i).toString();
-        }
-        errObj["attributes"] = attrs;
-
-        errorsArray.append(errObj);
-    }
-    root["errors"] = errorsArray;
-
-    // 写入文件
-    QFile file(logFilePath);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        return false;
-    }
-
-    QJsonDocument doc(root);
-    file.write(doc.toJson(QJsonDocument::Indented));
-    file.close();
-    return true;
-}
+} // namespace Mission459

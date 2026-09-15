@@ -5,11 +5,14 @@
 #include <qgstaskmanager.h>
 #include <qgsmessagelog.h>
 #include <string>
+#include <functional>
 #include <qstring.h>
+#include <qstringlist.h>
 #include <vector>
 
 class GDALDataset;
 class OGRLayer;
+class OGREnvelope;
 
 using namespace std;
 
@@ -37,6 +40,9 @@ public:
     int progress() const;
     void finished(bool result) override;
     void setSrcFileList(const QStringList& srcFileList) { m_srcFileList = srcFileList; }
+    int successCount() const { return m_successCount; }
+    int totalCount() const { return m_totalCount; }
+    QStringList failedNames() const { return m_failedNames; }
 
 signals:
     void taskFinished(bool result);
@@ -57,13 +63,24 @@ private:
     string m_strGdbName;
     string m_strCopyError;
     QStringList m_srcFileList;
+    int m_successCount = 0;
+    int m_totalCount = 0;
+    QStringList m_failedNames;
 
     QStringList GetFileNames(const QString& path, const QStringList& nameFilters);
-    bool ConvertToSHP(const std::string& srcFile, const std::string& tgtDir, const std::string& baseName, const std::string& srcDriver = "");
-    bool ConvertToGPKG(const std::string& srcFile, const std::string& outFile, const std::string& srcDriver = "");
-    bool ConvertToGDB(const std::string& srcFile, const std::string& gdbPath, const std::string& srcDriver = "");
-    bool CopyLayer(OGRLayer* poSrcLayer, OGRLayer* poTgtLayer, const std::string& srcDriver = "");
-    bool CreateShapefileCPG(string strCPGFilePath, string strEncoding);
+    // baseName：显式层名（单文件模式手填），空串=自动命名（输出名=图层名，不拼源库前缀）；
+    // srcBaseName：源库名，输出名被占用时加库名区分；
+    // pOutDesc 回填实际输出文件名（日志用），pRenameNote 回填重名改存说明（可空）
+    bool ConvertToSHP(const std::string& srcFile, const std::string& tgtDir,
+                      const std::string& baseName, const std::string& srcBaseName,
+                      const std::string& srcDriver = "",
+                      const std::function<void(double)>& progCb = nullptr,
+                      std::string* pOutDesc = nullptr, std::string* pRenameNote = nullptr);
+    bool ConvertToGPKG(const std::string& srcFile, const std::string& outFile, const std::string& srcDriver = "", const std::function<void(double)>& progCb = nullptr);
+    bool ConvertToGDB(const std::string& srcFile, const std::string& gdbPath, const std::string& srcDriver = "", const std::function<void(double)>& progCb = nullptr);
+    // 批量模式：源文件的图层作为要素类追加进已打开的 GDB；重名自动 _2/_3 后缀（记录到 renameNote）
+    bool CopyFileToGDB(const std::string& srcFile, GDALDataset* poTgtDS, const std::string& srcDriver, std::string& renameNote, const std::function<void(double)>& progCb = nullptr);
+    bool CopyLayer(OGRLayer* poSrcLayer, OGRLayer* poTgtLayer, const std::string& srcDriver = "", const std::function<void(double)>& progCb = nullptr, OGREnvelope* pEnv = nullptr);
 };
 
 #endif

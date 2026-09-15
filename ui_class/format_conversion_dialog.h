@@ -30,6 +30,7 @@ private:
     static bool isAccessEngineInstalled();
     QString accessEngineInstallerPath();
     void currentSourceFilter(QStringList& extensions, bool& allowFiles, bool& showGdbDirs) const;
+    void appendSourcePaths(const QStringList& paths);
 
     Ui::FormatConversionDialog ui;
     QString m_qstrInputDataPath;
@@ -43,6 +44,7 @@ private:
 private slots:
     void Button_Open_clicked();
     void Button_SelectData_clicked();
+    void Button_SelectFolder_clicked();
     void Button_RemoveSelected_clicked();
     void Button_Save_clicked();
     void Button_OK_accepted();
@@ -51,7 +53,6 @@ private slots:
     void onConversionTypeChanged();
     void onBatchToggled(bool checked);
     void onTaskFinished(bool result);
-    void CalculateTotalProgress();
     void onInputPathEdited(const QString& text);
     void onOutputPathEdited(const QString& text);
     void resetAllNames();

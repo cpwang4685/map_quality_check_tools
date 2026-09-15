@@ -1,5 +1,4 @@
 #include "se_db_manager.h"
-#include "se_mission453_check.h" // FieldDefinition
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>

@@ -1,6 +1,7 @@
 #include "param_config_dialog.h"
 
 #include <algorithm>
+#include <functional>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QFile>
@@ -23,13 +24,136 @@
 #include <QPushButton>
 #include <QDebug>
 #include <QTimer>
+#include <QPair>
+#include <QScrollArea>
 
 #include "ui_fit_helper.h"
+
+// 参数表格 7 列布局（参数/路径/链接视图共用；构造时与每次填充前统一恢复，
+// 防止只读视图改列数后残留 2 列状态）
+static void setupParamsTableColumns(QTableWidget* table)
+{
+    table->setColumnCount(7);
+    table->setHorizontalHeaderLabels({
+        QStringLiteral("序号"),
+        QStringLiteral("参数键名"),
+        QStringLiteral("参数名称"),
+        QStringLiteral("参数值"),
+        QStringLiteral("参数说明"),
+        QStringLiteral("状态"),
+        QStringLiteral("常用")
+    });
+    QHeaderView* hdr = table->horizontalHeader();
+    hdr->setSectionResizeMode(0, QHeaderView::Fixed);
+    hdr->setSectionResizeMode(1, QHeaderView::Fixed);
+    hdr->setSectionResizeMode(2, QHeaderView::Fixed);
+    hdr->setSectionResizeMode(3, QHeaderView::Interactive);
+    hdr->setSectionResizeMode(4, QHeaderView::Stretch);
+    hdr->setSectionResizeMode(5, QHeaderView::Fixed);
+    hdr->setSectionResizeMode(6, QHeaderView::Fixed);
+    table->setColumnWidth(0, 36);
+    table->setColumnWidth(1, 100);
+    table->setColumnWidth(2, 96);
+    table->setColumnWidth(3, 70);
+    table->setColumnWidth(5, 46);
+    table->setColumnWidth(6, 40);
+}
+
+// 只读属性视图：2 列（属性/值）
+static void setupRawTableColumns(QTableWidget* table)
+{
+    table->setColumnCount(2);
+    table->setHorizontalHeaderLabels({
+        QStringLiteral("属性"),
+        QStringLiteral("值")
+    });
+    QHeaderView* hdr = table->horizontalHeader();
+    hdr->setSectionResizeMode(0, QHeaderView::Fixed);
+    hdr->setSectionResizeMode(1, QHeaderView::Stretch);
+    table->setColumnWidth(0, 160);
+}
+
+// 原始树节点文本：元素名 + 属性摘要 + 直接文本截断
+static QString rawNodeText(const QDomElement& elem)
+{
+    QString text = elem.tagName();
+    if (elem.hasAttributes()) {
+        QStringList attrs;
+        QDomNamedNodeMap am = elem.attributes();
+        for (int a = 0; a < am.size(); ++a) {
+            QDomAttr at = am.item(a).toAttr();
+            if (!at.isNull())
+                attrs << (at.name() + QStringLiteral("=\"") + at.value() + QStringLiteral("\""));
+        }
+        text += QStringLiteral("  [") + attrs.join(QStringLiteral(", ")) + QStringLiteral("]");
+    }
+    QString t;
+    QDomNodeList cn = elem.childNodes();
+    for (int c = 0; c < cn.size(); ++c)
+        if (cn.at(c).isText()) t += cn.at(c).toText().data();
+    t = t.trimmed();
+    if (!t.isEmpty()) {
+        if (t.length() > 60) t = t.left(60) + QStringLiteral("…");
+        text += QStringLiteral("  =  ") + t;
+    }
+    return text;
+}
+
+// 按元素子节点序号路径定位元素（与树构建一致，只数元素子节点）
+static QDomElement elementAtPath(const QDomElement& root, const QString& path)
+{
+    QDomElement cur = root;
+    if (path.isEmpty()) return cur;
+    const QStringList idxs = path.split(QLatin1Char(','));
+    for (const QString& s : idxs) {
+        int idx = s.toInt();
+        QDomNodeList children = cur.childNodes();
+        int seen = 0;
+        QDomElement next;
+        for (int c = 0; c < children.size(); ++c) {
+            QDomNode n = children.at(c);
+            if (!n.isElement()) continue;
+            if (seen == idx) { next = n.toElement(); break; }
+            ++seen;
+        }
+        if (next.isNull()) return QDomElement();
+        cur = next;
+    }
+    return cur;
+}
+
+// 递归构建原始元素树（只读查看）
+static void appendRawTree(QTreeWidgetItem* parentItem, const QDomElement& elem,
+                          int fileIdx, const QString& path)
+{
+    QDomNodeList children = elem.childNodes();
+    int elemIdx = 0;
+    for (int c = 0; c < children.size(); ++c) {
+        QDomNode n = children.at(c);
+        if (!n.isElement()) continue;
+        QDomElement childElem = n.toElement();
+        QString childPath = path.isEmpty()
+            ? QString::number(elemIdx) : path + QStringLiteral(",") + QString::number(elemIdx);
+        QTreeWidgetItem* rawItem = new QTreeWidgetItem();
+        rawItem->setText(0, rawNodeText(childElem));
+        rawItem->setData(0, Qt::UserRole, fileIdx);
+        rawItem->setData(1, Qt::UserRole, childPath);
+        rawItem->setData(0, Qt::UserRole + 1, QStringLiteral("raw"));
+        QFont rf = rawItem->font(0);
+        rf.setFamily(QStringLiteral("Segoe UI Emoji"));
+        rawItem->setFont(0, rf);
+        parentItem->addChild(rawItem);
+        ++elemIdx;
+        appendRawTree(rawItem, childElem, fileIdx, childPath);
+    }
+}
 
 ParamConfigDialog::ParamConfigDialog(QWidget* parent, Qt::WindowFlags fl)
     : QDialog(parent, fl)
 {
+    setAttribute(Qt::WA_DeleteOnClose);
     ui.setupUi(this);
+    // 麒麟上屏幕分辨率/DPI 与设计尺寸差异大，按内容自适应收放，避免布局被裁剪
     DialogFitHelper::install(this);
 
     ui.pushButton_openXml->setAutoDefault(false);
@@ -56,30 +180,7 @@ ParamConfigDialog::ParamConfigDialog(QWidget* parent, Qt::WindowFlags fl)
 
     // ---- Init table (7 columns) ----
     QTableWidget* table = ui.tableWidget_params;
-    table->setColumnCount(7);
-    table->setHorizontalHeaderLabels({
-        QStringLiteral("序号"),
-        QStringLiteral("参数键名"),
-        QStringLiteral("参数名称"),
-        QStringLiteral("参数值"),
-        QStringLiteral("参数说明"),
-        QStringLiteral("状态"),
-        QStringLiteral("常用")
-    });
-    QHeaderView* hdr = table->horizontalHeader();
-    hdr->setSectionResizeMode(0, QHeaderView::Fixed);
-    hdr->setSectionResizeMode(1, QHeaderView::Fixed);
-    hdr->setSectionResizeMode(2, QHeaderView::Fixed);
-    hdr->setSectionResizeMode(3, QHeaderView::Interactive);
-    hdr->setSectionResizeMode(4, QHeaderView::Stretch);
-    hdr->setSectionResizeMode(5, QHeaderView::Fixed);
-    hdr->setSectionResizeMode(6, QHeaderView::Fixed);
-    table->setColumnWidth(0, 36);
-    table->setColumnWidth(1, 100);
-    table->setColumnWidth(2, 96);
-    table->setColumnWidth(3, 70);
-    table->setColumnWidth(5, 46);
-    table->setColumnWidth(6, 40);
+    setupParamsTableColumns(table);
     table->verticalHeader()->setVisible(false);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setWordWrap(true);
@@ -197,6 +298,12 @@ ParamConfigDialog::ParamConfigDialog(QWidget* parent, Qt::WindowFlags fl)
             this, &ParamConfigDialog::onSearchTextChanged);
     connect(ui.lineEdit_search, &QLineEdit::returnPressed,
             this, [this]() { navigateSearchResult(+1); });
+    // 搜索防抖：停止输入 150ms 后才执行全量搜索
+    m_searchTimer = new QTimer(this);
+    m_searchTimer->setSingleShot(true);
+    m_searchTimer->setInterval(150);
+    connect(m_searchTimer, &QTimer::timeout,
+            this, [this]() { doSearch(ui.lineEdit_search->text().trimmed()); });
     ui.lineEdit_search->installEventFilter(this);
     connect(ui.checkBox_filterMarked, &QCheckBox::toggled,
             this, [this](bool checked) {
@@ -296,65 +403,141 @@ ParsedFileData ParamConfigDialog::parseOneFile(const QString& path)
         return result;
     }
 
-    QString xml = QString::fromUtf8(file.readAll());
-    file.close();
-
-    if (!result.xmlDoc.setContent(xml)) {
+    // QIODevice 重载按 XML 声明的 encoding 自动转码（GBK/UTF-8/UTF-16 等）
+    if (!result.xmlDoc.setContent(&file)) {
+        file.close();
         QMessageBox::warning(this,
             QStringLiteral("解析失败"),
             QStringLiteral("XML文件格式不正确，无法解析"));
         return result;
     }
+    file.close();
 
     QDomElement root = result.xmlDoc.documentElement();
 
     QDomNodeList missionBlocks = root.elementsByTagName("MissionBlock");
 
-    auto parseParamChildren = [](QDomElement paramElem) -> QVector<ParsedParameter> {
+    // FilePath 标签泛化：FilePath、FilePath2、FilePath3… 均按路径处理
+    auto isFilePathTag = [](const QString& tag) {
+        if (!tag.startsWith(QStringLiteral("FilePath"))) return false;
+        const QString rest = tag.mid(QStringLiteral("FilePath").size());
+        for (const QChar& c : rest)
+            if (!c.isDigit()) return false;
+        return true;
+    };
+
+    auto buildParamFrom = [](const QDomElement& e) {
+        ParsedParameter p;
+        p.name = e.tagName();
+        p.originalName = p.name;
+        p.value = e.text().trimmed();
+        p.originalValue = p.value;
+        p.description = e.attribute("note");
+        p.originalDescription = p.description;
+        p.tip = e.attribute("tip");
+        p.originalTip = p.tip;
+        p.favorited = (e.attribute("favorite") == QStringLiteral("true"));
+        p.originalFavorited = p.favorited;
+        p.domElement = e;
+        return p;
+    };
+
+    // 自身无 note 时取父元素 note；结构层（ParaIn/ParaOut/Mission）不取
+    auto fillParentNote = [](ParsedParameter& p) {
+        if (!p.description.isEmpty()) return;
+        QDomElement parentElem = p.domElement.parentNode().toElement();
+        if (parentElem.isNull()) return;
+        const QString pt = parentElem.tagName();
+        if (pt == QStringLiteral("ParaIn") || pt == QStringLiteral("ParaOut")
+            || pt == QStringLiteral("Mission"))
+            return;
+        p.description = parentElem.attribute("note");
+        p.originalDescription = p.description;
+    };
+
+    struct WalkResult {
+        QVector<QDomElement> filePaths;
+        QVector<QDomElement> bareLeaves;
+    };
+    // 子树收集：FilePathN → 路径；有文本的叶子 → 裸参数（无包装参数）。
+    // descendExcluded：是否进入被排除子树（进入后只收 FilePathN，不收裸参数）——
+    // ParaIn/ParaOut 下 Parameter 子树内也挂路径（如 MissionWhileNum>FilePath），需进入；
+    // Mission 级兜底不进入（ParaIn/ParaOut 由各自循环收集，防重复）。
+    std::function<void(const QDomElement&, const QSet<QString>&, bool, bool, WalkResult&)> walk;
+    walk = [&](const QDomElement& e, const QSet<QString>& excludeTags,
+               bool descendExcluded, bool insideExcluded, WalkResult& r) {
+        if (isFilePathTag(e.tagName())) { r.filePaths.append(e); return; }
+        const bool selfExcluded = excludeTags.contains(e.tagName());
+        if (selfExcluded && !descendExcluded) return;
+        const bool nextInside = insideExcluded || selfExcluded;
+        bool hasElemChild = false;
+        for (QDomNode n = e.firstChild(); !n.isNull(); n = n.nextSibling()) {
+            if (!n.isElement()) continue;
+            hasElemChild = true;
+            walk(n.toElement(), excludeTags, descendExcluded, nextInside, r);
+        }
+        if (!hasElemChild && !e.text().trimmed().isEmpty()
+            && !insideExcluded && !selfExcluded)
+            r.bareLeaves.append(e);
+    };
+
+    auto parseParamChildren = [&](QDomElement paramElem) {
         QVector<ParsedParameter> r;
         QDomNodeList children = paramElem.childNodes();
         for (int c = 0; c < children.size(); ++c) {
             QDomNode node = children.at(c);
             if (!node.isElement()) continue;
-            QDomElement childElem = node.toElement();
-            ParsedParameter param;
-            param.name = childElem.tagName();
-            param.value = childElem.text().trimmed();
-            param.originalValue = param.value;
-            param.description = childElem.attribute("note");
-            param.originalDescription = param.description;
-            param.favorited = (childElem.attribute("favorite") == QStringLiteral("true"));
-            param.originalFavorited = param.favorited;
-            param.domElement = childElem;
-            r.append(param);
+            r.append(buildParamFrom(node.toElement()));
         }
         return r;
     };
 
-    auto extractFilePaths = [](QDomElement paraElem) -> QVector<ParsedParameter> {
-        QVector<ParsedParameter> r;
-        QDomNodeList fps = paraElem.elementsByTagName("FilePath");
-        for (int f = 0; f < fps.size(); ++f) {
-            QDomElement fpElem = fps.at(f).toElement();
-            if (fpElem.isNull()) continue;
-            ParsedParameter pp;
-            pp.name = fpElem.tagName();
-            pp.value = fpElem.text().trimmed();
-            pp.originalValue = pp.value;
-            pp.description = fpElem.attribute("note");
-            if (pp.description.isEmpty() && !fpElem.parentNode().isNull()) {
-                QDomElement parentElem = fpElem.parentNode().toElement();
-                if (!parentElem.isNull() && parentElem.tagName() != "ParaIn"
-                    && parentElem.tagName() != "ParaOut")
-                    pp.description = parentElem.attribute("note");
-            }
-            pp.originalDescription = pp.description;
-            pp.favorited = (fpElem.attribute("favorite") == QStringLiteral("true"));
-            pp.originalFavorited = pp.favorited;
-            pp.domElement = fpElem;
-            r.append(pp);
+    const QSet<QString> paraExcludes{ QStringLiteral("Parameter") };
+    const QSet<QString> missionExcludes{ QStringLiteral("ParaIn"), QStringLiteral("ParaOut") };
+
+    auto applyWalkResult = [&](const WalkResult& wr, ParsedMission& mission,
+                               QVector<ParsedParameter>* pathDest) {
+        for (const QDomElement& e : wr.filePaths) {
+            ParsedParameter pp = buildParamFrom(e);
+            fillParentNote(pp);
+            if (pathDest) pathDest->append(pp);
         }
-        return r;
+        for (const QDomElement& e : wr.bareLeaves) {
+            ParsedParameter pp = buildParamFrom(e);
+            fillParentNote(pp);
+            mission.params.append(pp);
+        }
+    };
+
+    auto parseMission = [&](QDomElement missionElem) {
+        ParsedMission mission;
+        mission.id = missionElem.attribute("id");
+        mission.note = missionElem.attribute("note");
+        mission.domElement = missionElem;
+
+        // Mission 级兜底：排除 ParaIn/ParaOut 子树，收集直挂 FilePathN 与裸参数
+        WalkResult r0;
+        walk(missionElem, missionExcludes, false, false, r0);
+        applyWalkResult(r0, mission, &mission.inputPaths);
+
+        QDomNodeList paraIns = missionElem.elementsByTagName("ParaIn");
+        for (int pi = 0; pi < paraIns.size(); ++pi) {
+            QDomElement paraInElem = paraIns.at(pi).toElement();
+            QDomNodeList parameters = paraInElem.elementsByTagName("Parameter");
+            for (int p = 0; p < parameters.size(); ++p)
+                mission.params.append(parseParamChildren(parameters.at(p).toElement()));
+            WalkResult r;
+            walk(paraInElem, paraExcludes, true, false, r);
+            applyWalkResult(r, mission, &mission.inputPaths);
+        }
+
+        QDomNodeList paraOuts = missionElem.elementsByTagName("ParaOut");
+        for (int po = 0; po < paraOuts.size(); ++po) {
+            WalkResult r;
+            walk(paraOuts.at(po).toElement(), paraExcludes, true, false, r);
+            applyWalkResult(r, mission, &mission.outputPaths);
+        }
+        return mission;
     };
 
     if (missionBlocks.isEmpty()) {
@@ -363,28 +546,8 @@ ParsedFileData ParamConfigDialog::parseOneFile(const QString& path)
             ParsedMissionBlock virtualBlock;
             virtualBlock.note = QStringLiteral("(根节点)");
             virtualBlock.domElement = root;
-            for (int m = 0; m < missions.size(); ++m) {
-                QDomElement missionElem = missions.at(m).toElement();
-                ParsedMission mission;
-                mission.id = missionElem.attribute("id");
-                mission.note = missionElem.attribute("note");
-                mission.domElement = missionElem;
-                QDomNodeList paraIns = missionElem.elementsByTagName("ParaIn");
-                for (int pi = 0; pi < paraIns.size(); ++pi) {
-                    QDomNodeList parameters = paraIns.at(pi).toElement()
-                        .elementsByTagName("Parameter");
-                    for (int p = 0; p < parameters.size(); ++p) {
-                        mission.params.append(
-                            parseParamChildren(parameters.at(p).toElement()));
-                    }
-                    mission.inputPaths.append(extractFilePaths(paraIns.at(pi).toElement()));
-                }
-                QDomNodeList paraOuts = missionElem.elementsByTagName("ParaOut");
-                for (int po = 0; po < paraOuts.size(); ++po) {
-                    mission.outputPaths.append(extractFilePaths(paraOuts.at(po).toElement()));
-                }
-                virtualBlock.missions.append(mission);
-            }
+            for (int m = 0; m < missions.size(); ++m)
+                virtualBlock.missions.append(parseMission(missions.at(m).toElement()));
             result.blocks.append(virtualBlock);
             return result;
         }
@@ -406,6 +569,30 @@ ParsedFileData ParamConfigDialog::parseOneFile(const QString& path)
             result.blocks.append(virtualBlock);
             return result;
         }
+
+        // 批量处理链接文件：结构判定——文档中无 Mission/Parameter 但含 Link
+        // 元素即按链接文件处理，不依赖根元素名（根改名仍可识别）。
+        // 独立链接模型，不伪装成 Mission；根元素 relativePath 一并保留
+        QDomNodeList linkNodes = root.elementsByTagName("Link");
+        if (!linkNodes.isEmpty()) {
+            result.isLinkFile = true;
+            result.relativePath = root.attribute("relativePath");
+            for (int l = 0; l < linkNodes.size(); ++l) {
+                QDomElement linkElem = linkNodes.at(l).toElement();
+                if (linkElem.isNull()) continue;
+                ParsedLink lk;
+                lk.path = linkElem.text().trimmed();
+                lk.originalPath = lk.path;
+                lk.run = (linkElem.attribute("run").compare(
+                    QStringLiteral("true"), Qt::CaseInsensitive) == 0);
+                lk.originalRun = lk.run;
+                lk.favorited = (linkElem.attribute("favorite") == QStringLiteral("true"));
+                lk.originalFavorited = lk.favorited;
+                lk.domElement = linkElem;
+                result.links.append(lk);
+            }
+            return result;
+        }
     }
 
     for (int mb = 0; mb < missionBlocks.size(); ++mb) {
@@ -420,33 +607,14 @@ ParsedFileData ParamConfigDialog::parseOneFile(const QString& path)
             continue;
         }
 
-        for (int m = 0; m < missions.size(); ++m) {
-            QDomElement missionElem = missions.at(m).toElement();
-            ParsedMission mission;
-            mission.id = missionElem.attribute("id");
-            mission.note = missionElem.attribute("note");
-            mission.domElement = missionElem;
-
-            QDomNodeList paraIns = missionElem.elementsByTagName("ParaIn");
-            for (int pi = 0; pi < paraIns.size(); ++pi) {
-                QDomNodeList parameters = paraIns.at(pi).toElement()
-                    .elementsByTagName("Parameter");
-                for (int p = 0; p < parameters.size(); ++p) {
-                    mission.params.append(
-                        parseParamChildren(parameters.at(p).toElement()));
-                }
-                mission.inputPaths.append(extractFilePaths(paraIns.at(pi).toElement()));
-            }
-            QDomNodeList paraOuts = missionElem.elementsByTagName("ParaOut");
-            for (int po = 0; po < paraOuts.size(); ++po) {
-                mission.outputPaths.append(extractFilePaths(paraOuts.at(po).toElement()));
-            }
-
-            block.missions.append(mission);
-        }
+        for (int m = 0; m < missions.size(); ++m)
+            block.missions.append(parseMission(missions.at(m).toElement()));
 
         result.blocks.append(block);
     }
+
+    if (result.blocks.isEmpty() && !result.isLinkFile)
+        result.isUnknown = true; // 成功解析但结构未识别 → 只读查看
 
     return result;
 }
@@ -463,6 +631,17 @@ void ParamConfigDialog::onSelectFile()
         QStringLiteral("XML文件 (*.xml)"));
     if (paths.isEmpty()) return;
 
+    // 有未保存修改时先确认，默认取消，防静默丢失
+    collectCurrentMissionValues();
+    if (hasAnyModification()) {
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(QStringLiteral("未保存的修改"));
+        msgBox.setText(QStringLiteral("打开新文件将丢弃所有未保存的修改，确定继续吗？"));
+        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::Cancel);
+        msgBox.setDefaultButton(QMessageBox::Cancel);
+        if (msgBox.exec() != QMessageBox::Yes) return;
+    }
+
     // 打开新文件即抛弃旧文件的所有修改，直接重置状态后加载
     m_files.clear();
     m_currentFileIndex = -1;
@@ -474,17 +653,30 @@ void ParamConfigDialog::onSelectFile()
 
     int totalBlocks = 0;
     int totalMissions = 0;
+    int totalLinks = 0;
+    QStringList skippedFiles;
     for (const QString& path : paths) {
         ParsedFileData fd = parseOneFile(path);
-        if (fd.blocks.isEmpty() && QFileInfo(path).exists()) continue; // 解析失败跳过
+        if (fd.blocks.isEmpty() && !fd.isLinkFile && !fd.isUnknown && QFileInfo(path).exists()) {
+            skippedFiles << QFileInfo(path).fileName(); // 无法打开或 XML 解析失败
+            continue;
+        }
         totalBlocks += fd.blocks.size();
         for (const auto& mb : fd.blocks)
             totalMissions += mb.missions.size();
+        totalLinks += fd.links.size();
         m_files.append(fd);
     }
 
     if (m_files.isEmpty()) {
-        updateStatus(QStringLiteral("未能加载任何文件"));
+        QString msg = QStringLiteral("未能加载任何文件");
+        if (!skippedFiles.isEmpty())
+            msg += QStringLiteral("：%1 个文件无法解析").arg(skippedFiles.size());
+        updateStatus(msg);
+        if (!skippedFiles.isEmpty())
+            QMessageBox::warning(this, QStringLiteral("无法加载"),
+                QStringLiteral("以下文件无法打开或 XML 格式不正确，已跳过：\n  ")
+                + skippedFiles.join(QStringLiteral("\n  ")));
         return;
     }
 
@@ -492,16 +684,22 @@ void ParamConfigDialog::onSelectFile()
     m_filterModifiedOnly = false;
     ui.checkBox_filterMarked->setChecked(false);
     refreshParamTree();
-    updateStatus(QStringLiteral("已加载 %1 个文件，%2 个任务块，%3 个Mission")
-                 .arg(m_files.size()).arg(totalBlocks).arg(totalMissions));
+    updateStatus(QStringLiteral("已加载 %1 个文件，%2 个任务块，%3 个Mission%4")
+                 .arg(m_files.size()).arg(totalBlocks).arg(totalMissions)
+                 .arg(totalLinks > 0 ? QStringLiteral("，%1 条链接").arg(totalLinks)
+                                     : QString()));
+    if (!skippedFiles.isEmpty())
+        QMessageBox::information(this, QStringLiteral("部分文件已跳过"),
+            QStringLiteral("以下文件无法打开或 XML 格式不正确，已跳过：\n  ")
+            + skippedFiles.join(QStringLiteral("\n  ")));
     updateWindowTitle();
 }
 
-void ParamConfigDialog::loadXmlFile(const QString& path)
+bool ParamConfigDialog::loadXmlFile(const QString& path)
 {
     if (path.isEmpty() || !QFileInfo::exists(path)) {
         updateStatus(QStringLiteral("XML 文件不存在: %1").arg(path));
-        return;
+        return false;
     }
 
     // 重置状态后加载
@@ -514,9 +712,9 @@ void ParamConfigDialog::loadXmlFile(const QString& path)
     ui.lineEdit_search->clear();
 
     ParsedFileData fd = parseOneFile(path);
-    if (fd.blocks.isEmpty()) {
+    if (fd.blocks.isEmpty() && fd.links.isEmpty() && !fd.isUnknown) {
         updateStatus(QStringLiteral("未能解析文件: %1").arg(path));
-        return;
+        return false;
     }
 
     m_files.append(fd);
@@ -526,6 +724,7 @@ void ParamConfigDialog::loadXmlFile(const QString& path)
     refreshParamTree();
     updateStatus(QStringLiteral("已加载: %1").arg(QFileInfo(path).fileName()));
     updateWindowTitle();
+    return true;
 }
 
 void ParamConfigDialog::onAppendFile()
@@ -537,7 +736,11 @@ void ParamConfigDialog::onAppendFile()
     if (path.isEmpty()) return;
 
     ParsedFileData fd = parseOneFile(path);
-    if (fd.blocks.isEmpty()) return;
+    if (fd.blocks.isEmpty() && !fd.isLinkFile && !fd.isUnknown) {
+        QMessageBox::warning(this, QStringLiteral("无法追加"),
+            QStringLiteral("文件无法打开或 XML 格式不正确，未追加：\n%1").arg(path));
+        return;
+    }
 
     m_files.append(fd);
     collectCurrentMissionValues();
@@ -553,7 +756,7 @@ bool ParamConfigDialog::parseXmlFile(const QString& path)
 {
     // Legacy wrapper: parse single file, populate legacy members for backward compat
     ParsedFileData fd = parseOneFile(path);
-    if (fd.blocks.isEmpty()) return false;
+    if (fd.blocks.isEmpty() && !fd.isLinkFile && !fd.isUnknown) return false;
     m_xmlFilePath = fd.filePath;
     m_xmlDoc = fd.xmlDoc;
     m_missionBlocks = fd.blocks;
@@ -591,6 +794,29 @@ static int findNameSep(const QString& s) {
     return -1;
 }
 
+QString ParamConfigDialog::paramLeafText(const ParsedParameter& p) const
+{
+    int sp = findNameSep(p.description);
+    QString displayName = p.description.isEmpty() ? p.name
+        : p.description.left(sp > 0 ? sp : p.description.length());
+    return QStringLiteral("  \xE2\x9A\x99 ") + displayName + QStringLiteral(": ") + p.value;
+}
+
+QString ParamConfigDialog::pathLeafText(const ParsedParameter& p) const
+{
+    QString text = QStringLiteral("  \xF0\x9F\x93\x84 ") + p.value;
+    if (!p.tip.isEmpty())
+        text += QStringLiteral("  [") + p.tip + QStringLiteral("]");
+    return text;
+}
+
+QString ParamConfigDialog::linkLeafText(const ParsedLink& l) const
+{
+    return QStringLiteral("  \xF0\x9F\x94\x97 ") + l.path
+        + QStringLiteral("  [") + (l.run ? QStringLiteral("启用") : QStringLiteral("停用"))
+        + QStringLiteral("]");
+}
+
 void ParamConfigDialog::refreshParamTree()
 {
     QTreeWidget* tree = ui.treeWidget_checkItems;
@@ -606,22 +832,33 @@ void ParamConfigDialog::refreshParamTree()
     if (m_files.isEmpty()) {
         rootItem->setText(0, QStringLiteral("\xF0\x9F\x93\x82 (未选择文件)"));
     } else if (m_files.size() == 1) {
-        int totalBlocks = 0, totalMissions = 0;
-        for (const auto& mb : m_files[0].blocks) {
-            totalBlocks++;
-            totalMissions += mb.missions.size();
+        const auto& fd0 = m_files[0];
+        if (fd0.isLinkFile) {
+            rootItem->setText(0, QStringLiteral("\xF0\x9F\x93\x84 ") + QFileInfo(fd0.filePath).fileName()
+                + QStringLiteral("  [%1条链接]").arg(fd0.links.size()));
+        } else if (fd0.isUnknown) {
+            rootItem->setText(0, QStringLiteral("\xF0\x9F\x93\x84 ") + QFileInfo(fd0.filePath).fileName()
+                + QStringLiteral("  [结构未识别，只读]"));
+        } else {
+            int totalBlocks = 0, totalMissions = 0;
+            for (const auto& mb : fd0.blocks) {
+                totalBlocks++;
+                totalMissions += mb.missions.size();
+            }
+            rootItem->setText(0, QStringLiteral("\xF0\x9F\x93\x84 ") + QFileInfo(fd0.filePath).fileName()
+                + QStringLiteral("  [%1个任务块, %2个Mission]").arg(totalBlocks).arg(totalMissions));
         }
-        rootItem->setText(0, QStringLiteral("\xF0\x9F\x93\x84 ") + QFileInfo(m_files[0].filePath).fileName()
-            + QStringLiteral("  [%1个任务块, %2个Mission]").arg(totalBlocks).arg(totalMissions));
     } else {
-        int totalBlocks = 0, totalMissions = 0;
+        int totalBlocks = 0, totalMissions = 0, totalLinks = 0;
         for (const auto& fd : m_files) {
             totalBlocks += fd.blocks.size();
             for (const auto& mb : fd.blocks)
                 totalMissions += mb.missions.size();
+            totalLinks += fd.links.size();
         }
-        rootItem->setText(0, QStringLiteral("\xF0\x9F\x93\x82 %1 个文件, %2 个任务块, %3 个Mission")
-            .arg(m_files.size()).arg(totalBlocks).arg(totalMissions));
+        rootItem->setText(0, QStringLiteral("\xF0\x9F\x93\x82 %1 个文件, %2 个任务块, %3 个Mission%4")
+            .arg(m_files.size()).arg(totalBlocks).arg(totalMissions)
+            .arg(totalLinks > 0 ? QStringLiteral(", %1 条链接").arg(totalLinks) : QString()));
     }
     rootItem->setData(0, Qt::UserRole, -1);
     rootItem->setData(0, Qt::UserRole + 1, QStringLiteral("root"));
@@ -655,6 +892,104 @@ void ParamConfigDialog::refreshParamTree()
         bool fileModified = fileHasModification(fileIdx);
         bool fileShown = false;
 
+        // 链接文件：文件节点（多文件模式）→ "批量处理链接"容器 → 🔗 叶子
+        if (fd.isLinkFile) {
+            // 常用参数视图：无收藏链接时整组不显示（与右侧表格过滤口径一致）
+            int visibleLinkCount = 0;
+            for (const auto& lk : fd.links)
+                if (!m_showingFavoritesOnly || lk.favorited) ++visibleLinkCount;
+            if (m_showingFavoritesOnly && visibleLinkCount == 0)
+                continue;
+            if (!singleFile && !fileShown) {
+                fileShown = true;
+                QTreeWidgetItem* fileItem = new QTreeWidgetItem();
+                fileItem->setText(0, QStringLiteral("\xF0\x9F\x93\x84 ") + fileName
+                    + (fileModified ? QStringLiteral(" *") : QString()));
+                fileItem->setData(0, Qt::UserRole, fileIdx);
+                fileItem->setData(0, Qt::UserRole + 1, QStringLiteral("file"));
+                QFont fileFont = fileItem->font(0);
+                fileFont.setFamily(QStringLiteral("Segoe UI Emoji"));
+                fileFont.setBold(true);
+                fileItem->setFont(0, fileFont);
+                rootItem->addChild(fileItem);
+            }
+            QTreeWidgetItem* linkParent = singleFile ? rootItem
+                : rootItem->child(rootItem->childCount() - 1);
+            QTreeWidgetItem* linkList = new QTreeWidgetItem();
+            linkList->setText(0, QStringLiteral("\xF0\x9F\x94\x97 批量处理链接 [%1]").arg(fd.links.size()));
+            linkList->setData(0, Qt::UserRole, fileIdx);
+            linkList->setData(1, Qt::UserRole, -1);
+            linkList->setData(0, Qt::UserRole + 1, QStringLiteral("linklist"));
+            QFont llFont = linkList->font(0);
+            llFont.setFamily(QStringLiteral("Segoe UI Emoji"));
+            llFont.setBold(true);
+            linkList->setFont(0, llFont);
+            linkParent->addChild(linkList);
+
+            for (int lIdx = 0; lIdx < fd.links.size(); ++lIdx) {
+                const auto& lk = fd.links[lIdx];
+                if (m_showingFavoritesOnly && !lk.favorited) continue;
+                QTreeWidgetItem* lItem = new QTreeWidgetItem();
+                lItem->setText(0, linkLeafText(lk));
+                lItem->setData(0, Qt::UserRole, fileIdx);
+                lItem->setData(1, Qt::UserRole, lIdx);
+                lItem->setData(3, Qt::UserRole, lIdx);
+                lItem->setData(0, Qt::UserRole + 1, QStringLiteral("link"));
+                QFont lf = lItem->font(0);
+                lf.setFamily(QStringLiteral("Segoe UI Emoji"));
+                lItem->setFont(0, lf);
+                if (lk.modified()) {
+                    QFont lf2 = lItem->font(0); lf2.setBold(true); lItem->setFont(0, lf2);
+                    lItem->setForeground(0, QColor("#c0392b"));
+                }
+                linkList->addChild(lItem);
+            }
+            anyFileShown = true;
+            continue;
+        }
+
+        // 未识别结构文件：只读查看原始元素树
+        if (fd.isUnknown) {
+            if (!singleFile && !fileShown) {
+                fileShown = true;
+                QTreeWidgetItem* fileItem = new QTreeWidgetItem();
+                fileItem->setText(0, QStringLiteral("\xF0\x9F\x93\x84 ") + fileName
+                    + (fileModified ? QStringLiteral(" *") : QString()));
+                fileItem->setData(0, Qt::UserRole, fileIdx);
+                fileItem->setData(0, Qt::UserRole + 1, QStringLiteral("file"));
+                QFont fileFont = fileItem->font(0);
+                fileFont.setFamily(QStringLiteral("Segoe UI Emoji"));
+                fileFont.setBold(true);
+                fileItem->setFont(0, fileFont);
+                rootItem->addChild(fileItem);
+            }
+            QTreeWidgetItem* rawParent = singleFile ? rootItem
+                : rootItem->child(rootItem->childCount() - 1);
+            QTreeWidgetItem* rawRoot = new QTreeWidgetItem();
+            rawRoot->setText(0, QStringLiteral("\xF0\x9F\x94\x8D 结构未识别 — 只读查看"));
+            rawRoot->setData(0, Qt::UserRole, fileIdx);
+            rawRoot->setData(0, Qt::UserRole + 1, QStringLiteral("rawroot"));
+            QFont rrFont = rawRoot->font(0);
+            rrFont.setFamily(QStringLiteral("Segoe UI Emoji"));
+            rrFont.setBold(true);
+            rawRoot->setFont(0, rrFont);
+            rawParent->addChild(rawRoot);
+
+            QTreeWidgetItem* rawElemItem = new QTreeWidgetItem();
+            rawElemItem->setText(0, rawNodeText(fd.xmlDoc.documentElement()));
+            rawElemItem->setData(0, Qt::UserRole, fileIdx);
+            rawElemItem->setData(1, Qt::UserRole, QString());
+            rawElemItem->setData(0, Qt::UserRole + 1, QStringLiteral("raw"));
+            QFont ref = rawElemItem->font(0);
+            ref.setFamily(QStringLiteral("Segoe UI Emoji"));
+            rawElemItem->setFont(0, ref);
+            rawRoot->addChild(rawElemItem);
+            appendRawTree(rawElemItem, fd.xmlDoc.documentElement(), fileIdx, QString());
+
+            anyFileShown = true;
+            continue;
+        }
+
         for (int mbIdx = 0; mbIdx < fd.blocks.size(); ++mbIdx) {
             const auto& mb = fd.blocks[mbIdx];
 
@@ -662,7 +997,7 @@ void ParamConfigDialog::refreshParamTree()
             for (const auto& ms : mb.missions) {
                 mbTotalParams += ms.params.size();
                 for (const auto& p : ms.params)
-                    if (p.value != p.originalValue || p.description != p.originalDescription) ++mbModified;
+                    if (p.modified()) ++mbModified;
             }
 
             if (m_showingFavoritesOnly) {
@@ -737,7 +1072,7 @@ void ParamConfigDialog::refreshParamTree()
 
                 int missionModified = 0;
                 for (const auto& p : mission.params)
-                    if (p.value != p.originalValue || p.description != p.originalDescription) ++missionModified;
+                    if (p.modified()) ++missionModified;
 
                 if (m_showingFavoritesOnly) {
                     bool mHasFav = false;
@@ -789,13 +1124,10 @@ void ParamConfigDialog::refreshParamTree()
                     const auto& param = mission.params[pIdx];
                     if (m_showingFavoritesOnly && !param.favorited) continue;
 
-                    int spaceIdx = findNameSep(param.description);
-                    QString displayName = param.description.isEmpty() ? param.name
-                        : param.description.left(spaceIdx > 0 ? spaceIdx : param.description.length());
-                    bool modified = (param.value != param.originalValue || param.description != param.originalDescription);
+                    bool modified = param.modified();
 
                     QTreeWidgetItem* pItem = new QTreeWidgetItem();
-                    pItem->setText(0, QStringLiteral("  \xE2\x9A\x99 ") + displayName + ": " + param.value);
+                    pItem->setText(0, paramLeafText(param));
                     pItem->setData(0, Qt::UserRole, fileIdx);
                     pItem->setData(1, Qt::UserRole, mbIdx);
                     pItem->setData(2, Qt::UserRole, mIdx);
@@ -824,7 +1156,7 @@ void ParamConfigDialog::refreshParamTree()
                     if (showInPaths) {
                     int inPathModified = 0;
                     for (const auto& p : mission.inputPaths)
-                        if (p.value != p.originalValue || p.description != p.originalDescription) ++inPathModified;
+                        if (p.modified()) ++inPathModified;
 
                     QTreeWidgetItem* inGroup = new QTreeWidgetItem();
                     inGroup->setText(0, QStringLiteral("\xF0\x9F\x93\xA5 输入路径 [%1]")
@@ -842,9 +1174,9 @@ void ParamConfigDialog::refreshParamTree()
                     for (int pIdx = 0; pIdx < mission.inputPaths.size(); ++pIdx) {
                         const auto& pp = mission.inputPaths[pIdx];
                         if (m_showingFavoritesOnly && !pp.favorited) continue;
-                        bool mod = (pp.value != pp.originalValue || pp.description != pp.originalDescription);
+                        bool mod = pp.modified();
                         QTreeWidgetItem* ipItem = new QTreeWidgetItem();
-                        ipItem->setText(0, QStringLiteral("  \xF0\x9F\x93\x84 %1").arg(pp.value));
+                        ipItem->setText(0, pathLeafText(pp));
                         ipItem->setData(0, Qt::UserRole, fileIdx);
                         ipItem->setData(1, Qt::UserRole, mbIdx);
                         ipItem->setData(2, Qt::UserRole, mIdx);
@@ -872,7 +1204,7 @@ void ParamConfigDialog::refreshParamTree()
                     if (showOutPaths) {
                     int outPathModified = 0;
                     for (const auto& p : mission.outputPaths)
-                        if (p.value != p.originalValue || p.description != p.originalDescription) ++outPathModified;
+                        if (p.modified()) ++outPathModified;
 
                     QTreeWidgetItem* outGroup = new QTreeWidgetItem();
                     outGroup->setText(0, QStringLiteral("\xF0\x9F\x93\xA4 输出路径 [%1]")
@@ -890,9 +1222,9 @@ void ParamConfigDialog::refreshParamTree()
                     for (int pIdx = 0; pIdx < mission.outputPaths.size(); ++pIdx) {
                         const auto& pp = mission.outputPaths[pIdx];
                         if (m_showingFavoritesOnly && !pp.favorited) continue;
-                        bool mod = (pp.value != pp.originalValue || pp.description != pp.originalDescription);
+                        bool mod = pp.modified();
                         QTreeWidgetItem* opItem = new QTreeWidgetItem();
-                        opItem->setText(0, QStringLiteral("  \xF0\x9F\x93\x84 %1").arg(pp.value));
+                        opItem->setText(0, pathLeafText(pp));
                         opItem->setData(0, Qt::UserRole, fileIdx);
                         opItem->setData(1, Qt::UserRole, mbIdx);
                         opItem->setData(2, Qt::UserRole, mIdx);
@@ -926,7 +1258,8 @@ void ParamConfigDialog::refreshParamTree()
 
     tree->expandAll();
 
-    // 自动选中第一个有参数的 Mission
+    // 自动选中第一个有参数的 Mission；没有 Mission 时回退到链接列表节点
+    bool autoSelected = false;
     QTreeWidgetItemIterator it(tree);
     while (*it) {
         if ((*it)->data(0, Qt::UserRole + 1).toString() == "mission") {
@@ -938,10 +1271,35 @@ void ParamConfigDialog::refreshParamTree()
                 mIdx >= 0 && mIdx < m_files[fIdx].blocks[mbIdx].missions.size() &&
                 !m_files[fIdx].blocks[mbIdx].missions[mIdx].params.isEmpty()) {
                 tree->setCurrentItem(*it);
+                autoSelected = true;
                 break;
             }
         }
         ++it;
+    }
+    if (!autoSelected) {
+        QTreeWidgetItemIterator it2(tree);
+        while (*it2) {
+            if ((*it2)->data(0, Qt::UserRole + 1).toString() == "linklist") {
+                int fIdx = (*it2)->data(0, Qt::UserRole).toInt();
+                if (fIdx >= 0 && fIdx < m_files.size() && m_files[fIdx].isLinkFile) {
+                    tree->setCurrentItem(*it2);
+                    autoSelected = true;
+                    break;
+                }
+            }
+            ++it2;
+        }
+    }
+    if (!autoSelected) {
+        QTreeWidgetItemIterator it3(tree);
+        while (*it3) {
+            if ((*it3)->data(0, Qt::UserRole + 1).toString() == "rawroot") {
+                tree->setCurrentItem(*it3);
+                break;
+            }
+            ++it3;
+        }
     }
 }
 
@@ -989,6 +1347,46 @@ void ParamConfigDialog::onBlockSelectionChanged()
         }
     }
 
+    if (itemType == "link") {
+        QTreeWidgetItem* parent = item->parent();
+        if (parent) {
+            m_pendingHighlightRow = item->data(3, Qt::UserRole).toInt();
+            bool oldBlocked = ui.treeWidget_checkItems->blockSignals(true);
+            ui.treeWidget_checkItems->setCurrentItem(parent);
+            ui.treeWidget_checkItems->blockSignals(oldBlocked);
+            onBlockSelectionChanged();
+            return;
+        }
+    }
+
+    if (itemType == "linklist") {
+        int fIdx = item->data(0, Qt::UserRole).toInt();
+        if (fIdx >= 0 && fIdx < m_files.size() && m_files[fIdx].isLinkFile) {
+            m_currentFileIndex = fIdx;
+            m_currentMbIndex = -1;
+            m_currentMissionIndex = -1;
+            m_showingLinks = true;
+            m_showingPaths = false;
+            populateLinkTable(m_files[fIdx]);
+            return;
+        }
+    }
+
+    if (itemType == "raw" || itemType == "rawroot") {
+        int fIdx = item->data(0, Qt::UserRole).toInt();
+        QString elemPath = itemType == "raw"
+            ? item->data(1, Qt::UserRole).toString() : QString();
+        if (fIdx >= 0 && fIdx < m_files.size() && m_files[fIdx].isUnknown) {
+            m_currentFileIndex = fIdx;
+            m_currentMbIndex = -1;
+            m_currentMissionIndex = -1;
+            m_showingLinks = false;
+            m_showingPaths = false;
+            populateRawView(fIdx, elemPath);
+            return;
+        }
+    }
+
     if (itemType == "inpath-group" || itemType == "outpath-group") {
         m_currentFileIndex = item->data(0, Qt::UserRole).toInt();
         m_currentMbIndex = item->data(1, Qt::UserRole).toInt();
@@ -1021,7 +1419,7 @@ void ParamConfigDialog::onBlockSelectionChanged()
             populateTable(m_files[m_currentFileIndex].blocks[m_currentMbIndex].missions[m_currentMissionIndex]);
             int modCount = 0;
             for (const auto& p : m_files[m_currentFileIndex].blocks[m_currentMbIndex].missions[m_currentMissionIndex].params)
-                if (p.value != p.originalValue || p.description != p.originalDescription) ++modCount;
+                if (p.modified()) ++modCount;
             updateStatus(QStringLiteral("编辑: %1%2")
                          .arg(item->text(0))
                          .arg(modCount > 0 ? QStringLiteral("  —  已修改 %1 个参数").arg(modCount) : QString()));
@@ -1040,6 +1438,24 @@ void ParamConfigDialog::onBlockSelectionChanged()
     if (itemType == "file") {
         int fIdx = item->data(0, Qt::UserRole).toInt();
         if (fIdx >= 0 && fIdx < m_files.size()) {
+            if (m_files[fIdx].isUnknown) {
+                m_currentFileIndex = fIdx;
+                m_currentMbIndex = -1;
+                m_currentMissionIndex = -1;
+                m_showingLinks = false;
+                m_showingPaths = false;
+                populateRawView(fIdx, QString());
+                return;
+            }
+            if (m_files[fIdx].isLinkFile) {
+                m_currentFileIndex = fIdx;
+                m_currentMbIndex = -1;
+                m_currentMissionIndex = -1;
+                m_showingLinks = true;
+                m_showingPaths = false;
+                populateLinkTable(m_files[fIdx]);
+                return;
+            }
             clearTable();
             m_currentFileIndex = fIdx;
             m_currentMbIndex = -1;
@@ -1089,6 +1505,7 @@ void ParamConfigDialog::clearTable()
 {
     m_updatingTable = true;
     QTableWidget* table = ui.tableWidget_params;
+    setupParamsTableColumns(table);
     table->clearContents();
     table->setRowCount(1);
     table->setSpan(0, 0, 1, 7);
@@ -1105,13 +1522,18 @@ void ParamConfigDialog::clearTable()
     table->horizontalHeader()->setVisible(false);
     table->verticalHeader()->setVisible(false);
     m_showingPaths = false;
+    m_showingLinks = false;
+    m_highlightedRow = -1;          // 表格已清空，蓝色高亮行随之失效
     m_updatingTable = false;
 }
 
 void ParamConfigDialog::populateTable(const ParsedMission& mission, int searchHighlightRow)
 {
     m_updatingTable = true;
+    m_showingPaths = false;
+    m_showingLinks = false;
     QTableWidget* table = ui.tableWidget_params;
+    setupParamsTableColumns(table);
     table->horizontalHeader()->setVisible(true);
     table->verticalHeader()->setVisible(false);
 
@@ -1121,11 +1543,16 @@ void ParamConfigDialog::populateTable(const ParsedMission& mission, int searchHi
 
     if (mission.params.isEmpty()) {
         m_updatingTable = false;
+        m_highlightedRow = -1;
         updateStatus(QStringLiteral("此 Mission 没有可编辑的参数块"));
         return;
     }
 
     table->setRowCount(mission.params.size());
+
+    // 【2026-09-11】当前高亮行：搜索命中行优先，其次"点击左侧叶子定位"行
+    // （两者互斥，同时最多一个 >= 0）。全表只允许一行是蓝色的。
+    const int hlRow = (searchHighlightRow >= 0) ? searchHighlightRow : m_pendingHighlightRow;
 
     for (int i = 0; i < mission.params.size(); ++i) {
         const ParsedParameter& param = mission.params[i];
@@ -1134,7 +1561,7 @@ void ParamConfigDialog::populateTable(const ParsedMission& mission, int searchHi
         QString shortName = param.description.isEmpty() ? param.name
             : param.description.left(spaceIdx > 0 ? spaceIdx : param.description.length());
         QString detail = (spaceIdx > 0) ? param.description.mid(spaceIdx + 1) : QString();
-        bool modified = (param.value != param.originalValue || param.description != param.originalDescription);
+        bool modified = param.modified();
 
         // 序号
         QTableWidgetItem* seqItem = new QTableWidgetItem(QString::number(i + 1));
@@ -1150,15 +1577,17 @@ void ParamConfigDialog::populateTable(const ParsedMission& mission, int searchHi
         QTableWidgetItem* nameItem = new QTableWidgetItem(shortName);
         table->setItem(i, 2, nameItem);
 
-        // 参数值 — 布尔参数（IsXxx）用下拉框
-        bool isBool = param.name.startsWith(QStringLiteral("Is"), Qt::CaseInsensitive);
+        // 参数值 — 布尔参数用下拉框：Is 前缀，或值本身为 true/false
+        bool isBool = param.name.startsWith(QStringLiteral("Is"), Qt::CaseInsensitive)
+            || param.value.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0
+            || param.value.compare(QStringLiteral("false"), Qt::CaseInsensitive) == 0;
         if (isBool) {
             QComboBox* combo = new QComboBox();
             combo->addItems({QStringLiteral("true"), QStringLiteral("false")});
             combo->setCurrentIndex(
                 param.value.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0 ? 0 : 1);
             combo->setFont(table->font());
-            QColor comboBg = (i == searchHighlightRow) ? QColor("#29B6F6")
+            QColor comboBg = (i == hlRow) ? QColor("#29B6F6")
                 : modified ? QColor("#fff3cd")
                 : (i % 2 == 0) ? QColor(Qt::white) : QColor("#f5f5f5");
             combo->setStyleSheet(
@@ -1191,7 +1620,7 @@ void ParamConfigDialog::populateTable(const ParsedMission& mission, int searchHi
                 if (i >= ms.params.size()) return;
                 ParsedParameter& p = ms.params[i];
                 p.value = (idx == 0) ? QStringLiteral("true") : QStringLiteral("false");
-                bool mod = (p.value != p.originalValue || p.description != p.originalDescription);
+                bool mod = p.modified();
                 QTableWidget* t = ui.tableWidget_params;
                 m_updatingTable = true;
                 QTableWidgetItem* si = t->item(i, 5);
@@ -1227,10 +1656,7 @@ void ParamConfigDialog::populateTable(const ParsedMission& mission, int searchHi
                         (*it)->data(1, Qt::UserRole).toInt() == mbIdx &&
                         (*it)->data(2, Qt::UserRole).toInt() == mIdx &&
                         (*it)->data(3, Qt::UserRole).toInt() == i) {
-                        int sp = findNameSep(p.description);
-                        QString dn = p.description.isEmpty() ? p.name
-                            : p.description.left(sp > 0 ? sp : p.description.length());
-                        (*it)->setText(0, QStringLiteral("  \xE2\x9A\x99 ") + dn + ": " + p.value);
+                        (*it)->setText(0, paramLeafText(p));
                         if (mod) {
                             QFont pf = (*it)->font(0); pf.setBold(true); (*it)->setFont(0, pf);
                             (*it)->setForeground(0, QColor("#c0392b"));
@@ -1249,9 +1675,13 @@ void ParamConfigDialog::populateTable(const ParsedMission& mission, int searchHi
             table->setItem(i, 3, valItem);
         }
 
-        // 参数说明
-        QTableWidgetItem* descItem = new QTableWidgetItem(detail);
-        descItem->setToolTip(detail);
+        // 参数说明 — 有 tip 的行优先显示 tip
+        QString descText = param.tip.isEmpty() ? detail : param.tip;
+        QString descToolTip = param.tip.isEmpty() ? detail
+            : (param.tip + (param.description.isEmpty()
+                ? QString() : QStringLiteral("\n(") + param.description + QStringLiteral(")")));
+        QTableWidgetItem* descItem = new QTableWidgetItem(descText);
+        descItem->setToolTip(descToolTip);
         table->setItem(i, 4, descItem);
 
         // 状态（只读）：已修改 / 未修改
@@ -1282,8 +1712,8 @@ void ParamConfigDialog::populateTable(const ParsedMission& mission, int searchHi
 
         // 整行统一背景色（必须在所有 7 列 setItem 之后）
         QColor rowBg;
-        if (i == searchHighlightRow)
-            rowBg = QColor("#29B6F6");          // 搜索命中 → 蓝色
+        if (i == hlRow)
+            rowBg = QColor("#29B6F6");          // 搜索命中/点击叶子定位 → 蓝色
         else if (modified)
             rowBg = QColor("#fff3cd");          // 已修改 → 黄色
         else
@@ -1307,13 +1737,18 @@ void ParamConfigDialog::populateTable(const ParsedMission& mission, int searchHi
     if (scrollRow >= 0 && scrollRow < table->rowCount()) {
         table->scrollToItem(table->item(scrollRow, 0), QAbstractItemView::EnsureVisible);
     }
+    // 记下这一轮的高亮行，供"点右侧别的行时把旧的蓝色关掉"使用
+    m_highlightedRow = (scrollRow >= 0 && scrollRow < table->rowCount()) ? scrollRow : -1;
     m_pendingHighlightRow = -1;
 }
 
 void ParamConfigDialog::populatePathTable(const QVector<ParsedParameter>& paths, const QString& typeLabel)
 {
     m_updatingTable = true;
+    m_showingPaths = true;
+    m_showingLinks = false;
     QTableWidget* table = ui.tableWidget_params;
+    setupParamsTableColumns(table);
     table->horizontalHeader()->setVisible(true);
     table->verticalHeader()->setVisible(false);
     table->clearContents();
@@ -1329,7 +1764,7 @@ void ParamConfigDialog::populatePathTable(const QVector<ParsedParameter>& paths,
 
     for (int i = 0; i < paths.size(); ++i) {
         const ParsedParameter& pp = paths[i];
-        bool modified = (pp.value != pp.originalValue || pp.description != pp.originalDescription);
+        bool modified = pp.modified();
 
         QTableWidgetItem* seqItem = new QTableWidgetItem(QString::number(i + 1));
         seqItem->setFlags(seqItem->flags() & ~Qt::ItemIsEditable);
@@ -1346,8 +1781,12 @@ void ParamConfigDialog::populatePathTable(const QVector<ParsedParameter>& paths,
         QTableWidgetItem* valItem = new QTableWidgetItem(pp.value);
         table->setItem(i, 3, valItem);
 
-        QTableWidgetItem* descItem = new QTableWidgetItem(pp.description);
-        descItem->setToolTip(pp.description);
+        QString descText = pp.tip.isEmpty() ? pp.description : pp.tip;
+        QString descToolTip = pp.tip.isEmpty() ? pp.description
+            : (pp.tip + (pp.description.isEmpty()
+                ? QString() : QStringLiteral("\n(") + pp.description + QStringLiteral(")")));
+        QTableWidgetItem* descItem = new QTableWidgetItem(descText);
+        descItem->setToolTip(descToolTip);
         table->setItem(i, 4, descItem);
 
         QTableWidgetItem* statusItem = new QTableWidgetItem();
@@ -1392,17 +1831,279 @@ void ParamConfigDialog::populatePathTable(const QVector<ParsedParameter>& paths,
     applyTableFilter();
     QTimer::singleShot(0, this, [this]() { applyTableFilter(); });
 
+    // 定位到点击的路径叶子行，随后立即清零，避免残留高亮泄漏到下一次表格显示
+    if (m_pendingHighlightRow >= 0 && m_pendingHighlightRow < table->rowCount())
+        table->scrollToItem(table->item(m_pendingHighlightRow, 0), QAbstractItemView::EnsureVisible);
+    m_highlightedRow = (m_pendingHighlightRow >= 0 && m_pendingHighlightRow < table->rowCount())
+        ? m_pendingHighlightRow : -1;
+    m_pendingHighlightRow = -1;
+
     int modCount = 0;
     for (const auto& p : paths)
-        if (p.value != p.originalValue || p.description != p.originalDescription) ++modCount;
+        if (p.modified()) ++modCount;
     updateStatus(QStringLiteral("%1路径 — 共 %2 条%3")
         .arg(typeLabel).arg(paths.size())
         .arg(modCount > 0 ? QStringLiteral("，已修改 %1 条").arg(modCount) : QString()));
 }
 
+void ParamConfigDialog::populateLinkTable(const ParsedFileData& fd, int searchHighlightRow)
+{
+    m_updatingTable = true;
+    m_showingLinks = true;
+    m_showingPaths = false;
+    QTableWidget* table = ui.tableWidget_params;
+    setupParamsTableColumns(table);
+    table->horizontalHeader()->setVisible(true);
+    table->verticalHeader()->setVisible(false);
+    table->clearContents();
+    table->setRowCount(0);
+
+    if (fd.links.isEmpty()) {
+        m_updatingTable = false;
+        updateStatus(QStringLiteral("此文件没有链接"));
+        return;
+    }
+
+    table->setRowCount(fd.links.size());
+
+    for (int i = 0; i < fd.links.size(); ++i) {
+        const ParsedLink& lk = fd.links[i];
+        bool modified = lk.modified();
+
+        QTableWidgetItem* seqItem = new QTableWidgetItem(QString::number(i + 1));
+        seqItem->setFlags(seqItem->flags() & ~Qt::ItemIsEditable);
+        seqItem->setTextAlignment(Qt::AlignCenter);
+        table->setItem(i, 0, seqItem);
+
+        QTableWidgetItem* idItem = new QTableWidgetItem(QStringLiteral("Link"));
+        idItem->setFlags(idItem->flags() & ~Qt::ItemIsEditable);
+        table->setItem(i, 1, idItem);
+
+        QTableWidgetItem* nameItem = new QTableWidgetItem(QStringLiteral("引用文件"));
+        nameItem->setFlags(nameItem->flags() & ~Qt::ItemIsEditable);
+        table->setItem(i, 2, nameItem);
+
+        QTableWidgetItem* valItem = new QTableWidgetItem(lk.path);
+        table->setItem(i, 3, valItem);
+
+        // 启用/停用下拉（run 属性）
+        QComboBox* runCombo = new QComboBox();
+        runCombo->addItems({QStringLiteral("启用"), QStringLiteral("停用")});
+        runCombo->setCurrentIndex(lk.run ? 0 : 1);
+        runCombo->setFont(table->font());
+        QColor runBg = (i == searchHighlightRow || i == m_pendingHighlightRow) ? QColor("#29B6F6")
+            : modified ? QColor("#fff3cd")
+            : (i % 2 == 0) ? QColor(Qt::white) : QColor("#f5f5f5");
+        runCombo->setStyleSheet(
+            QString("QComboBox { background-color: %1; font-family: inherit; }"
+                    "QComboBox QAbstractItemView { "
+                    "  selection-background-color: #29B6F6;"
+                    "  selection-color: #000000;"
+                    "  outline: none;"
+                    "}"
+                    "QComboBox QAbstractItemView::item {"
+                    "  color: #000000;"
+                    "  padding: 2px 4px;"
+                    "}"
+                    "QComboBox QAbstractItemView::item:selected {"
+                    "  color: #000000;"
+                    "  background-color: #29B6F6;"
+                    "}")
+            .arg(runBg.name()));
+        int fIdx = m_currentFileIndex;
+        connect(runCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, [this, i, fIdx, runCombo](int idx) {
+            if (m_updatingTable) return;
+            if (fIdx < 0 || fIdx >= m_files.size()) return;
+            ParsedFileData& cfd = m_files[fIdx];
+            if (!cfd.isLinkFile || i >= cfd.links.size()) return;
+            ParsedLink& pl = cfd.links[i];
+            pl.run = (idx == 0);
+            bool mod = pl.modified();
+            QTableWidget* t = ui.tableWidget_params;
+            m_updatingTable = true;
+            QTableWidgetItem* si = t->item(i, 5);
+            if (si) {
+                if (mod) {
+                    si->setText(QStringLiteral("已修改"));
+                    si->setForeground(QColor("#c0392b"));
+                    QFont sf = si->font(); sf.setBold(true); si->setFont(sf);
+                } else {
+                    si->setText(QStringLiteral("-"));
+                    si->setForeground(QColor("#aaa"));
+                    QFont sf = si->font(); sf.setBold(false); si->setFont(sf);
+                }
+            }
+            QColor bg = mod ? QColor("#fff3cd") : ((i % 2 == 0) ? QColor(Qt::white) : QColor("#f5f5f5"));
+            for (int c = 0; c < 7; ++c) {
+                QTableWidgetItem* cell = t->item(i, c);
+                if (cell) cell->setBackground(bg);
+            }
+            runCombo->setStyleSheet(
+                QString("QComboBox { background-color: %1; }"
+                        "QComboBox QAbstractItemView { selection-background-color: #29B6F6; selection-color: #000000; outline: none; }"
+                        "QComboBox QAbstractItemView::item { color: #000000; padding: 2px 4px; }"
+                        "QComboBox QAbstractItemView::item:selected { color: #000000; background-color: #29B6F6; }")
+                .arg(bg.name()));
+            m_updatingTable = false;
+            applyTableFilter();
+            updateWindowTitle();
+            QTreeWidgetItemIterator it(ui.treeWidget_checkItems);
+            while (*it) {
+                if ((*it)->data(0, Qt::UserRole + 1).toString() == "link" &&
+                    (*it)->data(0, Qt::UserRole).toInt() == fIdx &&
+                    (*it)->data(1, Qt::UserRole).toInt() == i) {
+                    (*it)->setText(0, linkLeafText(pl));
+                    if (mod) {
+                        QFont pf = (*it)->font(0); pf.setBold(true); (*it)->setFont(0, pf);
+                        (*it)->setForeground(0, QColor("#c0392b"));
+                    } else {
+                        QFont pf = (*it)->font(0); pf.setBold(false); (*it)->setFont(0, pf);
+                        (*it)->setForeground(0, QColor(Qt::black));
+                    }
+                    break;
+                }
+                ++it;
+            }
+        });
+        table->setCellWidget(i, 4, runCombo);
+
+        // 状态（只读）
+        QTableWidgetItem* statusItem = new QTableWidgetItem();
+        statusItem->setFlags(statusItem->flags() & ~Qt::ItemIsEditable);
+        statusItem->setTextAlignment(Qt::AlignCenter);
+        if (modified) {
+            statusItem->setText(QStringLiteral("已修改"));
+            statusItem->setForeground(QColor("#c0392b"));
+            QFont sf = statusItem->font();
+            sf.setBold(true);
+            statusItem->setFont(sf);
+        } else {
+            statusItem->setText(QStringLiteral("-"));
+            statusItem->setForeground(QColor("#aaa"));
+        }
+        table->setItem(i, 5, statusItem);
+
+        // 收藏列（★/☆）
+        QTableWidgetItem* favItem = new QTableWidgetItem(
+            lk.favorited ? QStringLiteral("\xE2\x98\x85") : QStringLiteral("\xE2\x98\x86"));
+        favItem->setFlags(favItem->flags() & ~Qt::ItemIsEditable);
+        favItem->setTextAlignment(Qt::AlignCenter);
+        favItem->setData(Qt::UserRole, lk.favorited ? 1 : 0);
+        favItem->setToolTip(lk.favorited
+            ? QStringLiteral("点击取消收藏") : QStringLiteral("点击添加收藏"));
+        table->setItem(i, 6, favItem);
+
+        // 整行统一背景色（必须在所有 7 列 setItem 之后）
+        QColor rowBg;
+        if (i == searchHighlightRow || i == m_pendingHighlightRow)
+            rowBg = QColor("#29B6F6");
+        else if (modified)
+            rowBg = QColor("#fff3cd");
+        else
+            rowBg = (i % 2 == 0) ? QColor(Qt::white) : QColor("#f5f5f5");
+        for (int col = 0; col < 7; ++col) {
+            QTableWidgetItem* cell = table->item(i, col);
+            if (cell) cell->setBackground(rowBg);
+        }
+        table->resizeRowToContents(i);
+    }
+
+    m_updatingTable = false;
+    table->clearSpans();
+    table->scrollToTop();
+    applyTableFilter();
+    QTimer::singleShot(0, this, [this]() { applyTableFilter(); });
+
+    // 定位到点击的链接叶子行，随后立即清零，避免残留高亮泄漏
+    int scrollRow = (searchHighlightRow >= 0) ? searchHighlightRow : m_pendingHighlightRow;
+    if (scrollRow >= 0 && scrollRow < table->rowCount())
+        table->scrollToItem(table->item(scrollRow, 0), QAbstractItemView::EnsureVisible);
+    m_highlightedRow = (scrollRow >= 0 && scrollRow < table->rowCount()) ? scrollRow : -1;
+    m_pendingHighlightRow = -1;
+
+    int modCount = 0;
+    for (const auto& l : fd.links)
+        if (l.modified()) ++modCount;
+    updateStatus(QStringLiteral("批量处理链接 — 共 %1 条%2%3")
+        .arg(fd.links.size())
+        .arg(modCount > 0 ? QStringLiteral("，已修改 %1 条").arg(modCount) : QString())
+        .arg(fd.relativePath.isEmpty() ? QString()
+            : QStringLiteral("  [relativePath: %1]").arg(fd.relativePath)));
+}
+
+void ParamConfigDialog::populateRawView(int fileIdx, const QString& elemPath)
+{
+    m_updatingTable = true;
+    m_showingPaths = false;
+    m_showingLinks = false;
+    m_highlightedRow = -1;          // 原始视图（2列）没有高亮行概念
+    QTableWidget* table = ui.tableWidget_params;
+    setupRawTableColumns(table);
+    table->horizontalHeader()->setVisible(true);
+    table->verticalHeader()->setVisible(false);
+    table->clearContents();
+    table->setRowCount(0);
+
+    if (fileIdx < 0 || fileIdx >= m_files.size()) {
+        m_updatingTable = false;
+        clearTable();
+        return;
+    }
+    const ParsedFileData& fd = m_files[fileIdx];
+
+    QDomElement elem = elementAtPath(fd.xmlDoc.documentElement(), elemPath);
+    if (elem.isNull())
+        elem = fd.xmlDoc.documentElement();
+    if (elem.isNull()) {
+        m_updatingTable = false;
+        clearTable();
+        return;
+    }
+
+    int row = 0;
+    table->setRowCount(1);
+    auto addRow = [&](const QString& key, const QString& value) {
+        table->setRowCount(row + 1);
+        QTableWidgetItem* k = new QTableWidgetItem(key);
+        k->setFlags(k->flags() & ~Qt::ItemIsEditable);
+        k->setForeground(QColor("#2c3e50"));
+        QFont kf = k->font();
+        kf.setBold(true);
+        k->setFont(kf);
+        table->setItem(row, 0, k);
+        QTableWidgetItem* v = new QTableWidgetItem(value);
+        v->setFlags(v->flags() & ~Qt::ItemIsEditable);
+        table->setItem(row, 1, v);
+        ++row;
+    };
+
+    addRow(QStringLiteral("元素"), elem.tagName());
+    QDomNamedNodeMap attrs = elem.attributes();
+    for (int a = 0; a < attrs.count(); ++a) {
+        QDomAttr attr = attrs.item(a).toAttr();
+        if (!attr.isNull())
+            addRow(QStringLiteral("@%1").arg(attr.name()), attr.value());
+    }
+    QString directText;
+    for (QDomNode n = elem.firstChild(); !n.isNull(); n = n.nextSibling()) {
+        if (n.isText())
+            directText += n.nodeValue().trimmed();
+    }
+    if (!directText.isEmpty())
+        addRow(QStringLiteral("文本内容"), directText);
+
+    m_updatingTable = false;
+    table->clearSpans();
+    table->scrollToTop();
+    updateStatus(QStringLiteral("只读查看: %1（结构未识别，不可编辑）")
+                 .arg(QFileInfo(fd.filePath).fileName()));
+}
+
 void ParamConfigDialog::applyTableFilter()
 {
     QTableWidget* table = ui.tableWidget_params;
+    if (table->columnCount() != 7) return; // 只读原始视图（2列）不参与筛选
     bool searchActive = !ui.lineEdit_search->text().trimmed().isEmpty();
 
     qDebug() << "[applyTableFilter] m_showingFavoritesOnly=" << m_showingFavoritesOnly
@@ -1433,16 +2134,237 @@ void ParamConfigDialog::applyTableFilter()
 }
 
 
+// 【2026-09-11】右侧表格行 -> 左侧导航同步选中对应的叶子节点。
+// 同一张表格控件按视图显示四种内容，各自对应一类树叶子：
+//     m_showingLinks                      -> 🔗 链接叶子
+//     m_showingPaths + m_showingInputPaths -> 📄 输入路径叶子
+//     m_showingPaths + !m_showingInputPaths-> 📄 输出路径叶子
+//     其余                                 -> ⚙ 参数叶子
+// 四者的行号与该向量的下标一一对应（表格与树都按同一个向量顺序生成），
+// 所以直接按行号找节点即可，不需要额外的映射表。
+void ParamConfigDialog::syncTreeToTableRow(int row)
+{
+    if (row < 0) return;
+    if (m_currentFileIndex < 0 || m_currentFileIndex >= m_files.size()) return;
+
+    QTreeWidget* tree = ui.treeWidget_checkItems;
+
+    // 先按当前视图确定"这一行对应哪类叶子"，并取该视图的总行数
+    QString leafType;
+    int leafCount = 0;
+    if (m_showingLinks) {
+        const auto& fd = m_files[m_currentFileIndex];
+        if (!fd.isLinkFile) return;
+        leafType = QStringLiteral("link");
+        leafCount = fd.links.size();
+    } else {
+        if (m_currentMbIndex < 0 ||
+            m_currentMbIndex >= m_files[m_currentFileIndex].blocks.size()) return;
+        const auto& mb = m_files[m_currentFileIndex].blocks[m_currentMbIndex];
+        if (m_currentMissionIndex < 0 ||
+            m_currentMissionIndex >= mb.missions.size()) return;
+        const auto& ms = mb.missions[m_currentMissionIndex];
+        if (m_showingPaths) {
+            leafType = m_showingInputPaths ? QStringLiteral("inpath") : QStringLiteral("outpath");
+            leafCount = m_showingInputPaths ? ms.inputPaths.size() : ms.outputPaths.size();
+        } else {
+            leafType = QStringLiteral("param");
+            leafCount = ms.params.size();
+        }
+    }
+    if (row >= leafCount) return;
+
+    QTreeWidgetItemIterator it(tree);
+    while (*it) {
+        QTreeWidgetItem* item = *it;
+        if (item->data(0, Qt::UserRole + 1).toString() == leafType &&
+            item->data(0, Qt::UserRole).toInt() == m_currentFileIndex &&
+            item->data(3, Qt::UserRole).toInt() == row) {
+            // 链接叶子只带文件下标；其余三类叶子还要比对任务块/Mission。
+            // 注意链接叶子的 data(1) 存的是链接下标而非任务块下标，不能参与比对。
+            const bool bLeafMatch = (leafType == QStringLiteral("link"))
+                || (item->data(1, Qt::UserRole).toInt() == m_currentMbIndex &&
+                    item->data(2, Qt::UserRole).toInt() == m_currentMissionIndex);
+            if (bLeafMatch) {
+                QTreeWidgetItem* p = item->parent();
+                while (p) { p->setExpanded(true); p = p->parent(); }
+                // 必须加守卫：否则 setCurrentItem 会触发 onBlockSelectionChanged，
+                // 而该回调对叶子会把选中框弹回父节点 —— 等于选中不到叶子
+                m_selectingTreeItem = true;
+                tree->setCurrentItem(item);
+                m_selectingTreeItem = false;
+                tree->scrollToItem(item, QAbstractItemView::PositionAtCenter);
+                return;
+            }
+        }
+        ++it;
+    }
+
+    // 树上找不到对应叶子（"常用参数"视图下未收藏的条目不建节点，但搜索时
+    // 表格不按收藏过滤、仍会显示该行）-> 退化为选中上一级节点
+    if (leafType == QStringLiteral("link")) {
+        QTreeWidgetItemIterator lit(tree);
+        while (*lit) {
+            if ((*lit)->data(0, Qt::UserRole + 1).toString() == QStringLiteral("linklist") &&
+                (*lit)->data(0, Qt::UserRole).toInt() == m_currentFileIndex) {
+                QTreeWidgetItem* p = (*lit)->parent();
+                while (p) { p->setExpanded(true); p = p->parent(); }
+                m_selectingTreeItem = true;
+                tree->setCurrentItem(*lit);
+                m_selectingTreeItem = false;
+                tree->scrollToItem(*lit, QAbstractItemView::PositionAtCenter);
+                break;
+            }
+            ++lit;
+        }
+    } else {
+        selectTreeMission(m_currentFileIndex, m_currentMbIndex, m_currentMissionIndex);
+    }
+}
+
+// 【2026-09-11】按"是否高亮 + 是否已修改"重绘整行底色。
+// 蓝(#29B6F6)=当前高亮行，黄(#fff3cd)=已修改，白/浅灰=普通行。
+// 布尔参数的"参数值"是 QComboBox 单元格控件，它的底色由样式表控制，
+// 不跟着 item 的 background 走，必须单独设一次，否则那一格颜色会跟同行的其他格不一致。
+void ParamConfigDialog::repaintRowBackground(int row, bool highlighted)
+{
+    QTableWidget* table = ui.tableWidget_params;
+    if (table->columnCount() != 7) return;      // 只读原始视图（2列）不参与
+    if (row < 0 || row >= table->rowCount()) return;
+
+    QTableWidgetItem* statusItem = table->item(row, 5);
+    const bool modified = statusItem && statusItem->text() == QStringLiteral("已修改");
+    const QColor bg = highlighted ? QColor("#29B6F6")
+        : modified ? QColor("#fff3cd")
+        : ((row % 2 == 0) ? QColor(Qt::white) : QColor("#f5f5f5"));
+
+    const bool bOldUpdating = m_updatingTable;
+    m_updatingTable = true;
+    for (int c = 0; c < 7; ++c) {
+        QTableWidgetItem* cell = table->item(row, c);
+        if (cell) cell->setBackground(bg);
+        // 该格是下拉框（参数表的布尔值是第 3 列、链接表的 run 是第 4 列）时，
+        // 它的底色由样式表控制，不跟着 item 的 background 走，需一并改
+        if (QComboBox* combo = qobject_cast<QComboBox*>(table->cellWidget(row, c))) {
+            combo->setStyleSheet(
+                QString("QComboBox { background-color: %1; font-family: inherit; }"
+                        "QComboBox QAbstractItemView { "
+                        "  selection-background-color: #29B6F6;"
+                        "  selection-color: #000000;"
+                        "  outline: none;"
+                        "}"
+                        "QComboBox QAbstractItemView::item {"
+                        "  color: #000000;"
+                        "  padding: 2px 4px;"
+                        "}"
+                        "QComboBox QAbstractItemView::item:selected {"
+                        "  color: #000000;"
+                        "  background-color: #29B6F6;"
+                        "}")
+                .arg(bg.name()));
+        }
+    }
+    m_updatingTable = bOldUpdating;
+}
+
 void ParamConfigDialog::onTableCellClicked(int row, int col)
 {
-    if (col != 6) return;
+    if (col != 6) {
+        // 【2026-09-11】点右侧表格任一行（收藏列以外的任意列）时：
+        //  ① 左侧导航同步选中对应的叶子节点（参数/输入路径/输出路径/链接都走这里）；
+        //  ② 把上一行残留的蓝色高亮关掉，只让当前这一行是蓝色的。
+        //     左侧点叶子时右侧那行的蓝色是 populateTable 刷的一次性底色，不会自己消失，
+        //     不主动清掉的话表格里会同时出现两行"被选中"。
+        syncTreeToTableRow(row);
+        // 只有表格确实在显示可点选内容时才动高亮色：
+        // 清空态（"请点击左侧 Mission 节点"提示行）与只读原始视图下 currentFile/Mb 为 -1，不动
+        const bool bHasRows = (m_currentFileIndex >= 0)
+            && (m_showingLinks || m_currentMbIndex >= 0);
+        if (bHasRows && row != m_highlightedRow) {
+            const int nPrevRow = m_highlightedRow;
+            m_highlightedRow = row;
+            if (nPrevRow >= 0) repaintRowBackground(nPrevRow, false);
+            repaintRowBackground(row, true);
+        }
+        return;
+    }
+
+    QTableWidget* table = ui.tableWidget_params;
+
+    // 收藏切换后同步行级"已修改"状态与底色（与 onTableCellChanged 同款样式）
+    auto updateFavRowStatus = [&](int r, bool mod) {
+        m_updatingTable = true;
+        QTableWidgetItem* si = table->item(r, 5);
+        if (si) {
+            if (mod) {
+                si->setText(QStringLiteral("已修改"));
+                si->setForeground(QColor("#c0392b"));
+                QFont sf = si->font(); sf.setBold(true); si->setFont(sf);
+            } else {
+                si->setText(QStringLiteral("-"));
+                si->setForeground(QColor("#aaa"));
+                QFont sf = si->font(); sf.setBold(false); si->setFont(sf);
+            }
+        }
+        m_updatingTable = false;
+        // 底色统一交给 repaintRowBackground：它认识"当前高亮行"，
+        // 不会把蓝色误刷成黄/白（收藏切换的行若正好是高亮行要保住蓝色）
+        repaintRowBackground(r, r == m_highlightedRow);
+    };
+
+    if (m_showingLinks) {
+        if (m_currentFileIndex < 0 || m_currentFileIndex >= m_files.size()) return;
+        ParsedFileData& fd = m_files[m_currentFileIndex];
+        if (!fd.isLinkFile || row < 0 || row >= fd.links.size()) return;
+        ParsedLink& lk = fd.links[row];
+        lk.favorited = !lk.favorited;
+        lk.domElement.setAttribute(QStringLiteral("favorite"),
+            lk.favorited ? QStringLiteral("true") : QStringLiteral("false"));
+
+        m_updatingTable = true;
+        QTableWidgetItem* fi = table->item(row, 6);
+        if (fi) {
+            fi->setText(lk.favorited
+                ? QStringLiteral("\xE2\x98\x85") : QStringLiteral("\xE2\x98\x86"));
+            fi->setData(Qt::UserRole, lk.favorited ? 1 : 0);
+            fi->setToolTip(lk.favorited
+                ? QStringLiteral("点击取消收藏") : QStringLiteral("点击添加收藏"));
+        }
+        m_updatingTable = false;
+        updateFavRowStatus(row, lk.modified());
+
+        // 同步左侧树节点文本与加粗红色样式
+        QTreeWidgetItemIterator lit(ui.treeWidget_checkItems);
+        while (*lit) {
+            if ((*lit)->data(0, Qt::UserRole + 1).toString() == QStringLiteral("link")
+                && (*lit)->data(0, Qt::UserRole).toInt() == m_currentFileIndex
+                && (*lit)->data(1, Qt::UserRole).toInt() == row) {
+                (*lit)->setText(0, linkLeafText(lk));
+                QFont lf = (*lit)->font(0);
+                lf.setFamily(QStringLiteral("Segoe UI Emoji"));
+                lf.setBold(lk.modified());
+                (*lit)->setFont(0, lf);
+                (*lit)->setForeground(0, lk.modified()
+                    ? QColor("#c0392b") : QColor(Qt::black));
+                break;
+            }
+            ++lit;
+        }
+
+        updateWindowTitle();
+        applyTableFilter();
+        // 常用参数视图下收藏切换后重建树，保证左右两侧过滤口径一致
+        if (m_showingFavoritesOnly)
+            refreshParamTree();
+        return;
+    }
+
     if (m_currentFileIndex < 0 || m_currentMbIndex < 0 || m_currentMissionIndex < 0) return;
     if (m_currentFileIndex >= m_files.size()) return;
     if (m_currentMbIndex >= m_files[m_currentFileIndex].blocks.size()) return;
     if (m_currentMissionIndex >= m_files[m_currentFileIndex].blocks[m_currentMbIndex].missions.size()) return;
 
     ParsedMission& mission = m_files[m_currentFileIndex].blocks[m_currentMbIndex].missions[m_currentMissionIndex];
-    QTableWidget* table = ui.tableWidget_params;
 
     if (m_showingPaths) {
         QVector<ParsedParameter>& pathVec = m_showingInputPaths
@@ -1463,6 +2385,29 @@ void ParamConfigDialog::onTableCellClicked(int row, int col)
                 ? QStringLiteral("点击取消收藏") : QStringLiteral("点击添加收藏"));
         }
         m_updatingTable = false;
+        updateFavRowStatus(row, pp.modified());
+
+        // 同步左侧树叶子加粗红色样式
+        QString treeType = m_showingInputPaths ? QStringLiteral("inpath") : QStringLiteral("outpath");
+        QTreeWidgetItemIterator pit(ui.treeWidget_checkItems);
+        while (*pit) {
+            if ((*pit)->data(0, Qt::UserRole + 1).toString() == treeType &&
+                (*pit)->data(0, Qt::UserRole).toInt() == m_currentFileIndex &&
+                (*pit)->data(1, Qt::UserRole).toInt() == m_currentMbIndex &&
+                (*pit)->data(2, Qt::UserRole).toInt() == m_currentMissionIndex &&
+                (*pit)->data(3, Qt::UserRole).toInt() == row) {
+                (*pit)->setText(0, pathLeafText(pp));
+                if (pp.modified()) {
+                    QFont pf = (*pit)->font(0); pf.setBold(true); (*pit)->setFont(0, pf);
+                    (*pit)->setForeground(0, QColor("#c0392b"));
+                } else {
+                    QFont pf = (*pit)->font(0); pf.setBold(false); (*pit)->setFont(0, pf);
+                    (*pit)->setForeground(0, QColor(Qt::black));
+                }
+                break;
+            }
+            ++pit;
+        }
     } else {
         if (row < 0 || row >= mission.params.size()) return;
         ParsedParameter& param = mission.params[row];
@@ -1480,29 +2425,35 @@ void ParamConfigDialog::onTableCellClicked(int row, int col)
                 ? QStringLiteral("点击取消收藏") : QStringLiteral("点击添加收藏"));
         }
         m_updatingTable = false;
+        updateFavRowStatus(row, param.modified());
+
+        // 同步左侧树叶子加粗红色样式
+        QTreeWidgetItemIterator pit(ui.treeWidget_checkItems);
+        while (*pit) {
+            if ((*pit)->data(0, Qt::UserRole + 1).toString() == QStringLiteral("param") &&
+                (*pit)->data(0, Qt::UserRole).toInt() == m_currentFileIndex &&
+                (*pit)->data(1, Qt::UserRole).toInt() == m_currentMbIndex &&
+                (*pit)->data(2, Qt::UserRole).toInt() == m_currentMissionIndex &&
+                (*pit)->data(3, Qt::UserRole).toInt() == row) {
+                (*pit)->setText(0, paramLeafText(param));
+                if (param.modified()) {
+                    QFont pf = (*pit)->font(0); pf.setBold(true); (*pit)->setFont(0, pf);
+                    (*pit)->setForeground(0, QColor("#c0392b"));
+                } else {
+                    QFont pf = (*pit)->font(0); pf.setBold(false); (*pit)->setFont(0, pf);
+                    (*pit)->setForeground(0, QColor(Qt::black));
+                }
+                break;
+            }
+            ++pit;
+        }
     }
 
     updateWindowTitle();
-
-    if (m_showingFavoritesOnly) {
-        bool anyFav = false;
-        for (const auto& p : mission.params)
-            if (p.favorited) { anyFav = true; break; }
-        if (!anyFav) {
-            for (const auto& p : mission.inputPaths)
-                if (p.favorited) { anyFav = true; break; }
-        }
-        if (!anyFav) {
-            for (const auto& p : mission.outputPaths)
-                if (p.favorited) { anyFav = true; break; }
-        }
-        if (!anyFav) {
-            refreshParamTree();
-            return;
-        }
-    }
-
     applyTableFilter();
+    // 常用参数视图下收藏切换后重建树，保证左右两侧过滤口径一致
+    if (m_showingFavoritesOnly)
+        refreshParamTree();
 }
 
 void ParamConfigDialog::onViewModeChanged(int index)
@@ -1515,12 +2466,7 @@ void ParamConfigDialog::onViewModeChanged(int index)
 void ParamConfigDialog::onTableCellChanged(int row, int col)
 {
     if (m_updatingTable) return;
-    if (m_currentFileIndex < 0 || m_currentMbIndex < 0 || m_currentMissionIndex < 0) return;
-    if (m_currentFileIndex >= m_files.size()) return;
-    if (m_currentMbIndex >= m_files[m_currentFileIndex].blocks.size()) return;
-    if (m_currentMissionIndex >= m_files[m_currentFileIndex].blocks[m_currentMbIndex].missions.size()) return;
 
-    ParsedMission& mission = m_files[m_currentFileIndex].blocks[m_currentMbIndex].missions[m_currentMissionIndex];
     QTableWidget* table = ui.tableWidget_params;
 
     auto updateRowStatus = [&](int r, bool mod) {
@@ -1551,6 +2497,42 @@ void ParamConfigDialog::onTableCellChanged(int row, int col)
         updateWindowTitle();
     };
 
+    if (m_showingLinks) {
+        if (m_currentFileIndex < 0 || m_currentFileIndex >= m_files.size()) return;
+        ParsedFileData& fd = m_files[m_currentFileIndex];
+        if (!fd.isLinkFile || row < 0 || row >= fd.links.size()) return;
+        if (col == 3 && table->item(row, col)) {
+            fd.links[row].path = table->item(row, col)->text().trimmed();
+            bool modified = fd.links[row].modified();
+            updateRowStatus(row, modified);
+            QTreeWidgetItemIterator it(ui.treeWidget_checkItems);
+            while (*it) {
+                if ((*it)->data(0, Qt::UserRole + 1).toString() == "link" &&
+                    (*it)->data(0, Qt::UserRole).toInt() == m_currentFileIndex &&
+                    (*it)->data(1, Qt::UserRole).toInt() == row) {
+                    (*it)->setText(0, linkLeafText(fd.links[row]));
+                    if (modified) {
+                        QFont pf = (*it)->font(0); pf.setBold(true); (*it)->setFont(0, pf);
+                        (*it)->setForeground(0, QColor("#c0392b"));
+                    } else {
+                        QFont pf = (*it)->font(0); pf.setBold(false); (*it)->setFont(0, pf);
+                        (*it)->setForeground(0, QColor(Qt::black));
+                    }
+                    break;
+                }
+                ++it;
+            }
+        }
+        return;
+    }
+
+    if (m_currentFileIndex < 0 || m_currentMbIndex < 0 || m_currentMissionIndex < 0) return;
+    if (m_currentFileIndex >= m_files.size()) return;
+    if (m_currentMbIndex >= m_files[m_currentFileIndex].blocks.size()) return;
+    if (m_currentMissionIndex >= m_files[m_currentFileIndex].blocks[m_currentMbIndex].missions.size()) return;
+
+    ParsedMission& mission = m_files[m_currentFileIndex].blocks[m_currentMbIndex].missions[m_currentMissionIndex];
+
     if (m_showingPaths) {
         QVector<ParsedParameter>& pathVec = m_showingInputPaths
             ? mission.inputPaths : mission.outputPaths;
@@ -1562,7 +2544,7 @@ void ParamConfigDialog::onTableCellChanged(int row, int col)
 
         if (col == 3 && table->item(row, col)) {
             pp.value = table->item(row, col)->text().trimmed();
-            bool modified = (pp.value != pp.originalValue) || (pp.description != pp.originalDescription);
+            bool modified = pp.modified();
             updateRowStatus(row, modified);
             QString treeType = m_showingInputPaths ? "inpath" : "outpath";
             QTreeWidgetItemIterator it(ui.treeWidget_checkItems);
@@ -1572,7 +2554,7 @@ void ParamConfigDialog::onTableCellChanged(int row, int col)
                     (*it)->data(1, Qt::UserRole).toInt() == m_currentMbIndex &&
                     (*it)->data(2, Qt::UserRole).toInt() == m_currentMissionIndex &&
                     (*it)->data(3, Qt::UserRole).toInt() == row) {
-                    (*it)->setText(0, QStringLiteral("  \xF0\x9F\x93\x84 %1").arg(pp.value));
+                    (*it)->setText(0, pathLeafText(pp));
                     if (modified) {
                         QFont pf = (*it)->font(0); pf.setBold(true); (*it)->setFont(0, pf);
                         (*it)->setForeground(0, QColor("#c0392b"));
@@ -1586,8 +2568,11 @@ void ParamConfigDialog::onTableCellChanged(int row, int col)
             }
         }
         if (col == 4 && table->item(row, col)) {
-            pp.description = table->item(row, col)->text().trimmed();
-            bool modified = (pp.value != pp.originalValue) || (pp.description != pp.originalDescription);
+            if (pp.tip.isEmpty())
+                pp.description = table->item(row, col)->text().trimmed();
+            else
+                pp.tip = table->item(row, col)->text().trimmed();
+            bool modified = pp.modified();
             updateRowStatus(row, modified);
             // 同步树节点格式（路径叶子文本不变，仅更新红字/加粗状态）
             QString treeType = m_showingInputPaths ? "inpath" : "outpath";
@@ -1629,7 +2614,7 @@ void ParamConfigDialog::onTableCellChanged(int row, int col)
                 param.description = newShort + param.description.mid(spaceIdx);
             else
                 param.description = newShort;
-            bool modified = (param.value != param.originalValue) || (param.description != param.originalDescription);
+            bool modified = param.modified();
             updateRowStatus(row, modified);
             QTreeWidgetItemIterator it(ui.treeWidget_checkItems);
             while (*it) {
@@ -1638,10 +2623,7 @@ void ParamConfigDialog::onTableCellChanged(int row, int col)
                     (*it)->data(1, Qt::UserRole).toInt() == m_currentMbIndex &&
                     (*it)->data(2, Qt::UserRole).toInt() == m_currentMissionIndex &&
                     (*it)->data(3, Qt::UserRole).toInt() == row) {
-                    int sp = findNameSep(param.description);
-                    QString dn = param.description.isEmpty() ? param.name
-                        : param.description.left(sp > 0 ? sp : param.description.length());
-                    (*it)->setText(0, QStringLiteral("  \xE2\x9A\x99 ") + dn + ": " + param.value);
+                    (*it)->setText(0, paramLeafText(param));
                     if (modified) {
                         QFont pf = (*it)->font(0); pf.setBold(true); (*it)->setFont(0, pf);
                         (*it)->setForeground(0, QColor("#c0392b"));
@@ -1658,7 +2640,7 @@ void ParamConfigDialog::onTableCellChanged(int row, int col)
     case 3: { // 参数值
         if (table->item(row, col))
             param.value = table->item(row, col)->text().trimmed();
-        bool modified = (param.value != param.originalValue) || (param.description != param.originalDescription);
+        bool modified = param.modified();
         updateRowStatus(row, modified);
         QTreeWidgetItemIterator it(ui.treeWidget_checkItems);
         while (*it) {
@@ -1667,10 +2649,7 @@ void ParamConfigDialog::onTableCellChanged(int row, int col)
                 (*it)->data(1, Qt::UserRole).toInt() == m_currentMbIndex &&
                 (*it)->data(2, Qt::UserRole).toInt() == m_currentMissionIndex &&
                 (*it)->data(3, Qt::UserRole).toInt() == row) {
-                int sp = findNameSep(param.description);
-                QString dn = param.description.isEmpty() ? param.name
-                    : param.description.left(sp > 0 ? sp : param.description.length());
-                (*it)->setText(0, QStringLiteral("  \xE2\x9A\x99 ") + dn + ": " + param.value);
+                (*it)->setText(0, paramLeafText(param));
                 if (modified) {
                     QFont pf = (*it)->font(0); pf.setBold(true); (*it)->setFont(0, pf);
                     (*it)->setForeground(0, QColor("#c0392b"));
@@ -1687,13 +2666,17 @@ void ParamConfigDialog::onTableCellChanged(int row, int col)
     case 4: // 参数说明
         if (table->item(row, col)) {
             QString newDetail = table->item(row, col)->text().trimmed();
-            int spaceIdx = findNameSep(param.description);
-            QString shortPart = spaceIdx > 0
-                ? param.description.left(spaceIdx)
-                : param.description;
-            param.description = newDetail.isEmpty() ? shortPart
-                : shortPart + " " + newDetail;
-            bool modified = (param.value != param.originalValue) || (param.description != param.originalDescription);
+            if (param.tip.isEmpty()) {
+                int spaceIdx = findNameSep(param.description);
+                QString shortPart = spaceIdx > 0
+                    ? param.description.left(spaceIdx)
+                    : param.description;
+                param.description = newDetail.isEmpty() ? shortPart
+                    : shortPart + " " + newDetail;
+            } else {
+                param.tip = newDetail;
+            }
+            bool modified = param.modified();
             updateRowStatus(row, modified);
             QTreeWidgetItemIterator it(ui.treeWidget_checkItems);
             while (*it) {
@@ -1702,10 +2685,7 @@ void ParamConfigDialog::onTableCellChanged(int row, int col)
                     (*it)->data(1, Qt::UserRole).toInt() == m_currentMbIndex &&
                     (*it)->data(2, Qt::UserRole).toInt() == m_currentMissionIndex &&
                     (*it)->data(3, Qt::UserRole).toInt() == row) {
-                    int sp = findNameSep(param.description);
-                    QString dn = param.description.isEmpty() ? param.name
-                        : param.description.left(sp > 0 ? sp : param.description.length());
-                    (*it)->setText(0, QStringLiteral("  \xE2\x9A\x99 ") + dn + ": " + param.value);
+                    (*it)->setText(0, paramLeafText(param));
                     if (modified) {
                         QFont pf = (*it)->font(0); pf.setBold(true); (*it)->setFont(0, pf);
                         (*it)->setForeground(0, QColor("#c0392b"));
@@ -1728,11 +2708,16 @@ void ParamConfigDialog::onTableCellChanged(int row, int col)
 
 void ParamConfigDialog::onSearchTextChanged(const QString& text)
 {
-    QString kw = text.trimmed();
+    Q_UNUSED(text);
+    // 防抖：每次输入仅清空旧结果并重启 150ms 定时器，超时后才全量搜索
     m_searchResults.clear();
     m_currentSearchIndex = -1;
     if (m_searchInfoBar) m_searchInfoBar->setVisible(false);
+    if (m_searchTimer) m_searchTimer->start();
+}
 
+void ParamConfigDialog::doSearch(const QString& kw)
+{
     if (kw.isEmpty()) {
         for (int fIdx = 0; fIdx < m_files.size(); ++fIdx) {
             for (int mbIdx = 0; mbIdx < m_files[fIdx].blocks.size(); ++mbIdx) {
@@ -1754,24 +2739,41 @@ void ParamConfigDialog::onSearchTextChanged(const QString& text)
                 }
             }
         }
+        // 没有 Mission 时回退到第一个链接文件
+        for (int fIdx = 0; fIdx < m_files.size(); ++fIdx) {
+            if (m_files[fIdx].isLinkFile && !m_files[fIdx].links.isEmpty()) {
+                m_currentFileIndex = fIdx;
+                m_currentMbIndex = -1;
+                m_currentMissionIndex = -1;
+                populateLinkTable(m_files[fIdx]);
+                updateStatus(QStringLiteral("就绪"));
+                return;
+            }
+        }
+        // 再回退到第一个结构未识别文件（只读查看）
+        for (int fIdx = 0; fIdx < m_files.size(); ++fIdx) {
+            if (m_files[fIdx].isUnknown) {
+                m_currentFileIndex = fIdx;
+                m_currentMbIndex = -1;
+                m_currentMissionIndex = -1;
+                populateRawView(fIdx, QString());
+                updateStatus(QStringLiteral("就绪"));
+                return;
+            }
+        }
         clearTable();
         updateStatus(QStringLiteral("就绪"));
         return;
     }
 
-    // 收集全部结果
+    // 收集全部结果（全局搜索：不受"常用参数"过滤限制，
+    // 与 applyTableFilter 搜索激活时全量显示的口径一致）
     // 1) 搜任务 ID
     for (int fIdx = 0; fIdx < m_files.size(); ++fIdx) {
         for (int mbIdx = 0; mbIdx < m_files[fIdx].blocks.size(); ++mbIdx) {
             for (int mIdx = 0; mIdx < m_files[fIdx].blocks[mbIdx].missions.size(); ++mIdx) {
                 const auto& mission = m_files[fIdx].blocks[mbIdx].missions[mIdx];
                 if (!mission.id.isEmpty() && mission.id.contains(kw, Qt::CaseInsensitive)) {
-                    if (m_showingFavoritesOnly) {
-                        bool hasFav = false;
-                        for (const auto& p : mission.params)
-                            if (p.favorited) { hasFav = true; break; }
-                        if (!hasFav) continue;
-                    }
                     m_searchResults.append({fIdx, mbIdx, mIdx, -1, 1});
                 }
             }
@@ -1788,8 +2790,6 @@ void ParamConfigDialog::onSearchTextChanged(const QString& text)
                     int spIdx = findNameSep(param.description);
                     QString paramName = param.description.isEmpty() ? QString()
                         : (spIdx > 0 ? param.description.left(spIdx) : param.description);
-                    if (m_showingFavoritesOnly && !param.favorited)
-                        continue;
                     if (param.name.contains(kw, Qt::CaseInsensitive) ||
                         paramName.contains(kw, Qt::CaseInsensitive)) {
                         m_searchResults.append({fIdx, mbIdx, mIdx, pIdx, 2});
@@ -1799,7 +2799,17 @@ void ParamConfigDialog::onSearchTextChanged(const QString& text)
         }
     }
 
-    // 3) 搜树节点文本
+    // 3) 搜链接文件路径
+    for (int fIdx = 0; fIdx < m_files.size(); ++fIdx) {
+        const auto& fd = m_files[fIdx];
+        if (!fd.isLinkFile) continue;
+        for (int lIdx = 0; lIdx < fd.links.size(); ++lIdx) {
+            if (fd.links[lIdx].path.contains(kw, Qt::CaseInsensitive))
+                m_searchResults.append({fIdx, -1, -1, lIdx, 4});
+        }
+    }
+
+    // 4) 搜树节点文本
     QTreeWidgetItemIterator it(ui.treeWidget_checkItems);
     while (*it) {
         QString type = (*it)->data(0, Qt::UserRole + 1).toString();
@@ -1812,12 +2822,6 @@ void ParamConfigDialog::onSearchTextChanged(const QString& text)
                 if (fIdx >= 0 && fIdx < m_files.size() &&
                     mbIdx >= 0 && mbIdx < m_files[fIdx].blocks.size() &&
                     mIdx >= 0 && mIdx < m_files[fIdx].blocks[mbIdx].missions.size()) {
-                    if (m_showingFavoritesOnly) {
-                        bool hasFav = false;
-                        for (const auto& p : m_files[fIdx].blocks[mbIdx].missions[mIdx].params)
-                            if (p.favorited) { hasFav = true; break; }
-                        if (!hasFav) { ++it; continue; }
-                    }
                     m_searchResults.append({fIdx, mbIdx, mIdx, -1, 3});
                 }
             } else if (type == "param") {
@@ -1828,8 +2832,6 @@ void ParamConfigDialog::onSearchTextChanged(const QString& text)
                     mbIdx >= 0 && mbIdx < m_files[fIdx].blocks.size() &&
                     mIdx >= 0 && mIdx < m_files[fIdx].blocks[mbIdx].missions.size() &&
                     pIdx >= 0 && pIdx < m_files[fIdx].blocks[mbIdx].missions[mIdx].params.size()) {
-                    if (m_showingFavoritesOnly && !m_files[fIdx].blocks[mbIdx].missions[mIdx].params[pIdx].favorited)
-                        { ++it; continue; }
                     m_searchResults.append({fIdx, mbIdx, mIdx, pIdx, 3});
                 }
             } else {
@@ -1889,7 +2891,26 @@ void ParamConfigDialog::navigateSearchResult(int direction)
     QString kw = ui.lineEdit_search->text().trimmed();
 
     if (r.fileIdx >= 0 && r.fileIdx < m_files.size()) {
-        if (r.mbIdx >= 0 && r.mIdx >= 0 &&
+        if (m_files[r.fileIdx].isLinkFile && r.mbIdx < 0 && r.mIdx < 0 && r.pIdx >= 0) {
+            m_currentFileIndex = r.fileIdx;
+            m_currentMbIndex = -1;
+            m_currentMissionIndex = -1;
+            populateLinkTable(m_files[r.fileIdx], r.pIdx);
+            QTreeWidgetItemIterator lit(ui.treeWidget_checkItems);
+            while (*lit) {
+                if ((*lit)->data(0, Qt::UserRole + 1).toString() == "linklist" &&
+                    (*lit)->data(0, Qt::UserRole).toInt() == r.fileIdx) {
+                    QTreeWidgetItem* p = (*lit)->parent();
+                    while (p) { p->setExpanded(true); p = p->parent(); }
+                    m_selectingTreeItem = true;
+                    ui.treeWidget_checkItems->setCurrentItem(*lit);
+                    m_selectingTreeItem = false;
+                    ui.treeWidget_checkItems->scrollToItem(*lit, QAbstractItemView::PositionAtCenter);
+                    break;
+                }
+                ++lit;
+            }
+        } else if (r.mbIdx >= 0 && r.mIdx >= 0 &&
             r.mbIdx < m_files[r.fileIdx].blocks.size() &&
             r.mIdx < m_files[r.fileIdx].blocks[r.mbIdx].missions.size()) {
             m_currentFileIndex = r.fileIdx;
@@ -1955,13 +2976,24 @@ void ParamConfigDialog::selectTreeMission(int fileIdx, int mbIdx, int mIdx)
 
 void ParamConfigDialog::collectCurrentMissionValues()
 {
+    QTableWidget* table = ui.tableWidget_params;
+
+    if (m_showingLinks) {
+        if (m_currentFileIndex < 0 || m_currentFileIndex >= m_files.size()) return;
+        ParsedFileData& fd = m_files[m_currentFileIndex];
+        if (!fd.isLinkFile) return;
+        for (int row = 0; row < fd.links.size() && row < table->rowCount(); ++row)
+            if (QTableWidgetItem* item = table->item(row, 3))
+                fd.links[row].path = item->text().trimmed();
+        return;
+    }
+
     if (m_currentFileIndex < 0 || m_currentMbIndex < 0 || m_currentMissionIndex < 0) return;
     if (m_currentFileIndex >= m_files.size()) return;
     if (m_currentMbIndex >= m_files[m_currentFileIndex].blocks.size()) return;
     if (m_currentMissionIndex >= m_files[m_currentFileIndex].blocks[m_currentMbIndex].missions.size()) return;
 
     ParsedMission& mission = m_files[m_currentFileIndex].blocks[m_currentMbIndex].missions[m_currentMissionIndex];
-    QTableWidget* table = ui.tableWidget_params;
 
     if (m_showingPaths) {
         QVector<ParsedParameter>& pathVec = m_showingInputPaths
@@ -1973,8 +3005,12 @@ void ParamConfigDialog::collectCurrentMissionValues()
                 pp.name = item->text().remove(QChar(0x200B)).trimmed();
             if (QTableWidgetItem* item = table->item(row, 3))
                 pp.value = item->text().trimmed();
-            if (QTableWidgetItem* item = table->item(row, 4))
-                pp.description = item->text().trimmed();
+            if (QTableWidgetItem* item = table->item(row, 4)) {
+                if (pp.tip.isEmpty())
+                    pp.description = item->text().trimmed();
+                else
+                    pp.tip = item->text().trimmed();
+            }
         }
     } else {
         for (int row = 0; row < mission.params.size() && row < table->rowCount(); ++row) {
@@ -2013,8 +3049,16 @@ void ParamConfigDialog::onSaveToFile()
 
     collectCurrentMissionValues();
 
+    int savedCount = 0;
+    int unknownCount = 0;
+
     for (int fIdx = 0; fIdx < m_files.size(); ++fIdx) {
         auto& fd = m_files[fIdx];
+
+        if (fd.isUnknown) {
+            ++unknownCount;
+            continue;
+        }
 
         auto saveParam = [&fd](ParsedParameter& param) {
             if (param.domElement.isNull()) return;
@@ -2030,7 +3074,12 @@ void ParamConfigDialog::onSaveToFile()
                             newElem.setAttribute(attr.name(), attr.value());
                     }
                     newElem.setAttribute("note", param.description);
-                    newElem.setAttribute("favorite", param.favorited ? "true" : "false");
+                    if (param.favorited || param.originalFavorited)
+                        newElem.setAttribute("favorite", param.favorited ? "true" : "false");
+                    if (param.tip.isEmpty())
+                        newElem.removeAttribute("tip");
+                    else
+                        newElem.setAttribute("tip", param.tip);
                     QDomText textNode = doc.createTextNode(param.value);
                     newElem.appendChild(textNode);
                     parent.replaceChild(newElem, param.domElement);
@@ -2039,7 +3088,14 @@ void ParamConfigDialog::onSaveToFile()
                 }
             }
             param.domElement.setAttribute("note", param.description);
-            param.domElement.setAttribute("favorite", param.favorited ? "true" : "false");
+            if (param.favorited || param.originalFavorited)
+                param.domElement.setAttribute("favorite", param.favorited ? "true" : "false");
+            else
+                param.domElement.removeAttribute("favorite");
+            if (param.tip.isEmpty())
+                param.domElement.removeAttribute("tip");
+            else
+                param.domElement.setAttribute("tip", param.tip);
             while (param.domElement.hasChildNodes())
                 param.domElement.removeChild(param.domElement.firstChild());
             param.domElement.appendChild(fd.xmlDoc.createTextNode(param.value));
@@ -2055,6 +3111,16 @@ void ParamConfigDialog::onSaveToFile()
                     saveParam(pp);
             }
         }
+        if (fd.isLinkFile) {
+            for (auto& lk : fd.links) {
+                if (lk.domElement.isNull()) continue;
+                lk.domElement.setAttribute("run", lk.run ? "true" : "false");
+                lk.domElement.setAttribute("favorite", lk.favorited ? "true" : "false");
+                while (lk.domElement.hasChildNodes())
+                    lk.domElement.removeChild(lk.domElement.firstChild());
+                lk.domElement.appendChild(fd.xmlDoc.createTextNode(lk.path));
+            }
+        }
 
         QFile file(fd.filePath);
         if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -2068,35 +3134,50 @@ void ParamConfigDialog::onSaveToFile()
         stream.setCodec("UTF-8");
         fd.xmlDoc.save(stream, 4);
         file.close();
+        ++savedCount;
 
         for (auto& mb : fd.blocks)
             for (auto& mission : mb.missions) {
                 for (auto& param : mission.params) {
+                    param.originalName = param.name;
                     param.originalValue = param.value;
                     param.originalDescription = param.description;
+                    param.originalTip = param.tip;
                     param.originalFavorited = param.favorited;
                 }
                 for (auto& pp : mission.inputPaths) {
+                    pp.originalName = pp.name;
                     pp.originalValue = pp.value;
                     pp.originalDescription = pp.description;
+                    pp.originalTip = pp.tip;
                     pp.originalFavorited = pp.favorited;
                 }
                 for (auto& pp : mission.outputPaths) {
+                    pp.originalName = pp.name;
                     pp.originalValue = pp.value;
                     pp.originalDescription = pp.description;
+                    pp.originalTip = pp.tip;
                     pp.originalFavorited = pp.favorited;
                 }
             }
+        if (fd.isLinkFile) {
+            for (auto& lk : fd.links) {
+                lk.originalPath = lk.path;
+                lk.originalRun = lk.run;
+                lk.originalFavorited = lk.favorited;
+            }
+        }
     }
 
     m_pendingHighlightRow = -1;
     refreshParamTree();
 
-    updateStatus(QStringLiteral("已保存 %1 个文件").arg(m_files.size()));
+    QString msg = QStringLiteral("已保存 %1 个文件").arg(savedCount);
+    if (unknownCount > 0)
+        msg += QStringLiteral("（跳过 %1 个结构未识别的只读文件）").arg(unknownCount);
+    updateStatus(msg);
     updateWindowTitle();
-    QMessageBox::information(this,
-        QStringLiteral("保存成功"),
-        QStringLiteral("已保存 %1 个文件").arg(m_files.size()));
+    QMessageBox::information(this, QStringLiteral("保存成功"), msg);
 }
 
 void ParamConfigDialog::onSaveAsFile()
@@ -2118,6 +3199,13 @@ void ParamConfigDialog::onSaveAsFile()
 
     auto& fd = m_files[m_currentFileIndex];
 
+    if (fd.isUnknown) {
+        QMessageBox::information(this,
+            QStringLiteral("另存为"),
+            QStringLiteral("该文件结构未识别，为只读查看，没有可编辑内容"));
+        return;
+    }
+
     auto saveParamSA = [&fd](ParsedParameter& param) {
         if (param.domElement.isNull()) return;
         if (param.domElement.tagName() != param.name) {
@@ -2132,7 +3220,12 @@ void ParamConfigDialog::onSaveAsFile()
                         newElem.setAttribute(attr.name(), attr.value());
                 }
                 newElem.setAttribute("note", param.description);
-                newElem.setAttribute("favorite", param.favorited ? "true" : "false");
+                if (param.favorited || param.originalFavorited)
+                    newElem.setAttribute("favorite", param.favorited ? "true" : "false");
+                if (param.tip.isEmpty())
+                    newElem.removeAttribute("tip");
+                else
+                    newElem.setAttribute("tip", param.tip);
                 QDomText textNode = doc.createTextNode(param.value);
                 newElem.appendChild(textNode);
                 parent.replaceChild(newElem, param.domElement);
@@ -2141,7 +3234,14 @@ void ParamConfigDialog::onSaveAsFile()
             }
         }
         param.domElement.setAttribute("note", param.description);
-        param.domElement.setAttribute("favorite", param.favorited ? "true" : "false");
+        if (param.favorited || param.originalFavorited)
+            param.domElement.setAttribute("favorite", param.favorited ? "true" : "false");
+        else
+            param.domElement.removeAttribute("favorite");
+        if (param.tip.isEmpty())
+            param.domElement.removeAttribute("tip");
+        else
+            param.domElement.setAttribute("tip", param.tip);
         while (param.domElement.hasChildNodes())
             param.domElement.removeChild(param.domElement.firstChild());
         param.domElement.appendChild(fd.xmlDoc.createTextNode(param.value));
@@ -2155,6 +3255,16 @@ void ParamConfigDialog::onSaveAsFile()
                 saveParamSA(pp);
             for (auto& pp : mission.outputPaths)
                 saveParamSA(pp);
+        }
+    }
+    if (fd.isLinkFile) {
+        for (auto& lk : fd.links) {
+            if (lk.domElement.isNull()) continue;
+            lk.domElement.setAttribute("run", lk.run ? "true" : "false");
+            lk.domElement.setAttribute("favorite", lk.favorited ? "true" : "false");
+            while (lk.domElement.hasChildNodes())
+                lk.domElement.removeChild(lk.domElement.firstChild());
+            lk.domElement.appendChild(fd.xmlDoc.createTextNode(lk.path));
         }
     }
 
@@ -2174,21 +3284,34 @@ void ParamConfigDialog::onSaveAsFile()
     for (auto& mb : fd.blocks)
         for (auto& mission : mb.missions) {
             for (auto& param : mission.params) {
+                param.originalName = param.name;
                 param.originalValue = param.value;
                 param.originalDescription = param.description;
+                param.originalTip = param.tip;
                 param.originalFavorited = param.favorited;
             }
             for (auto& pp : mission.inputPaths) {
+                pp.originalName = pp.name;
                 pp.originalValue = pp.value;
                 pp.originalDescription = pp.description;
+                pp.originalTip = pp.tip;
                 pp.originalFavorited = pp.favorited;
             }
             for (auto& pp : mission.outputPaths) {
+                pp.originalName = pp.name;
                 pp.originalValue = pp.value;
                 pp.originalDescription = pp.description;
+                pp.originalTip = pp.tip;
                 pp.originalFavorited = pp.favorited;
             }
         }
+    if (fd.isLinkFile) {
+        for (auto& lk : fd.links) {
+            lk.originalPath = lk.path;
+            lk.originalRun = lk.run;
+            lk.originalFavorited = lk.favorited;
+        }
+    }
 
     m_pendingHighlightRow = -1;
     refreshParamTree();
@@ -2204,6 +3327,16 @@ void ParamConfigDialog::reloadFromFile()
 {
     if (m_files.isEmpty()) return;
 
+    collectCurrentMissionValues();
+    if (hasAnyModification()) {
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(QStringLiteral("未保存的修改"));
+        msgBox.setText(QStringLiteral("重新加载将丢弃所有修改，确定继续吗？"));
+        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::Cancel);
+        msgBox.setDefaultButton(QMessageBox::Cancel);
+        if (msgBox.exec() != QMessageBox::Yes) return;
+    }
+
     ui.lineEdit_search->clear();
     m_filterModifiedOnly = false;
     ui.checkBox_filterMarked->setChecked(false);
@@ -2211,7 +3344,7 @@ void ParamConfigDialog::reloadFromFile()
     // 重新解析所有文件
     for (int fIdx = 0; fIdx < m_files.size(); ++fIdx) {
         ParsedFileData fd = parseOneFile(m_files[fIdx].filePath);
-        if (!fd.blocks.isEmpty())
+        if (!fd.blocks.isEmpty() || fd.isLinkFile || fd.isUnknown)
             m_files[fIdx] = fd;
     }
 
@@ -2226,22 +3359,23 @@ void ParamConfigDialog::reloadFromFile()
 
 bool ParamConfigDialog::hasAnyModification() const
 {
-    for (const auto& fd : m_files)
+    for (const auto& fd : m_files) {
         for (const auto& mb : fd.blocks)
             for (const auto& ms : mb.missions) {
                 for (const auto& p : ms.params)
-                    if (p.value != p.originalValue || p.description != p.originalDescription
-                        || p.favorited != p.originalFavorited)
+                    if (p.modified() || p.favorited != p.originalFavorited)
                         return true;
                 for (const auto& p : ms.inputPaths)
-                    if (p.value != p.originalValue || p.description != p.originalDescription
-                        || p.favorited != p.originalFavorited)
+                    if (p.modified() || p.favorited != p.originalFavorited)
                         return true;
                 for (const auto& p : ms.outputPaths)
-                    if (p.value != p.originalValue || p.description != p.originalDescription
-                        || p.favorited != p.originalFavorited)
+                    if (p.modified() || p.favorited != p.originalFavorited)
                         return true;
             }
+        for (const auto& l : fd.links)
+            if (l.modified() || l.favorited != l.originalFavorited)
+                return true;
+    }
     return false;
 }
 
@@ -2297,6 +3431,40 @@ bool ParamConfigDialog::eventFilter(QObject* obj, QEvent* event)
 
 void ParamConfigDialog::onResetCurrentRow()
 {
+    if (m_showingLinks) {
+        if (m_currentFileIndex < 0 || m_currentFileIndex >= m_files.size()) return;
+        ParsedFileData& fd = m_files[m_currentFileIndex];
+        int row = ui.tableWidget_params->currentRow();
+        if (row < 0 || row >= fd.links.size()) return;
+        ParsedLink& lk = fd.links[row];
+        if (!lk.modified()) return;
+        collectCurrentMissionValues();
+        lk.path = lk.originalPath;
+        lk.run = lk.originalRun;
+        lk.favorited = lk.originalFavorited;
+        if (lk.originalFavorited)
+            lk.domElement.setAttribute(QStringLiteral("favorite"), QStringLiteral("true"));
+        else
+            lk.domElement.removeAttribute(QStringLiteral("favorite"));
+        populateLinkTable(fd);
+        ui.tableWidget_params->selectRow(row);
+        QTreeWidgetItemIterator tit(ui.treeWidget_checkItems);
+        while (*tit) {
+            if ((*tit)->data(0, Qt::UserRole + 1).toString() == "link" &&
+                (*tit)->data(0, Qt::UserRole).toInt() == m_currentFileIndex &&
+                (*tit)->data(1, Qt::UserRole).toInt() == row) {
+                (*tit)->setText(0, linkLeafText(lk));
+                QFont pf = (*tit)->font(0); pf.setBold(false); (*tit)->setFont(0, pf);
+                (*tit)->setForeground(0, QColor(Qt::black));
+                break;
+            }
+            ++tit;
+        }
+        updateWindowTitle();
+        updateStatus(QStringLiteral("已重置第 %1 行链接").arg(row + 1));
+        return;
+    }
+
     if (m_currentFileIndex < 0 || m_currentMbIndex < 0 || m_currentMissionIndex < 0) return;
     if (m_currentFileIndex >= m_files.size()) return;
     if (m_currentMbIndex >= m_files[m_currentFileIndex].blocks.size()) return;
@@ -2312,10 +3480,17 @@ void ParamConfigDialog::onResetCurrentRow()
             ? mission.inputPaths : mission.outputPaths;
         if (row >= pathVec.size()) return;
         ParsedParameter& pp = pathVec[row];
-        if (pp.value == pp.originalValue && pp.description == pp.originalDescription) return;
+        if (!pp.modified()) return;
         collectCurrentMissionValues();
+        pp.name = pp.originalName;
         pp.value = pp.originalValue;
         pp.description = pp.originalDescription;
+        pp.tip = pp.originalTip;
+        pp.favorited = pp.originalFavorited;
+        if (pp.originalFavorited)
+            pp.domElement.setAttribute(QStringLiteral("favorite"), QStringLiteral("true"));
+        else
+            pp.domElement.removeAttribute(QStringLiteral("favorite"));
         QString label = m_showingInputPaths ? QStringLiteral("输入") : QStringLiteral("输出");
         populatePathTable(pathVec, label);
         ui.tableWidget_params->selectRow(row);
@@ -2327,6 +3502,7 @@ void ParamConfigDialog::onResetCurrentRow()
                 (*tit)->data(1, Qt::UserRole).toInt() == m_currentMbIndex &&
                 (*tit)->data(2, Qt::UserRole).toInt() == m_currentMissionIndex &&
                 (*tit)->data(3, Qt::UserRole).toInt() == row) {
+                (*tit)->setText(0, pathLeafText(pp));
                 QFont pf = (*tit)->font(0); pf.setBold(false); (*tit)->setFont(0, pf);
                 (*tit)->setForeground(0, QColor(Qt::black));
                 break;
@@ -2341,11 +3517,18 @@ void ParamConfigDialog::onResetCurrentRow()
     if (row >= mission.params.size()) return;
 
     ParsedParameter& param = mission.params[row];
-    if (param.value == param.originalValue && param.description == param.originalDescription) return;
+    if (!param.modified()) return;
 
     collectCurrentMissionValues();
+    param.name = param.originalName;
     param.value = param.originalValue;
     param.description = param.originalDescription;
+    param.tip = param.originalTip;
+    param.favorited = param.originalFavorited;
+    if (param.originalFavorited)
+        param.domElement.setAttribute(QStringLiteral("favorite"), QStringLiteral("true"));
+    else
+        param.domElement.removeAttribute(QStringLiteral("favorite"));
 
     populateTable(mission);
     ui.tableWidget_params->selectRow(row);
@@ -2358,10 +3541,7 @@ void ParamConfigDialog::onResetCurrentRow()
             (*it)->data(1, Qt::UserRole).toInt() == m_currentMbIndex &&
             (*it)->data(2, Qt::UserRole).toInt() == m_currentMissionIndex &&
             (*it)->data(3, Qt::UserRole).toInt() == row) {
-            int sp = findNameSep(param.description);
-            QString dn = param.description.isEmpty() ? param.name
-                : param.description.left(sp > 0 ? sp : param.description.length());
-            (*it)->setText(0, QStringLiteral("  \xE2\x9A\x99 ") + dn + ": " + param.value);
+            (*it)->setText(0, paramLeafText(param));
             QFont pf = (*it)->font(0);
             pf.setBold(false);
             (*it)->setFont(0, pf);
@@ -2377,6 +3557,58 @@ void ParamConfigDialog::onResetCurrentRow()
 
 void ParamConfigDialog::onResetCurrentMission()
 {
+    if (m_showingLinks) {
+        if (m_currentFileIndex < 0 || m_currentFileIndex >= m_files.size()) return;
+        ParsedFileData& fd = m_files[m_currentFileIndex];
+        bool anyModified = false;
+        for (const auto& l : fd.links)
+            if (l.modified()) { anyModified = true; break; }
+        if (!anyModified) {
+            updateStatus(QStringLiteral("当前链接列表无修改，无需重置"));
+            return;
+        }
+
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(QStringLiteral("重置链接列表"));
+        msgBox.setText(QStringLiteral("确定要重置全部链接为初始值吗？\n此操作将丢弃所有未保存的修改。"));
+        msgBox.setIcon(QMessageBox::Question);
+        QPushButton* btnYes = msgBox.addButton(QStringLiteral("确定"), QMessageBox::YesRole);
+        QPushButton* btnNo = msgBox.addButton(QStringLiteral("取消"), QMessageBox::NoRole);
+        msgBox.setDefaultButton(btnNo);
+        msgBox.exec();
+        if (msgBox.clickedButton() != btnYes) return;
+
+        collectCurrentMissionValues();
+        for (auto& lk : fd.links) {
+            lk.path = lk.originalPath;
+            lk.run = lk.originalRun;
+            lk.favorited = lk.originalFavorited;
+            if (lk.originalFavorited)
+                lk.domElement.setAttribute(QStringLiteral("favorite"), QStringLiteral("true"));
+            else
+                lk.domElement.removeAttribute(QStringLiteral("favorite"));
+        }
+        populateLinkTable(fd);
+        QTreeWidgetItemIterator tit(ui.treeWidget_checkItems);
+        while (*tit) {
+            QString type = (*tit)->data(0, Qt::UserRole + 1).toString();
+            if (type == "link" &&
+                (*tit)->data(0, Qt::UserRole).toInt() == m_currentFileIndex) {
+                int lIdx = (*tit)->data(1, Qt::UserRole).toInt();
+                if (lIdx >= 0 && lIdx < fd.links.size())
+                    (*tit)->setText(0, linkLeafText(fd.links[lIdx]));
+                QFont pf = (*tit)->font(0);
+                pf.setBold(false);
+                (*tit)->setFont(0, pf);
+                (*tit)->setForeground(0, QColor(Qt::black));
+            }
+            ++tit;
+        }
+        updateWindowTitle();
+        updateStatus(QStringLiteral("已重置全部链接"));
+        return;
+    }
+
     if (m_currentFileIndex < 0 || m_currentMbIndex < 0 || m_currentMissionIndex < 0) return;
     if (m_currentFileIndex >= m_files.size()) return;
     if (m_currentMbIndex >= m_files[m_currentFileIndex].blocks.size()) return;
@@ -2386,13 +3618,13 @@ void ParamConfigDialog::onResetCurrentMission()
 
     bool anyModified = false;
     for (const auto& p : mission.params)
-        if (p.value != p.originalValue || p.description != p.originalDescription) { anyModified = true; break; }
+        if (p.modified()) { anyModified = true; break; }
     if (!anyModified)
         for (const auto& p : mission.inputPaths)
-            if (p.value != p.originalValue || p.description != p.originalDescription) { anyModified = true; break; }
+            if (p.modified()) { anyModified = true; break; }
     if (!anyModified)
         for (const auto& p : mission.outputPaths)
-            if (p.value != p.originalValue || p.description != p.originalDescription) { anyModified = true; break; }
+            if (p.modified()) { anyModified = true; break; }
     if (!anyModified) {
         updateStatus(QStringLiteral("当前任务无修改，无需重置"));
         return;
@@ -2411,16 +3643,37 @@ void ParamConfigDialog::onResetCurrentMission()
     collectCurrentMissionValues();
 
     for (auto& param : mission.params) {
+        param.name = param.originalName;
         param.value = param.originalValue;
         param.description = param.originalDescription;
+        param.tip = param.originalTip;
+        param.favorited = param.originalFavorited;
+        if (param.originalFavorited)
+            param.domElement.setAttribute(QStringLiteral("favorite"), QStringLiteral("true"));
+        else
+            param.domElement.removeAttribute(QStringLiteral("favorite"));
     }
     for (auto& pp : mission.inputPaths) {
+        pp.name = pp.originalName;
         pp.value = pp.originalValue;
         pp.description = pp.originalDescription;
+        pp.tip = pp.originalTip;
+        pp.favorited = pp.originalFavorited;
+        if (pp.originalFavorited)
+            pp.domElement.setAttribute(QStringLiteral("favorite"), QStringLiteral("true"));
+        else
+            pp.domElement.removeAttribute(QStringLiteral("favorite"));
     }
     for (auto& pp : mission.outputPaths) {
+        pp.name = pp.originalName;
         pp.value = pp.originalValue;
         pp.description = pp.originalDescription;
+        pp.tip = pp.originalTip;
+        pp.favorited = pp.originalFavorited;
+        if (pp.originalFavorited)
+            pp.domElement.setAttribute(QStringLiteral("favorite"), QStringLiteral("true"));
+        else
+            pp.domElement.removeAttribute(QStringLiteral("favorite"));
     }
 
     if (m_showingPaths) {
@@ -2457,10 +3710,7 @@ void ParamConfigDialog::onResetCurrentMission()
             int pIdx = (*it)->data(3, Qt::UserRole).toInt();
             if (pIdx < mission.params.size()) {
                 const auto& param = mission.params[pIdx];
-                int sp = findNameSep(param.description);
-                QString dn = param.description.isEmpty() ? param.name
-                    : param.description.left(sp > 0 ? sp : param.description.length());
-                (*it)->setText(0, QStringLiteral("  \xE2\x9A\x99 ") + dn + ": " + param.value);
+                (*it)->setText(0, paramLeafText(param));
             }
             QFont pf = (*it)->font(0);
             pf.setBold(false);
@@ -2494,18 +3744,18 @@ bool ParamConfigDialog::fileHasModification(int fileIdx) const
     for (const auto& mb : fd.blocks)
         for (const auto& ms : mb.missions) {
             for (const auto& p : ms.params)
-                if (p.value != p.originalValue || p.description != p.originalDescription
-                    || p.favorited != p.originalFavorited)
+                if (p.modified() || p.favorited != p.originalFavorited)
                     return true;
             for (const auto& p : ms.inputPaths)
-                if (p.value != p.originalValue || p.description != p.originalDescription
-                    || p.favorited != p.originalFavorited)
+                if (p.modified() || p.favorited != p.originalFavorited)
                     return true;
             for (const auto& p : ms.outputPaths)
-                if (p.value != p.originalValue || p.description != p.originalDescription
-                    || p.favorited != p.originalFavorited)
+                if (p.modified() || p.favorited != p.originalFavorited)
                     return true;
         }
+    for (const auto& l : fd.links)
+        if (l.modified() || l.favorited != l.originalFavorited)
+            return true;
     return false;
 }
 
@@ -2546,6 +3796,15 @@ void ParamConfigDialog::onRemoveFile(int fileIdx)
     }
 
     collectCurrentMissionValues();
+    if (fileHasModification(fileIdx)) {
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(QStringLiteral("未保存的修改"));
+        msgBox.setText(QStringLiteral("文件 [%1] 有未保存的修改，确定要移除吗？")
+                       .arg(QFileInfo(m_files[fileIdx].filePath).fileName()));
+        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::Cancel);
+        msgBox.setDefaultButton(QMessageBox::Cancel);
+        if (msgBox.exec() != QMessageBox::Yes) return;
+    }
     m_files.removeAt(fileIdx);
 
     if (m_currentFileIndex > fileIdx)
@@ -2565,125 +3824,296 @@ void ParamConfigDialog::onRemoveFile(int fileIdx)
 
 void ParamConfigDialog::onSyncToOtherFiles()
 {
+    if (m_showingLinks) {
+        updateStatus(QStringLiteral("链接列表不支持同步到其他文件"));
+        return;
+    }
+    if (m_currentFileIndex >= 0 && m_currentFileIndex < m_files.size() &&
+        m_files[m_currentFileIndex].isUnknown) {
+        updateStatus(QStringLiteral("结构未识别的只读文件不支持同步"));
+        return;
+    }
     if (m_currentFileIndex < 0 || m_currentFileIndex >= m_files.size()) return;
     if (m_currentMbIndex < 0 || m_currentMissionIndex < 0) return;
     const auto& fd = m_files[m_currentFileIndex];
     if (m_currentMbIndex >= fd.blocks.size()) return;
     if (m_currentMissionIndex >= fd.blocks[m_currentMbIndex].missions.size()) return;
 
-    const auto& curMission = fd.blocks[m_currentMbIndex].missions[m_currentMissionIndex];
-    QString curId = curMission.id;
-    if (curId.isEmpty()) {
-        updateStatus(QStringLiteral("当前 Mission 无 ID，无法同步"));
-        return;
-    }
-
-    // 收集当前 Mission 中已修改的参数/路径（按键名索引，仅 value 或 description 有变化的）
+    // 收集当前文件所有已修改 Mission 的变更（仅 value/description/tip/name 变化，收藏变化不参与同步）
     collectCurrentMissionValues();
-    struct ChangedItem { QString value; QString description; };
-    QHash<QString, ChangedItem> changedParams;
-    for (const auto& p : curMission.params) {
-        if (p.value != p.originalValue || p.description != p.originalDescription)
-            changedParams[p.name] = { p.value, p.description };
-    }
-    QHash<QString, ChangedItem> changedInputs;
-    for (const auto& p : curMission.inputPaths) {
-        if (p.value != p.originalValue || p.description != p.originalDescription)
-            changedInputs[p.value] = { p.value, p.description };
-    }
-    QHash<QString, ChangedItem> changedOutputs;
-    for (const auto& p : curMission.outputPaths) {
-        if (p.value != p.originalValue || p.description != p.originalDescription)
-            changedOutputs[p.value] = { p.value, p.description };
-    }
+    struct ChangedItem {
+        QString key;      // 同步身份键：参数 name:原名#序号；路径 note:机器键#序号 或 pos:位置
+        QString display;  // 弹窗节标题展示文本
+        QString name;     // 参数当前名（改名同步用）
+        QString value;
+        QString description;
+        QString tip;
+    };
+    struct MissionChanges {
+        int mbIdx; int mIdx; QString id; QString note;
+        QString mkey;   // Mission 身份键：id + 同 id 出现序号（note 不参与匹配，见下）
+        QVector<ChangedItem> params;
+        QVector<ChangedItem> inputs;
+        QVector<ChangedItem> outputs;
+        int total() const { return params.size() + inputs.size() + outputs.size(); }
+    };
 
-    if (changedParams.isEmpty() && changedInputs.isEmpty() && changedOutputs.isEmpty()) {
-        updateStatus(QStringLiteral("当前 Mission 无修改，无需同步"));
+    // 参数身份键：原名 + 同名出现序号（改名、同名参数均能稳定匹配）
+    auto buildParamKeys = [](const QVector<ParsedParameter>& params, bool useOriginal) {
+        QHash<QString, int> occ;
+        QVector<QString> keys(params.size());
+        for (int i = 0; i < params.size(); ++i) {
+            const QString nm = useOriginal ? params[i].originalName : params[i].name;
+            int n = occ.value(nm, 0);
+            occ[nm] = n + 1;
+            keys[i] = QStringLiteral("name:%1#%2").arg(nm).arg(n);
+        }
+        return keys;
+    };
+    // 路径身份键：note（机器键，解析时已含父 note 继承）优先；
+    // 无 note 按同向量内无 note 路径的出现位置。同名 note 以 #序号 区分。
+    auto buildPathKeys = [](const QVector<ParsedParameter>& paths, bool useOriginal) {
+        QHash<QString, int> occ;
+        int posNoNote = 0;
+        QVector<QString> keys(paths.size());
+        for (int i = 0; i < paths.size(); ++i) {
+            const QString note = useOriginal ? paths[i].originalDescription : paths[i].description;
+            if (!note.isEmpty()) {
+                int n = occ.value(note, 0);
+                occ[note] = n + 1;
+                keys[i] = QStringLiteral("note:%1#%2").arg(note).arg(n);
+            } else {
+                keys[i] = QStringLiteral("pos:%1").arg(posNoNote++);
+            }
+        }
+        return keys;
+    };
+    // 路径节标题：有值显示值；空值显示（空值）+ 机器键，便于辨认
+    auto pathDisplay = [](const ParsedParameter& p) {
+        if (!p.value.isEmpty()) return p.value;
+        return p.description.isEmpty()
+            ? QStringLiteral("(空值)")
+            : QStringLiteral("(空值) %1").arg(p.description);
+    };
+
+    // Mission 身份键：id（功能类别码，同 id 可达几十个任务）+ 同 id 出现序号。
+    // note 是任务名称文本、实测会被改名——参与匹配会导致失配甚至序号串位
+    // （note 一改分组就变，后面的任务会错配到相邻任务）；
+    // 故 note 不参与匹配，也不随同步传播（任务名是识别标签，不同文件
+    // 同位置任务本可不同名，同步改名属"错同步"，2026-09-09 用户拍板移除）。
+    auto buildMissionKeys = [](const ParsedFileData& file) {
+        QVector<QVector<QString>> keys(file.blocks.size());
+        QHash<QString, int> occ;
+        for (int bIdx = 0; bIdx < file.blocks.size(); ++bIdx) {
+            keys[bIdx].resize(file.blocks[bIdx].missions.size());
+            for (int mIdx = 0; mIdx < file.blocks[bIdx].missions.size(); ++mIdx) {
+                const QString& id = file.blocks[bIdx].missions[mIdx].id;
+                int n = occ.value(id, 0);
+                occ[id] = n + 1;
+                keys[bIdx][mIdx] = id + QStringLiteral("#") + QString::number(n);
+            }
+        }
+        return keys;
+    };
+
+    QVector<QVector<QString>> srcMissionKeys = buildMissionKeys(fd);
+    QVector<MissionChanges> allChanges;
+    int noIdCount = 0;
+    for (int bIdx = 0; bIdx < fd.blocks.size(); ++bIdx) {
+        for (int mIdx = 0; mIdx < fd.blocks[bIdx].missions.size(); ++mIdx) {
+            const auto& m = fd.blocks[bIdx].missions[mIdx];
+            MissionChanges mc;
+            mc.mbIdx = bIdx;
+            mc.mIdx = mIdx;
+            mc.id = m.id;
+            mc.note = m.note;
+            mc.mkey = srcMissionKeys[bIdx][mIdx];
+            QVector<QString> pKeys = buildParamKeys(m.params, true);
+            for (int i = 0; i < m.params.size(); ++i) {
+                const ParsedParameter& p = m.params[i];
+                if (!p.contentModified()) continue;
+                mc.params.append({ pKeys[i], p.name, p.name,
+                                   p.value, p.description, p.tip });
+            }
+            QVector<QString> iKeys = buildPathKeys(m.inputPaths, true);
+            for (int i = 0; i < m.inputPaths.size(); ++i) {
+                const ParsedParameter& p = m.inputPaths[i];
+                if (!p.contentModified()) continue;
+                mc.inputs.append({ iKeys[i], pathDisplay(p), QString(),
+                                   p.value, p.description, p.tip });
+            }
+            QVector<QString> oKeys = buildPathKeys(m.outputPaths, true);
+            for (int i = 0; i < m.outputPaths.size(); ++i) {
+                const ParsedParameter& p = m.outputPaths[i];
+                if (!p.contentModified()) continue;
+                mc.outputs.append({ oKeys[i], pathDisplay(p), QString(),
+                                    p.value, p.description, p.tip });
+            }
+            if (mc.total() == 0) continue;
+            if (mc.id.isEmpty()) { ++noIdCount; continue; }
+            allChanges.append(mc);
+        }
+    }
+    if (allChanges.isEmpty()) {
+        updateStatus(noIdCount > 0
+            ? QStringLiteral("有修改的 Mission 均无 ID，无法同步")
+            : QStringLiteral("当前文件无修改，无需同步"));
         return;
     }
 
-    // 收集同名 Mission 的其他文件，同时记录每个目标匹配的参数子集
-    struct SyncTarget {
-        int fileIdx; int mbIdx; int mIdx; QString fileName;
-        QStringList matchedParamNames;   // 该目标中含有的已修改参数名
-        QStringList matchedInputNames;   // 该目标中含有的已修改输入路径
-        QStringList matchedOutputNames;  // 该目标中含有的已修改输出路径
-    };
-    QVector<SyncTarget> validTargets;
-    for (int fIdx = 0; fIdx < m_files.size(); ++fIdx) {
-        if (fIdx == m_currentFileIndex) continue;
-        const auto& ofd = m_files[fIdx];
-        for (int bIdx = 0; bIdx < ofd.blocks.size(); ++bIdx) {
-            for (int mIdx = 0; mIdx < ofd.blocks[bIdx].missions.size(); ++mIdx) {
-                if (ofd.blocks[bIdx].missions[mIdx].id != curId) continue;
-
-                const ParsedMission& tm = ofd.blocks[bIdx].missions[mIdx];
-                SyncTarget st;
-                st.fileIdx = fIdx;
-                st.mbIdx = bIdx;
-                st.mIdx = mIdx;
-                st.fileName = QFileInfo(ofd.filePath).fileName();
-
-                // 收集该目标中实际存在的已修改参数
-                for (auto it = changedParams.begin(); it != changedParams.end(); ++it) {
-                    for (const auto& tp : tm.params) {
-                        if (tp.name == it.key()) { st.matchedParamNames.append(it.key()); break; }
-                    }
-                }
-                for (auto it = changedInputs.begin(); it != changedInputs.end(); ++it) {
-                    for (const auto& tp : tm.inputPaths) {
-                        if (tp.value == it.key() || tp.name == it.key()) { st.matchedInputNames.append(it.key()); break; }
-                    }
-                }
-                for (auto it = changedOutputs.begin(); it != changedOutputs.end(); ++it) {
-                    for (const auto& tp : tm.outputPaths) {
-                        if (tp.value == it.key() || tp.name == it.key()) { st.matchedOutputNames.append(it.key()); break; }
-                    }
-                }
-
-                int totalMatch = st.matchedParamNames.size() + st.matchedInputNames.size() + st.matchedOutputNames.size();
-                if (totalMatch > 0) validTargets.append(st);
+    // 多个 Mission 有修改时询问同步范围：全部已修改 / 仅当前 Mission
+    QVector<MissionChanges> selected;
+    bool onlyCurrent = (allChanges.size() == 1
+        && allChanges[0].mbIdx == m_currentMbIndex
+        && allChanges[0].mIdx == m_currentMissionIndex);
+    if (onlyCurrent) {
+        selected = allChanges;
+    } else {
+        bool curModified = false;
+        for (const auto& mc : allChanges) {
+            if (mc.mbIdx == m_currentMbIndex && mc.mIdx == m_currentMissionIndex) {
+                curModified = true;
+                break;
             }
+        }
+        QMessageBox scopeBox(this);
+        scopeBox.setWindowTitle(QStringLiteral("同步到其他文件"));
+        QString text = QStringLiteral("当前文件共有 %1 个 Mission 发生修改。").arg(allChanges.size());
+        if (noIdCount > 0)
+            text += QStringLiteral("\n另有 %1 个无 ID 的修改 Mission 无法同步。").arg(noIdCount);
+        if (!curModified)
+            text += QStringLiteral("\n注意：当前选中的 Mission 没有修改。");
+        scopeBox.setText(text + QStringLiteral("\n\n请选择同步范围："));
+        QPushButton* btnAll = scopeBox.addButton(QStringLiteral("全部已修改 Mission"), QMessageBox::AcceptRole);
+        QPushButton* btnCur = nullptr;
+        if (curModified)
+            btnCur = scopeBox.addButton(QStringLiteral("仅当前 Mission"), QMessageBox::AcceptRole);
+        scopeBox.addButton(QMessageBox::Cancel);
+        scopeBox.setDefaultButton(btnAll);
+        scopeBox.exec();
+        QAbstractButton* clicked = scopeBox.clickedButton();
+        if (clicked == btnAll) {
+            selected = allChanges;
+        } else if (btnCur && clicked == btnCur) {
+            for (const auto& mc : allChanges) {
+                if (mc.mbIdx == m_currentMbIndex && mc.mIdx == m_currentMissionIndex)
+                    selected.append(mc);
+            }
+        } else {
+            return;
         }
     }
 
-    if (validTargets.isEmpty()) {
-        int totalChanged = changedParams.size() + changedInputs.size() + changedOutputs.size();
-        if (totalChanged > 0) {
+    // 每个选中 Mission：在其他文件中按身份键（id+同 id 出现序号）找同一任务，记录匹配项
+    struct SyncTarget {
+        int fileIdx; int mbIdx; int mIdx; QString fileName;
+        QSet<QString> matchedParams;   // 该目标中能匹配上的已修改参数键
+        QSet<QString> matchedInputs;   // 该目标中能匹配上的已修改输入路径键
+        QSet<QString> matchedOutputs;  // 该目标中能匹配上的已修改输出路径键
+    };
+    // 每个文件预计算 Mission 身份键（目标侧）
+    QVector<QVector<QVector<QString>>> targetMissionKeys(m_files.size());
+    for (int fIdx = 0; fIdx < m_files.size(); ++fIdx)
+        targetMissionKeys[fIdx] = buildMissionKeys(m_files[fIdx]);
+
+    QVector<QVector<SyncTarget>> targetsPerMission;
+    int missionsWithTargets = 0;
+    for (const auto& mc : selected) {
+        QVector<SyncTarget> validTargets;
+        for (int fIdx = 0; fIdx < m_files.size(); ++fIdx) {
+            if (fIdx == m_currentFileIndex) continue;
+            const auto& ofd = m_files[fIdx];
+            for (int bIdx = 0; bIdx < ofd.blocks.size(); ++bIdx) {
+                for (int mIdx = 0; mIdx < ofd.blocks[bIdx].missions.size(); ++mIdx) {
+                    if (targetMissionKeys[fIdx][bIdx][mIdx] != mc.mkey) continue;
+
+                    const ParsedMission& tm = ofd.blocks[bIdx].missions[mIdx];
+                    SyncTarget st;
+                    st.fileIdx = fIdx;
+                    st.mbIdx = bIdx;
+                    st.mIdx = mIdx;
+                    st.fileName = QFileInfo(ofd.filePath).fileName();
+
+                    QVector<QString> tParamKeys = buildParamKeys(tm.params, false);
+                    QVector<QString> tInputKeys = buildPathKeys(tm.inputPaths, false);
+                    QVector<QString> tOutputKeys = buildPathKeys(tm.outputPaths, false);
+                    for (const auto& ci : mc.params)
+                        if (tParamKeys.contains(ci.key)) st.matchedParams.insert(ci.key);
+                    for (const auto& ci : mc.inputs)
+                        if (tInputKeys.contains(ci.key)) st.matchedInputs.insert(ci.key);
+                    for (const auto& ci : mc.outputs)
+                        if (tOutputKeys.contains(ci.key)) st.matchedOutputs.insert(ci.key);
+
+                    if (!st.matchedParams.isEmpty() || !st.matchedInputs.isEmpty()
+                        || !st.matchedOutputs.isEmpty())
+                        validTargets.append(st);
+                }
+            }
+        }
+        targetsPerMission.append(validTargets);
+        if (!validTargets.isEmpty()) ++missionsWithTargets;
+    }
+
+    if (missionsWithTargets == 0) {
+        QString msg;
+        if (selected.size() == 1) {
+            const MissionChanges& mc = selected[0];
             bool hasSameMission = false;
             for (int fIdx = 0; fIdx < m_files.size() && !hasSameMission; ++fIdx) {
                 if (fIdx == m_currentFileIndex) continue;
-                for (int bIdx = 0; bIdx < m_files[fIdx].blocks.size() && !hasSameMission; ++bIdx) {
-                    for (int mIdx = 0; mIdx < m_files[fIdx].blocks[bIdx].missions.size(); ++mIdx) {
-                        if (m_files[fIdx].blocks[bIdx].missions[mIdx].id == curId) {
+                for (int bIdx = 0; bIdx < targetMissionKeys[fIdx].size() && !hasSameMission; ++bIdx) {
+                    for (int mIdx = 0; mIdx < targetMissionKeys[fIdx][bIdx].size(); ++mIdx) {
+                        if (targetMissionKeys[fIdx][bIdx][mIdx] == mc.mkey) {
                             hasSameMission = true; break;
                         }
                     }
                 }
             }
-            QString msg = hasSameMission
-                ? QStringLiteral("Mission [%1] 有 %2 个参数发生修改，\n"
-                    "但其他文件的同名 Mission 中均不存在对应参数，无法同步。")
-                    .arg(curId).arg(totalChanged)
-                : QStringLiteral("没有其他文件包含同名 Mission [%1]。").arg(curId);
-            QMessageBox::information(this, QStringLiteral("同步到其他文件"), msg);
+            msg = hasSameMission
+                ? QStringLiteral("任务 [%1（%2）] 有 %3 项修改，\n"
+                    "但其他文件的相同任务中不存在对应项，无法同步。")
+                    .arg(mc.id).arg(mc.note).arg(mc.total())
+                : QStringLiteral("没有其他文件包含相同任务 [%1（%2）]（按 id 与出现顺序匹配的任务）。")
+                    .arg(mc.id).arg(mc.note);
         } else {
-            updateStatus(QStringLiteral("当前 Mission 无修改，无需同步"));
+            msg = QStringLiteral("共 %1 个 Mission 发生修改，但其他文件中均无匹配目标，无法同步。")
+                .arg(selected.size());
         }
+        QMessageBox::information(this, QStringLiteral("同步到其他文件"), msg);
         return;
     }
 
-    // 弹窗 — 按参数分组，逐文件勾选
+    // 弹窗 — 三列表格：项/文件（树：Mission→分组→文件勾选行）｜旧值｜新值
     QDialog dlg(this);
     dlg.setWindowTitle(QStringLiteral("同步到其他文件"));
-    dlg.setMinimumWidth(480);
     QVBoxLayout* dlgLayout = new QVBoxLayout(&dlg);
-    dlgLayout->setSpacing(2);
+    dlgLayout->setSpacing(6);
 
-    int totalChanged = changedParams.size() + changedInputs.size() + changedOutputs.size();
-    QLabel* hint = new QLabel(QStringLiteral(
-        "Mission [%1] 共计 %2 个参数发生修改，下方按参数展示可同步条目：")
-        .arg(curId).arg(totalChanged));
+    int totalChanged = 0;
+    int totalUnmatched = 0;
+    for (int si = 0; si < selected.size(); ++si) {
+        totalChanged += selected[si].total();
+        const auto& vts = targetsPerMission[si];
+        auto itemMatched = [&vts](const ChangedItem& ci, int itemType) {
+            for (const auto& st : vts) {
+                bool m = itemType == 0 ? st.matchedParams.contains(ci.key)
+                        : itemType == 1 ? st.matchedInputs.contains(ci.key)
+                        : st.matchedOutputs.contains(ci.key);
+                if (m) return true;
+            }
+            return false;
+        };
+        for (const auto& ci : selected[si].params)
+            if (!itemMatched(ci, 0)) ++totalUnmatched;
+        for (const auto& ci : selected[si].inputs)
+            if (!itemMatched(ci, 1)) ++totalUnmatched;
+        for (const auto& ci : selected[si].outputs)
+            if (!itemMatched(ci, 2)) ++totalUnmatched;
+    }
+    QString hintText = QStringLiteral("共 %1 个任务、%2 项修改").arg(selected.size()).arg(totalChanged);
+    if (totalUnmatched > 0)
+        hintText += QStringLiteral("，其中 %1 项无对应项（不会同步）").arg(totalUnmatched);
+    QLabel* hint = new QLabel(hintText);
     hint->setWordWrap(true);
     dlgLayout->addWidget(hint);
 
@@ -2698,95 +4128,159 @@ void ParamConfigDialog::onSyncToOtherFiles()
     selRow->addStretch();
     dlgLayout->addLayout(selRow);
 
-    // 数据结构：每个 checkbox 对应一个 (参数, 目标文件)
+    // 表格：列0 文件（勾选行）、列1 项、列2 旧值、列3 新值——一行一条完整变更
+    //（借鉴 GitHub split diff / Navicat 同步预览的"旧左新右"并排对比）
+    QTreeWidget* tree = new QTreeWidget(&dlg);
+    tree->setColumnCount(4);
+    tree->setHeaderLabels(QStringList()
+        << QStringLiteral("文件") << QStringLiteral("项")
+        << QStringLiteral("旧值") << QStringLiteral("新值"));
+    tree->setRootIsDecorated(true);
+    tree->setIndentation(14);
+    tree->setSelectionMode(QAbstractItemView::NoSelection);
+    tree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    tree->header()->setSectionResizeMode(1, QHeaderView::Interactive);
+    tree->header()->setSectionResizeMode(2, QHeaderView::Interactive);
+    tree->header()->setSectionResizeMode(3, QHeaderView::Interactive);
+    tree->header()->setStretchLastSection(false);
+    tree->header()->setMinimumSectionSize(40);
+    dlgLayout->addWidget(tree, 1);
+
+    // 数据结构：每个勾选行对应一个 (Mission, 项, 目标文件)
     struct CheckEntry {
-        QCheckBox* cb;
+        QTreeWidgetItem* item;
         int fileIdx; int mbIdx; int mIdx;
-        QString paramKey;
         int itemType; // 0=param, 1=inputPath, 2=outputPath
+        int srcIdx;   // 来源 Mission 在 selected 中的索引
+        int itemIdx;  // 该项在 src.params/inputs/outputs 中的索引（itemType=3 时无意义）
     };
     QVector<CheckEntry> allChecks;
 
-    // 去重计数：validTargets 中不重复的文件数
-    QSet<int> allTargetFileSet;
-    for (const auto& st : validTargets) allTargetFileSet.insert(st.fileIdx);
-    int totalUniqueFiles = allTargetFileSet.size();
-
-    auto addSection = [&](const QString& label, int matchFileCount) {
-        QString html;
-        if (matchFileCount > 0) {
-            html = QStringLiteral(
-                "<b style='color:#555'>━━ %1  【可同步至 %2/%3 个文件】</b>")
-                .arg(label).arg(matchFileCount).arg(totalUniqueFiles);
-        } else {
-            html = QStringLiteral(
-                "<b style='color:#aaa'>━━ %1  【无匹配目标】</b>")
-                .arg(label);
-        }
-        QLabel* sec = new QLabel(html);
-        sec->setTextFormat(Qt::RichText);
-        dlgLayout->addWidget(sec);
+    // 值截短显示（路径等长值不撑爆行宽）
+    auto shortVal = [](const QString& s, int maxLen = 28) {
+        QString t = s.trimmed();
+        if (t.isEmpty()) return QStringLiteral("(空)");
+        return t.size() > maxLen ? t.left(maxLen) + QStringLiteral("…") : t;
     };
-
-    auto addCheckRow = [&](const SyncTarget& st, const QString& paramKey, int itemType) {
-        QWidget* row = new QWidget();
-        QHBoxLayout* rowLayout = new QHBoxLayout(row);
-        rowLayout->setContentsMargins(12, 1, 0, 1);
-        rowLayout->setSpacing(4);
-
-        QCheckBox* cb = new QCheckBox();
-        cb->setChecked(false);
-        rowLayout->addWidget(cb);
-
-        QLabel* lbl = new QLabel(QStringLiteral("%1  —  %2  [ID=%3]")
-            .arg(st.fileName)
-            .arg(m_files[st.fileIdx].blocks[st.mbIdx].missions[st.mIdx].note)
-            .arg(curId));
-        rowLayout->addWidget(lbl, 1);
-        dlgLayout->addWidget(row);
-        allChecks.append({cb, st.fileIdx, st.mbIdx, st.mIdx, paramKey, itemType});
+    // 字段行：灰色小标签 + 值（旧值黑 #333 / 新值绿 #1a7f37 / 无对应项灰 #aaa）
+    auto fieldLine = [](const QString& label, const QString& value, const QString& color) {
+        return QStringLiteral("<span style='color:#999'>%1</span> "
+                              "<span style='color:%2'>%3</span>")
+            .arg(label.toHtmlEscaped()).arg(color).arg(value.toHtmlEscaped());
     };
-
-    auto addMissingRow = [&](const SyncTarget& st) {
-        QLabel* lbl = new QLabel(QStringLiteral(
-            "    <span style='color:#999;'>%1  —  缺少</span>").arg(st.fileName));
+    // 旧值/新值格：只列实际变化的字段（值/键名/说明/提示），每字段一行
+    auto buildValueCell = [&](const ParsedParameter& oldP, const ChangedItem& ci, bool isParam,
+                              bool isNew, const QString& color) {
+        QStringList lines;
+        if (ci.value != oldP.value)
+            lines << fieldLine(QStringLiteral("值"),
+                shortVal(isNew ? ci.value : oldP.value), color);
+        if (isParam && ci.name != oldP.name)
+            lines << fieldLine(QStringLiteral("键名"),
+                shortVal(isNew ? ci.name : oldP.name), color);
+        if (ci.description != oldP.description)
+            lines << fieldLine(QStringLiteral("说明"),
+                shortVal(isNew ? ci.description : oldP.description), color);
+        if (ci.tip != oldP.tip)
+            lines << fieldLine(QStringLiteral("提示"),
+                shortVal(isNew ? ci.tip : oldP.tip), color);
+        return lines.join(QStringLiteral("<br>"));
+    };
+    auto setCellWidget = [&tree](QTreeWidgetItem* item, int col, const QString& html) {
+        if (html.isEmpty()) return;
+        QLabel* lbl = new QLabel(html);
         lbl->setTextFormat(Qt::RichText);
-        dlgLayout->addWidget(lbl);
+        tree->setItemWidget(item, col, lbl);
     };
-
-    // 按参数分组输出
-    auto outputParamGroup = [&](const QString& label, const QHash<QString, ChangedItem>& changedMap,
-                                int itemType) {
-        for (auto it = changedMap.begin(); it != changedMap.end(); ++it) {
-            const QString& key = it.key();
-            QVector<int> matchIdx, missIdx;
-            QSet<int> matchFileSet;
-            for (int i = 0; i < validTargets.size(); ++i) {
-                bool matched = false;
-                if (itemType == 0) matched = validTargets[i].matchedParamNames.contains(key);
-                else if (itemType == 1) matched = validTargets[i].matchedInputNames.contains(key);
-                else matched = validTargets[i].matchedOutputNames.contains(key);
-                if (matched) {
-                    matchIdx.append(i);
-                    matchFileSet.insert(validTargets[i].fileIdx);
-                } else {
-                    missIdx.append(i);
-                }
-            }
-            QString secLabel = label.arg(key);
-            addSection(secLabel, matchFileSet.size());
-            for (int i : matchIdx)
-                addCheckRow(validTargets[i], key, itemType);
-            if (!matchIdx.isEmpty()) {
-                for (int i : missIdx)
-                    addMissingRow(validTargets[i]);
-            }
+    // 按身份键在目标 Mission 中定位对应元素（旧值来源）
+    auto findOldItem = [&](const SyncTarget& st, const ChangedItem& ci, int itemType) -> const ParsedParameter* {
+        const ParsedMission& tm = m_files[st.fileIdx].blocks[st.mbIdx].missions[st.mIdx];
+        if (itemType == 0) {
+            QVector<QString> ks = buildParamKeys(tm.params, false);
+            int i = ks.indexOf(ci.key);
+            return i >= 0 ? &tm.params[i] : nullptr;
         }
+        const QVector<ParsedParameter>& paths = itemType == 1 ? tm.inputPaths : tm.outputPaths;
+        QVector<QString> ks = buildPathKeys(paths, false);
+        int i = ks.indexOf(ci.key);
+        return i >= 0 ? &paths[i] : nullptr;
     };
 
-    outputParamGroup(QStringLiteral("参数 %1"), changedParams, 0);
-    outputParamGroup(QStringLiteral("输入路径 %1"), changedInputs, 1);
-    outputParamGroup(QStringLiteral("输出路径 %1"), changedOutputs, 2);
+    // 按 Mission 建表：文件为主序（同文件连续行，每行都写文件名），
+    // 每行一条完整变更：文件｜项｜旧值｜新值
+    for (int si = 0; si < selected.size(); ++si) {
+        const MissionChanges& mc = selected[si];
+        const QVector<SyncTarget>& validTargets = targetsPerMission[si];
+        if (validTargets.isEmpty()) continue; // 无任何目标文件的任务不展示，数量已计入顶部提示
+
+        // 多任务时才显示 📁 任务分组头（单任务时顶部提示已说明）
+        QTreeWidgetItem* missionNode = nullptr;
+        if (selected.size() > 1) {
+            missionNode = new QTreeWidgetItem(tree);
+            QString mText = QStringLiteral("\xF0\x9F\x93\x81 [%1]").arg(mc.id);
+            if (!mc.note.isEmpty()) mText += QStringLiteral(" %1").arg(mc.note);
+            missionNode->setText(0, mText);
+            missionNode->setFirstColumnSpanned(true);
+            QFont mf = missionNode->font(0);
+            mf.setBold(true);
+            missionNode->setFont(0, mf);
+            missionNode->setExpanded(true);
+        }
+        auto addRow = [&]() {
+            return missionNode ? new QTreeWidgetItem(missionNode) : new QTreeWidgetItem(tree);
+        };
+
+        // 每个目标文件一个块：先已匹配行（参数→输入→输出），再无对应项行
+        for (int fi = 0; fi < validTargets.size(); ++fi) {
+            const SyncTarget& st = validTargets[fi];
+
+            auto rowForItem = [&](const ChangedItem& ci, int itemType, int iIdx, const QString& icon) {
+                const ParsedParameter* oldP = findOldItem(st, ci, itemType);
+                QTreeWidgetItem* row = addRow();
+                row->setText(0, st.fileName);
+                row->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
+                row->setCheckState(0, Qt::Unchecked); // 默认全不选，用户勾选后同步
+                row->setText(1, icon + ci.display);
+                if (oldP) {
+                    setCellWidget(row, 2, buildValueCell(*oldP, ci, itemType == 0, false, QStringLiteral("#333")));
+                    setCellWidget(row, 3, buildValueCell(*oldP, ci, itemType == 0, true, QStringLiteral("#1a7f37")));
+                }
+                allChecks.append({row, st.fileIdx, st.mbIdx, st.mIdx, itemType, si, iIdx});
+            };
+
+            for (int iIdx = 0; iIdx < mc.params.size(); ++iIdx)
+                if (st.matchedParams.contains(mc.params[iIdx].key))
+                    rowForItem(mc.params[iIdx], 0, iIdx, QStringLiteral("\xE2\x9A\x99 "));
+            for (int iIdx = 0; iIdx < mc.inputs.size(); ++iIdx)
+                if (st.matchedInputs.contains(mc.inputs[iIdx].key))
+                    rowForItem(mc.inputs[iIdx], 1, iIdx, QStringLiteral("\xF0\x9F\x93\xA5 "));
+            for (int iIdx = 0; iIdx < mc.outputs.size(); ++iIdx)
+                if (st.matchedOutputs.contains(mc.outputs[iIdx].key))
+                    rowForItem(mc.outputs[iIdx], 2, iIdx, QStringLiteral("\xF0\x9F\x93\xA4 "));
+
+            // 该文件没有的项：灰色行，旧值"—"，新值列灰显本应同步的值（始终写全文件名）
+            auto rowForMissing = [&](const ChangedItem& ci, const QString& icon) {
+                QTreeWidgetItem* row = addRow();
+                row->setText(0, QStringLiteral("%1（无对应项）").arg(st.fileName));
+                row->setForeground(0, QColor(0xaa, 0xaa, 0xaa));
+                row->setForeground(1, QColor(0xaa, 0xaa, 0xaa));
+                row->setText(1, icon + ci.display);
+                setCellWidget(row, 2, QStringLiteral("<span style='color:#aaa'>—</span>"));
+                setCellWidget(row, 3, fieldLine(QStringLiteral("值"), shortVal(ci.value), QStringLiteral("#aaa")));
+            };
+            for (int iIdx = 0; iIdx < mc.params.size(); ++iIdx)
+                if (!st.matchedParams.contains(mc.params[iIdx].key))
+                    rowForMissing(mc.params[iIdx], QStringLiteral("\xE2\x9A\x99 "));
+            for (int iIdx = 0; iIdx < mc.inputs.size(); ++iIdx)
+                if (!st.matchedInputs.contains(mc.inputs[iIdx].key))
+                    rowForMissing(mc.inputs[iIdx], QStringLiteral("\xF0\x9F\x93\xA5 "));
+            for (int iIdx = 0; iIdx < mc.outputs.size(); ++iIdx)
+                if (!st.matchedOutputs.contains(mc.outputs[iIdx].key))
+                    rowForMissing(mc.outputs[iIdx], QStringLiteral("\xF0\x9F\x93\xA4 "));
+        }
+    }
+
+    tree->expandAll();
 
     // 无可勾选项时全选按钮置灰
     if (allChecks.isEmpty()) {
@@ -2795,10 +4289,10 @@ void ParamConfigDialog::onSyncToOtherFiles()
     }
 
     connect(btnSelectAll, &QPushButton::clicked, [&allChecks]() {
-        for (auto& e : allChecks) e.cb->setChecked(true);
+        for (auto& e : allChecks) e.item->setCheckState(0, Qt::Checked);
     });
     connect(btnDeselectAll, &QPushButton::clicked, [&allChecks]() {
-        for (auto& e : allChecks) e.cb->setChecked(false);
+        for (auto& e : allChecks) e.item->setCheckState(0, Qt::Unchecked);
     });
 
     QHBoxLayout* btnRow = new QHBoxLayout();
@@ -2812,52 +4306,90 @@ void ParamConfigDialog::onSyncToOtherFiles()
     connect(btnOk, &QPushButton::clicked, &dlg, &QDialog::accept);
     connect(btnCancel, &QPushButton::clicked, &dlg, &QDialog::reject);
 
+    // 自适应宽高：文件/项列按文本宽、旧值/新值列按内容宽；高度按行数估算，封顶 420 树内滚动
+    QFontMetrics fm(tree->font());
+    int w0 = 60, w1 = 40, w2 = 40, w3 = 40;
+    for (QTreeWidgetItemIterator it(tree); *it; ++it) {
+        w0 = qMax(w0, fm.horizontalAdvance((*it)->text(0)));
+        w1 = qMax(w1, fm.horizontalAdvance((*it)->text(1)));
+        if (QWidget* wdg = tree->itemWidget(*it, 2)) w2 = qMax(w2, wdg->sizeHint().width());
+        if (QWidget* wdg = tree->itemWidget(*it, 3)) w3 = qMax(w3, wdg->sizeHint().width());
+    }
+    tree->setColumnWidth(1, w1 + 16);
+    tree->setColumnWidth(2, w2 + 16);
+    tree->setColumnWidth(3, w3 + 16);
+    int w = qBound(560, w0 + w1 + w2 + w3 + 26 + 16 * 3
+        + dlgLayout->contentsMargins().left() + dlgLayout->contentsMargins().right()
+        + tree->frameWidth() * 2 + 20, 900);
+
+    int contentH = tree->header()->height();
+    for (QTreeWidgetItemIterator it(tree); *it; ++it) {
+        QTreeWidgetItem* item = *it;
+        if (item->isFirstColumnSpanned()) { contentH += 24; continue; } // 任务分组头
+        int rowH = tree->fontMetrics().height() + 4;
+        for (int c = 0; c < 4; ++c) {
+            if (QWidget* wdg = tree->itemWidget(item, c))
+                rowH = qMax(rowH, wdg->sizeHint().height() + 4);
+        }
+        contentH += rowH;
+    }
+    int treeH = qBound(80, contentH + 2, 420); // 按内容最优高度，最少 80、封顶 420 树内滚动
+    tree->setFixedHeight(treeH);
+
+    int hintH = hint->heightForWidth(w);
+    if (hintH <= 0) hintH = hint->sizeHint().height();
+    int fixedH = hintH + selRow->sizeHint().height() + btnRow->sizeHint().height()
+        + dlgLayout->contentsMargins().top() + dlgLayout->contentsMargins().bottom()
+        + dlgLayout->spacing() * 3 + 10;
+    dlg.resize(w, qBound(220, fixedH + treeH, 640)); // 高度随内容收放，220~640
+
     if (dlg.exec() != QDialog::Accepted) return;
 
-    // 同步：遍历已勾选的 (参数, 文件) 对
+    // 同步：遍历已勾选的 (Mission, 项, 文件) 对，按身份键定位目标元素
     int syncedItems = 0;
     QSet<int> syncedFileIndices;
     for (const auto& e : allChecks) {
-        if (!e.cb->isChecked()) continue;
-        ParsedMission& target = m_files[e.fileIdx].blocks[e.mbIdx].missions[e.mIdx];
+        if (e.item->checkState(0) != Qt::Checked) continue;
+        const MissionChanges& src = selected[e.srcIdx];
+        if (e.fileIdx < 0 || e.fileIdx >= m_files.size()) continue;
+        ParsedFileData& tfd = m_files[e.fileIdx];
+        if (e.mbIdx < 0 || e.mbIdx >= tfd.blocks.size()) continue;
+        if (e.mIdx < 0 || e.mIdx >= tfd.blocks[e.mbIdx].missions.size()) continue;
+        ParsedMission& target = tfd.blocks[e.mbIdx].missions[e.mIdx];
 
+        const ChangedItem* item = nullptr;
+        QVector<ParsedParameter>* tvec = nullptr;
         if (e.itemType == 0) {
-            auto it = changedParams.find(e.paramKey);
-            if (it == changedParams.end()) continue;
-            for (auto& tp : target.params) {
-                if (tp.name == e.paramKey) {
-                    tp.value = it->value;
-                    tp.description = it->description;
-                    break;
-                }
-            }
+            if (e.itemIdx < 0 || e.itemIdx >= src.params.size()) continue;
+            item = &src.params[e.itemIdx];
+            tvec = &target.params;
         } else if (e.itemType == 1) {
-            auto it = changedInputs.find(e.paramKey);
-            if (it == changedInputs.end()) continue;
-            for (auto& tp : target.inputPaths) {
-                if (tp.value == e.paramKey || tp.name == e.paramKey) {
-                    tp.value = it->value;
-                    tp.description = it->description;
-                    break;
-                }
-            }
+            if (e.itemIdx < 0 || e.itemIdx >= src.inputs.size()) continue;
+            item = &src.inputs[e.itemIdx];
+            tvec = &target.inputPaths;
         } else {
-            auto it = changedOutputs.find(e.paramKey);
-            if (it == changedOutputs.end()) continue;
-            for (auto& tp : target.outputPaths) {
-                if (tp.value == e.paramKey || tp.name == e.paramKey) {
-                    tp.value = it->value;
-                    tp.description = it->description;
-                    break;
-                }
-            }
+            if (e.itemIdx < 0 || e.itemIdx >= src.outputs.size()) continue;
+            item = &src.outputs[e.itemIdx];
+            tvec = &target.outputPaths;
         }
-        syncedItems++;
+        QVector<QString> tKeys = (e.itemType == 0)
+            ? buildParamKeys(*tvec, false)
+            : buildPathKeys(*tvec, false);
+        int ti = tKeys.indexOf(item->key);
+        if (ti < 0) continue;
+        ParsedParameter& tp = (*tvec)[ti];
+        if (e.itemType == 0) tp.name = item->name;
+        tp.value = item->value;
+        tp.description = item->description;
+        tp.tip = item->tip;
+        ++syncedItems;
         syncedFileIndices.insert(e.fileIdx);
     }
 
     refreshParamTree();
-    updateStatus(QStringLiteral("已将 %1 个参数同步到 %2 个文件").arg(syncedItems).arg(syncedFileIndices.size()));
+    updateWindowTitle();
+    updateStatus(QStringLiteral("已将 %1 项修改同步到 %2 个文件（未保存，点击“保存”写入磁盘）")
+        .arg(syncedItems).arg(syncedFileIndices.size()));
 }
 
 void ParamConfigDialog::updateStatus(const QString& msg)

@@ -1,17 +1,53 @@
 #include "se_mission456_check.h"
+
+#include "../ui_task/wuji_engine_bridge.h"
+#include "../ui_task/wuji_mission_runner.h"
+#include "../ui_task/wuji_mission_xml.h"
+
 #include "qgsvectorlayer.h"
 #include "qgsfeature.h"
 #include "qgsgeometry.h"
 #include "qgspointxy.h"
 #include "qgsspatialindex.h"
 #include "qgsfeaturerequest.h"
+
+#include <QDir>
+#include <QFileInfo>
 #include <QSet>
+#include <QTemporaryDir>
 #include <cmath>
 
-using namespace Mission456;
+// ============================================================
+//  本地回退实现
+//
+//  检查逻辑正常由引擎子进程（MapBatchProcessing.exe）完成；该可执行
+//  文件只存在于 Windows，麒麟上不存在，此时退回下面的本地 QGIS 算法，
+//  保证 456 在无引擎环境下仍可执行（Windows 用引擎、麒麟用本地）。
+//
+//  算法本体与本工程综合前的实现逐字一致，唯一差别是参考线/点图层由已
+//  合并好的 SHP 路径加载而来（引擎路径下参考图层同样以合并 SHP 形式传入）。
+//  模式位含义与引擎实现一致：1 面重叠 2 面缝隙 4 面包含点
+//  8 面包含唯一一点 16 面被要素覆盖 32 面边界被线覆盖 1024 面大于容差。
+//  其中 8/16 已从配置中移除，32 默认关闭，按配置不会进入。
+// ============================================================
+namespace {
+
+// 从 SHP 路径加载参考图层；失败返回 nullptr（调用方负责 delete）
+QgsVectorLayer* openRefLayer(const QString& shpPath)
+{
+    if (shpPath.isEmpty() || !QFileInfo::exists(shpPath))
+        return nullptr;
+    QgsVectorLayer* lyr = new QgsVectorLayer(
+        shpPath, QFileInfo(shpPath).completeBaseName(), QStringLiteral("ogr"));
+    if (!lyr->isValid()) {
+        delete lyr;
+        return nullptr;
+    }
+    return lyr;
+}
 
 // ====== 模式1: 面不能重叠 ======
-void Mission456::checkOverlap(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors)
+void checkOverlap(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors)
 {
     if (!layer) return;
     QgsSpatialIndex index(layer->getFeatures());
@@ -42,7 +78,7 @@ void Mission456::checkOverlap(QgsVectorLayer* layer, QList<QPair<QgsFeature, QSt
 
 // ====== 模式2: 面不能有缝隙 ======
 // 通过检查相邻面之间是否存在未被覆盖的狭长区域来检测
-void Mission456::checkGaps(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors, double tol)
+void checkGaps(QgsVectorLayer* layer, QList<QPair<QgsFeature, QString>>& errors, double tol)
 {
     if (!layer) return;
     QgsSpatialIndex index(layer->getFeatures());
@@ -83,7 +119,7 @@ void Mission456::checkGaps(QgsVectorLayer* layer, QList<QPair<QgsFeature, QStrin
 }
 
 // ====== 模式3: 面必须包含点 ======
-void Mission456::checkContainsPoint(QgsVectorLayer* polyLayer, QgsVectorLayer* pointLayer,
+void checkContainsPoint(QgsVectorLayer* polyLayer, QgsVectorLayer* pointLayer,
     QList<QPair<QgsFeature, QString>>& errors)
 {
     if (!polyLayer || !pointLayer) return;
@@ -108,7 +144,7 @@ void Mission456::checkContainsPoint(QgsVectorLayer* polyLayer, QgsVectorLayer* p
 }
 
 // ====== 面边界必须被线覆盖 ======
-void Mission456::checkBoundaryCoveredByLine(QgsVectorLayer* polyLayer, QgsVectorLayer* lineLayer,
+void checkBoundaryCoveredByLine(QgsVectorLayer* polyLayer, QgsVectorLayer* lineLayer,
     QList<QPair<QgsFeature, QString>>& errors, double tol)
 {
     if (!polyLayer || !lineLayer) return;
@@ -143,7 +179,7 @@ void Mission456::checkBoundaryCoveredByLine(QgsVectorLayer* polyLayer, QgsVector
 }
 
 // ====== 面必须大于聚类容差 ======
-void Mission456::checkLargerThanTolerance(QgsVectorLayer* layer,
+void checkLargerThanTolerance(QgsVectorLayer* layer,
     QList<QPair<QgsFeature, QString>>& errors, double minArea)
 {
     if (!layer || minArea <= 0.0) return;
@@ -160,8 +196,8 @@ void Mission456::checkLargerThanTolerance(QgsVectorLayer* layer,
     }
 }
 
-// ====== 主入口 ======
-void Mission456::execute(QgsVectorLayer* polyLayer, QgsVectorLayer* lineLayer,
+// ====== 本地回退主入口 ======
+void executeLocal(QgsVectorLayer* polyLayer, QgsVectorLayer* lineLayer,
     QgsVectorLayer* pointLayer, QgsVectorLayer* refPolyLayer,
     int processMode, const QHash<QString, double>& thresholds,
     QList<QPair<QgsFeature, QString>>& allErrors, QStringList& executedChecks)
@@ -192,3 +228,84 @@ void Mission456::execute(QgsVectorLayer* polyLayer, QgsVectorLayer* lineLayer,
     double minArea = gd("minArea", 0.0);
     run(1024, "面大于容差",       [&](auto& e){ checkLargerThanTolerance(polyLayer, e, minArea); });
 }
+
+} // namespace
+
+namespace Mission456 {
+
+void execute(QgsVectorLayer* polyLayer, const QString& refLineShp,
+             const QString& refPointShp,
+             int processMode, const QHash<QString, double>& thresholds,
+             QList<QPair<QgsFeature, QString>>& allErrors, QStringList& executedChecks)
+{
+    if (!polyLayer) {
+        executedChecks.append(QStringLiteral("面拓扑检查：无面要素图层，本次不涉及"));
+        return;
+    }
+
+    // ---- 引擎不可用（如麒麟无 MapBatchProcessing.exe）→ 本地 QGIS 实现 ----
+    if (!WujiEngineBridge::engineAvailable()) {
+        QgsVectorLayer* refLine = openRefLayer(refLineShp);
+        QgsVectorLayer* refPoint = openRefLayer(refPointShp);
+        executeLocal(polyLayer, refLine, refPoint, nullptr /*refPolygonShp 未用*/,
+                     processMode, thresholds, allErrors, executedChecks);
+        delete refPoint;
+        delete refLine;
+        return;
+    }
+
+    QTemporaryDir work;
+    if (!work.isValid()) {
+        executedChecks.append(QStringLiteral("面拓扑检查：无法创建工作目录，本次未执行"));
+        return;
+    }
+    const QString dir = work.path();
+
+    // ---- 输入图层导出为 GBK 编码 SHP ----
+    QString errOut;
+    const QString polyShp = WujiMissionRunner::exportLayerShp(
+        polyLayer, dir, QStringLiteral("polygon"), &errOut);
+    if (polyShp.isEmpty()) {
+        executedChecks.append(QStringLiteral("面拓扑检查：无法导出面图层（%1），本次未执行").arg(errOut));
+        return;
+    }
+    // 参考图层（其余类型的全部图层合并件）复制进任务目录（FilePath 必须相对路径）
+    const QString lineShp = refLineShp.isEmpty() ? QString()
+        : WujiMissionRunner::stageShapefiles(QStringList() << refLineShp, dir).value(0);
+    const QString pointShp = refPointShp.isEmpty() ? QString()
+        : WujiMissionRunner::stageShapefiles(QStringList() << refPointShp, dir).value(0);
+
+    // ---- 构造任务 XML 并执行 ----
+    const QString outPolyShp = QDir(dir).filePath(QStringLiteral("polygon_out.shp"));
+    const QString outLineShp = QDir(dir).filePath(QStringLiteral("polyline_out.shp"));
+    const QString outPointShp = QDir(dir).filePath(QStringLiteral("point_out.shp"));
+    const QString xml = WujiMissionXml::buildMission456(
+        dir, polyShp, lineShp, pointShp, QString() /*refPolygonShp 未用*/,
+        processMode, thresholds.value(QStringLiteral("FuzzyTolerance"), 0.001),
+        thresholds.value(QStringLiteral("BufferDistance"), 0.0),
+        outPolyShp, outLineShp, outPointShp);
+
+    int errBefore = allErrors.size();
+    if (WujiMissionRunner::runMissionXml(xml, dir, QStringLiteral("面拓扑检查"),
+                                         processMode, executedChecks)) {
+        // 面结果层：源面要素副本 + info_NM 字段（非空即错误）
+        // 错误消息带图层名，如"面拓扑检查(A级景区)"，供合并输出时提取
+        const QString baseName = QFileInfo(polyLayer->source()).completeBaseName();
+        WujiMissionRunner::readResultErrors(outPolyShp, polyLayer,
+            QStringLiteral("面拓扑检查(%1)").arg(baseName), WujiMissionRunner::ReadInfoField,
+            QStringLiteral("info_NM"), allErrors);
+        // 线结果层 / 错误位置点层：每个要素即一处错误
+        WujiMissionRunner::readResultErrors(outLineShp, polyLayer,
+            QStringLiteral("面拓扑检查线结果(%1)").arg(baseName), WujiMissionRunner::ReadAll,
+            QStringLiteral("info_NM"), allErrors);
+        WujiMissionRunner::readResultErrors(outPointShp, polyLayer,
+            QStringLiteral("面拓扑检查错误位置(%1)").arg(baseName), WujiMissionRunner::ReadAll,
+            QStringLiteral("info_NM"), allErrors);
+    }
+    int added = allErrors.size() - errBefore;
+    executedChecks.append(QStringLiteral("面拓扑检查(%1)：%2")
+        .arg(QFileInfo(polyLayer->source()).completeBaseName())
+        .arg(added == 0 ? QStringLiteral("未检出异常") : QStringLiteral("检出异常%1处").arg(added)));
+}
+
+} // namespace Mission456
