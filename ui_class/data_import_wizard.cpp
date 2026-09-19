@@ -4,6 +4,7 @@
 #include "database/postgis_connector.h"
 #include "database/product_dao.h"
 #include "core/metadata_extractor.h"
+#include "ui_class/gdb_layer_selector_dialog.h"
 
 #include <QDir>
 #include <QFile>
@@ -11,6 +12,7 @@
 #include <QUuid>
 #include <QCoreApplication>
 #include <QFileInfo>
+#include <QRegularExpression>   // 本工程补：源侧删了这行却仍在使用（754/973/1010-1012）
 #include <QTextStream>
 #include <qgsmessagelog.h>
 #include <QMessageBox>
@@ -20,7 +22,6 @@
 #include <QSplitter>
 #include <QDateTime>
 #include <QDebug>
-#include <QRegularExpression>
 #include <qgsmessagelog.h>
 
 // GDAL headers（GDB/MDB 图层枚举）
@@ -142,6 +143,11 @@ DataImportWizard::DataImportWizard(QWidget* parent)
 
 DataImportWizard::~DataImportWizard()
 {
+}
+
+void DataImportWizard::setTargetParentDirId(int dirId)
+{
+	mTargetParentDirId = dirId;
 }
 
 // ============================================================================
@@ -816,14 +822,20 @@ void DataImportWizard::onStartImport()
 		int importDirId = DirectoryHelper::resolveDirectoryIdByExt(ext, false,
 			DirectoryHelper::RasterSubcategory::Image, mDirIds);
 
+		// 指定了目标目录节点时（从目录树右键导入）：栅格/制图/其它类型直接挂到该节点下
+		if (mTargetParentDirId > 0 && dt != ImportDataType::Vector)
+			importDirId = mTargetParentDirId;
+
 		if (dt == ImportDataType::Vector)
 		{
-			// gdb / mdb：在要素集下建以"gdb/mdb 文件名"命名的子节点，图层挂其下
+			// 矢量数据挂载父节点：指定了目标目录节点时挂到该节点下，否则用固定目录树的"要素集"
+			int vectorParent = (mTargetParentDirId > 0) ? mTargetParentDirId : mDirIds.elementFeature;
+			// gdb / mdb：在父节点下建以"gdb/mdb 文件名"命名的子节点，图层挂其下
 			if (ext == "gdb" || ext == "mdb")
 			{
 				QString base = fi.completeBaseName().isEmpty() ? fileName : fi.completeBaseName();
 				importDirId = DirectoryHelper::createNamedChildDirectory(
-					mDirDao, mDirIds.elementFeature, base);
+					mDirDao, vectorParent, base);
 				if (importDirId > 0) mImportUsedDirs.insert(importDirId);
 			}
 			else
@@ -832,24 +844,28 @@ void DataImportWizard::onStartImport()
 				QString containerName = mIsSingleVectorSource ? fileName : QDir(dirPath).dirName();
 				// 单源文件时该节点即图层节点，标记为图层类型（矢量图层图标）
 				importDirId = DirectoryHelper::createNamedChildDirectory(
-					mDirDao, mDirIds.elementFeature, containerName, mIsSingleVectorSource ? 1 : 0);
+					mDirDao, vectorParent, containerName, mIsSingleVectorSource ? 1 : 0);
 				if (importDirId > 0) mImportUsedDirs.insert(importDirId);
 			}
 		}
 		else if (dt == ImportDataType::Raster)
 		{
-			DirectoryHelper::RasterSubcategory sub =
-				(mRasterSubcategoryCombo && mRasterSubcategoryCombo->currentIndex() == 1)
-					? DirectoryHelper::RasterSubcategory::Shading
-					: DirectoryHelper::RasterSubcategory::Image;
-			importDirId = DirectoryHelper::resolveDirectoryIdByExt(ext, true, sub, mDirIds);
+			// 未指定目标目录节点时按子类别自动归类到影像/晕渲
+			if (mTargetParentDirId <= 0)
+			{
+				DirectoryHelper::RasterSubcategory sub =
+					(mRasterSubcategoryCombo && mRasterSubcategoryCombo->currentIndex() == 1)
+						? DirectoryHelper::RasterSubcategory::Shading
+						: DirectoryHelper::RasterSubcategory::Image;
+				importDirId = DirectoryHelper::resolveDirectoryIdByExt(ext, true, sub, mDirIds);
+			}
 		}
 
 		int percent = static_cast<int>((static_cast<double>(i) / files.size()) * 100.0);
 		mProgressBar->setValue(percent);
 		mProgressLabel->setText(
 			QString::fromUtf8("正在处理 %1/%2: %3").arg(i + 1).arg(files.size()).arg(fileName));
-		QApplication::processEvents();
+		QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 
 		appendLog(QString::fromUtf8("──────────────────────────────────"));
 		appendLog(QString::fromUtf8("[%1/%2] %3").arg(i + 1).arg(files.size()).arg(fileName), "#9fd8e6");
@@ -911,23 +927,12 @@ void DataImportWizard::onStartImport()
 		// ── 5. 按类型导入 ──
 	if (dt == ImportDataType::Vector)
 	{
-			// ── 5a. GDB / MDB：多图层数据集，哈希去重 + 每图层一条产品记录 ──
+			// ── 5a. GDB / MDB：多图层数据集，图层级去重 + 每图层一条产品记录 ──
 			if (ext == "gdb" || ext == "mdb")
 			{
-				// 哈希去重：GDB/MDB 按图层拆分为多条记录，用文件哈希精确定位
-				if (!fileHash.isEmpty())
-				{
-					ProductDAO daoCheck;
-					ProductMetadata hashExisting = daoCheck.findByHash(fileHash);
-					if (!hashExisting.dataId.isEmpty())
-					{
-						appendLog(QString::fromUtf8("  ⏭ 跳过: %1 文件哈希与已入库记录一致 (原记录 id=%2)")
-							.arg(ext.toUpper()).arg(hashExisting.id), "#e67e22");
-						skippedCount++;
-						continue;
-					}
-				}
-
+				// 不再做整文件哈希拦截（文件级去重会导致部分图层删除后整个 GDB 无法重导）。
+				// 去重下沉到图层级：同一 GDB（file_hash 相同）下同名图层已入库且哈希一致 → 跳过；
+				// 同名图层已入库但哈希不同 → 版本更新；无同名图层 → 新建。
 				int count = mImporter->importVectorToPostGIS(filePath, targetTable, 0, 4490, "UTF-8");
 				if (count < 0)
 				{
@@ -943,14 +948,29 @@ void DataImportWizard::onStartImport()
 					if (poDS)
 					{
 						ProductDAO dao;
-						int layerCount = poDS->GetLayerCount();
-						appendLog(QString::fromUtf8("  检测到 %1 个图层").arg(layerCount), "#8aa4b5");
+						// 取 GDB 内全部图层（含要素数据集归属信息），由 GDB_Items 系统目录表解析
+						const QList<GDBLayerInfo> layerInfos =
+							GDBLayerSelectorDialog::allLayerInfos(filePath);
+						appendLog(QString::fromUtf8("  检测到 %1 个图层").arg(layerInfos.size()), "#8aa4b5");
 
-						for (int iLayer = 0; iLayer < layerCount; ++iLayer)
+						// 预取同一文件哈希的全部历史记录，供图层级去重匹配
+						const QList<ProductMetadata> sameHashProducts =
+							(fileHash.isEmpty()) ? QList<ProductMetadata>() : dao.getProductsByHash(fileHash);
+
+						for (const GDBLayerInfo& layerInfo : layerInfos)
 						{
-							OGRLayer* poLayer = poDS->GetLayer(iLayer);
-							QString layerName = QString::fromUtf8(poLayer->GetName());
-							QString safeLayer = layerName.toLower();
+							// 通过 GDALDataset 按名取图层，拿到几何类型与要素数等运行时信息
+							OGRLayer* poLayer = poDS->GetLayerByName(layerInfo.layerName.toUtf8().constData());
+							if (!poLayer) continue;
+							// GDB 中可能含要素数据集（Feature Dataset），GDB_Items 解析后存于 layerInfo.datasetName。
+							const QString& datasetName   = layerInfo.datasetName; // 空 = 顶层图层
+							const QString& pureLayerName = layerInfo.layerName;
+							const QString& layerName     = layerInfo.layerName; // 兼容后续代码引用
+
+							// 表名后缀：无数据集用图层名，有数据集用 "数据集_图层名"，避免不同数据集下同名图层冲突
+							QString safeLayer = (datasetName.isEmpty()
+								? pureLayerName
+								: datasetName + "_" + pureLayerName).toLower();
 							safeLayer.replace(QRegularExpression("[^a-z0-9_\\x{4e00}-\\x{9fff}]"), "_");
 							QString layerTableName = targetTable + "_" + safeLayer;
 
@@ -966,48 +986,148 @@ void DataImportWizard::onStartImport()
 
 							int featCount = poLayer->GetFeatureCount();
 
+							// gdb/mdb：建目录层级挂载点（同名复用）。
+							// 有数据集时：gdb名节点 → 数据集名节点 → 图层名节点；无数据集：gdb名节点 → 图层名节点
+							int layerParentDirId = importDirId;
+							if (!datasetName.isEmpty())
+							{
+								// 要素数据集节点 nodeType=2（区别于图层节点 nodeType=1），
+								// 用于在目录树中按 ArcGIS 要素数据集样式渲染图标
+								int dsDirId = DirectoryHelper::createNamedChildDirectory(mDirDao, importDirId, datasetName, 2);
+								if (dsDirId > 0)
+								{
+									mImportUsedDirs.insert(dsDirId);
+									layerParentDirId = dsDirId;
+								}
+							}
+							int layerDirId = DirectoryHelper::createNamedChildDirectory(mDirDao, layerParentDirId, pureLayerName, 1);
+							if (layerDirId > 0)
+								mImportUsedDirs.insert(layerDirId);
+
+							// ===== 图层级去重：同一 GDB 下同名图层（产品表名以 _v{N}_图层名 结尾）=====
+							ProductMetadata existing;
+							if (!fileHash.isEmpty())
+							{
+								QRegularExpression re(QString("_v\\d+_%1$")
+									.arg(QRegularExpression::escape(safeLayer)),
+									QRegularExpression::CaseInsensitiveOption);
+								for (const auto& p : sameHashProducts)
+								{
+									if (re.match(p.productName).hasMatch())
+									{
+										existing = p;
+										break;
+									}
+								}
+							}
+							bool isNewLayer = existing.dataId.isEmpty();
+
+							// 若匹配到记录但其挂载目录已被删除（孤儿记录），重新挂载到新建图层节点，
+							// 避免残留记录永远拦截重导
+							if (!isNewLayer && existing.parentDirId > 0
+								&& dao.getDirectory(existing.parentDirId).id <= 0)
+							{
+								appendLog(QString::fromUtf8("  ⚠ 原挂载目录(id=%1)已删除，图层 [%2] 重新挂载")
+									.arg(existing.parentDirId).arg(layerName), "#e67e22");
+								if (layerDirId > 0)
+								{
+									dao.updateProductParentDir(existing.id, layerDirId);
+									mImportPopulatedDirs.insert(layerDirId);
+								}
+								// 内容未变（哈希一致），仅修复挂载关系
+								skippedCount++;
+								continue;
+							}
+
+							// 同名图层已入库且内容一致 → 跳过该图层，不重复建记录
+							if (!isNewLayer && !existing.fileHash.isEmpty() && existing.fileHash == fileHash)
+							{
+								appendLog(QString::fromUtf8("  ⏭ 图层 [%1] 已入库且哈希一致，跳过 (id=%2)")
+									.arg(layerName).arg(existing.id), "#e67e22");
+								skippedCount++;
+								continue;
+							}
+
 							ProductMetadata vecMeta = autoMeta;
-							vecMeta.productName = layerTableName;       // 例如 "testgdb_roads"
 							vecMeta.productType = ProductType::Vector;
 							vecMeta.fileFormat = ext;
 							vecMeta.filePath = filePath;
 							vecMeta.fileSize = fileSize;
 							vecMeta.fileHash = fileHash;
-							vecMeta.layerTableName = layerTableName;
 							vecMeta.geometryType = geomType;
 							applyFormMetadata(vecMeta);
 							vecMeta.createdBy = "postgres";
 							vecMeta.updatedBy = "postgres";
-							vecMeta.dataId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-							vecMeta.currentVersion = 1;
-							// gdb/mdb：在 gdb 名节点下为每个图层建"图层名"子节点，产品挂其下
-							int layerDirId = DirectoryHelper::createNamedChildDirectory(mDirDao, importDirId, layerName, 1);
-							if (layerDirId > 0)
-							{
-								mImportUsedDirs.insert(layerDirId);
-								vecMeta.parentDirId = layerDirId;
-							}
-							else
-							{
-								vecMeta.parentDirId = importDirId;
-							}
 
-							int pid = dao.insertProduct(vecMeta);
-							if (pid > 0)
+							if (isNewLayer)
 							{
-								if (vecMeta.parentDirId > 0) mImportPopulatedDirs.insert(vecMeta.parentDirId);
-								dao.registerLayer(pid, layerTableName, geomType, 4490,
-									featCount >= 0 ? featCount : 0);
-								dao.enrichWithTypeMeta(pid);
-								importedCount++;
-								appendLog(QString::fromUtf8("  ✓ 图层 [%1] → %2 (id=%3, %4 要素)")
-									.arg(layerName).arg(layerTableName).arg(pid)
-									.arg(featCount >= 0 ? QString::number(featCount) : QString::fromUtf8("未知")), "#27ae60");
+								// 新图层 → 新建产品记录
+								vecMeta.productName = layerTableName;       // 例如 "testgdb_roads"
+								vecMeta.layerTableName = layerTableName;
+								vecMeta.dataId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+								vecMeta.currentVersion = 1;
+								if (layerDirId > 0)
+								{
+									mImportUsedDirs.insert(layerDirId);
+									vecMeta.parentDirId = layerDirId;
+								}
+								else
+								{
+									vecMeta.parentDirId = importDirId;
+								}
+
+								int pid = dao.insertProduct(vecMeta);
+								if (pid > 0)
+								{
+									if (vecMeta.parentDirId > 0) mImportPopulatedDirs.insert(vecMeta.parentDirId);
+									dao.registerLayer(pid, layerTableName, geomType, 4490,
+										featCount >= 0 ? featCount : 0);
+									dao.enrichWithTypeMeta(pid);
+									importedCount++;
+									appendLog(QString::fromUtf8("  ✓ 图层 [%1] → %2 (id=%3, %4 要素)")
+										.arg(layerName).arg(layerTableName).arg(pid)
+										.arg(featCount >= 0 ? QString::number(featCount) : QString::fromUtf8("未知")), "#27ae60");
+								}
+								else
+								{
+									appendLog(QString::fromUtf8("  ✗ 图层 [%1] 元数据写入失败").arg(layerName), "#e74c3c");
+									failedCount++;
+								}
 							}
 							else
 							{
-								appendLog(QString::fromUtf8("  ✗ 图层 [%1] 元数据写入失败").arg(layerName), "#e74c3c");
-								failedCount++;
+								// 同名图层已存在但内容变化 → 版本更新：导入新版本图层表
+								int newVer = existing.currentVersion + 1;
+								QString newLayerTable = safeTableName(fileName) + "_v" + QString::number(newVer) + "_" + safeLayer;
+								int c2 = mImporter->importVectorLayerToPostGIS(filePath, layerName, newLayerTable, 0, 4490, "UTF-8");
+								if (c2 < 0)
+								{
+									appendLog(QString::fromUtf8("  ✗ 图层 [%1] 版本更新导入失败: %2")
+										.arg(layerName).arg(mImporter->lastError()), "#e74c3c");
+									failedCount++;
+									continue;
+								}
+
+								vecMeta.id = existing.id;
+								vecMeta.productName = newLayerTable;
+								vecMeta.layerTableName = newLayerTable;
+								vecMeta.parentDirId = existing.parentDirId;
+								vecMeta.currentVersion = newVer;
+								bool okUpd = dao.updateProduct(vecMeta);
+								if (okUpd)
+								{
+									dao.registerLayer(existing.id, newLayerTable, geomType, 4490, c2);
+									dao.enrichWithTypeMeta(existing.id);
+									if (existing.parentDirId > 0) mImportPopulatedDirs.insert(existing.parentDirId);
+									versionUpCount++;
+									appendLog(QString::fromUtf8("  ⬆ 图层 [%1] 内容变化，版本更新 → %2 (id=%3, 版本=%4)")
+										.arg(layerName).arg(newLayerTable).arg(existing.id).arg(newVer), "#3498db");
+								}
+								else
+								{
+									appendLog(QString::fromUtf8("  ✗ 图层 [%1] 版本更新元数据写入失败").arg(layerName), "#e74c3c");
+									failedCount++;
+								}
 							}
 						}
 					}
@@ -1440,7 +1560,7 @@ void DataImportWizard::appendLog(const QString& message, const QString& color)
 	QTextCursor cursor = mLogTextEdit->textCursor();
 	cursor.movePosition(QTextCursor::End);
 	mLogTextEdit->setTextCursor(cursor);
-	QApplication::processEvents();
+	QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 }
 
 void DataImportWizard::onToggleLog()

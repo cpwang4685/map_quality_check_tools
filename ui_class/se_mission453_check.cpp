@@ -406,7 +406,11 @@ void execute(QgsVectorLayer* layer, const QString& featureSchemaXmlPath,
                     || ct == QString::fromUtf8("列表") || ct == QLatin1String("list")) {
                     // 枚举：约束集为值列表，非空即合法
                 } else if (ct == QString::fromUtf8("范围") || ct == QLatin1String("range")) {
-                    const QStringList parts = cs.split(rangeSep, Qt::SkipEmptyParts);
+                    // 【2026-09-15】刻意用 QString::SkipEmptyParts 而不是 Qt::SkipEmptyParts：
+                    // 后者是 Qt 5.14 才加进 Qt 命名空间的，麒麟（Qt 5.12.12）编不过；前者
+                    // 5.12/5.15 都可用，也是本工程既有写法（product_dao.cpp 等处共 11 处）。
+                    // 本文件下面另两处同理。
+                    const QStringList parts = cs.split(rangeSep, QString::SkipEmptyParts);
                     bool ok1 = false, ok2 = false;
                     if (parts.size() == 2) {
                         parts[0].trimmed().toDouble(&ok1);
@@ -435,7 +439,7 @@ void execute(QgsVectorLayer* layer, const QString& featureSchemaXmlPath,
                 if (ct == QString::fromUtf8("枚举") || ct == QLatin1String("enum")
                     || ct == QString::fromUtf8("列表") || ct == QLatin1String("list")) {
                     QSet<QString> allowed;
-                    const QStringList vals = cs.split(enumSep, Qt::SkipEmptyParts);
+                    const QStringList vals = cs.split(enumSep, QString::SkipEmptyParts);
                     for (const QString& v : vals) allowed.insert(v.trimmed());
                     int bad = 0;
                     QStringList ex;
@@ -453,7 +457,7 @@ void execute(QgsVectorLayer* layer, const QString& featureSchemaXmlPath,
                         problems.append(QStringLiteral("字段%1共%2条记录的值不在约束集内(示例:%3)")
                             .arg(f.name).arg(bad).arg(ex.join(QStringLiteral(","))));
                 } else if (ct == QString::fromUtf8("范围") || ct == QLatin1String("range")) {
-                    const QStringList parts = cs.split(rangeSep2, Qt::SkipEmptyParts);
+                    const QStringList parts = cs.split(rangeSep2, QString::SkipEmptyParts);
                     bool ok1 = false, ok2 = false;
                     double lo = 0.0, hi = 0.0;
                     if (parts.size() == 2) {

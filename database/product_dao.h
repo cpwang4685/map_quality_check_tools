@@ -61,6 +61,21 @@ public:
 	 */
 	ProductMetadata findByHash(const QString& hash);
 
+	/**
+	 * @brief 按文件哈希查找全部产品记录（用于 GDB/MDB 图层级去重）
+	 * @param hash SHA256 哈希值
+	 * @return 匹配该哈希的所有产品元数据（同一 GDB 的多个图层/多个版本记录）
+	 */
+	QList<ProductMetadata> getProductsByHash(const QString& hash);
+
+	/**
+	 * @brief 仅更新产品记录的挂载目录（用于孤儿记录重新挂载）
+	 * @param productId 产品 ID
+	 * @param newParentDirId 新的挂载目录 ID
+	 * @return 是否更新成功
+	 */
+	bool updateProductParentDir(int productId, int newParentDirId);
+
 	// ===== 版本管理 =====
 	int insertVersionRecord(const VersionRecord& record);
 	QList<VersionRecord> getVersionHistory(int productId);

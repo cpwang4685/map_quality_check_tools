@@ -67,6 +67,15 @@ public:
 	explicit DataImportWizard(QWidget* parent = nullptr);
 	~DataImportWizard() override;
 
+	/**
+	 * @brief 设置目标挂载目录节点 ID
+	 *
+	 * 传入 >0 时，导入的数据将挂载到该目录节点下（矢量在节点下建命名子节点，
+	 * 栅格/制图文件直接挂到该节点），不再按文件格式自动归类到固定目录树；
+	 * 不调用或传 0 时保持原有的自动归类行为。
+	 */
+	void setTargetParentDirId(int dirId);
+
 private slots:
 	void onNextPage();
 	void onPrevPage();
@@ -116,6 +125,7 @@ private:
 	ProductDAO              mDirDao;
 	DirectoryHelper::FixedDirectoryIds mDirIds;
 	bool                    mIsSingleVectorSource = false;
+	int                     mTargetParentDirId = 0; // 目标挂载目录节点 ID（0=自动归类）
 	QSet<int>               mImportUsedDirs;      // 本次导入动态使用的命名目录 id
 	QSet<int>               mImportPopulatedDirs; // 本次导入成功挂载产品的目录 id
 

@@ -10,7 +10,6 @@
 #include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QGroupBox>
-#include <QLineEdit>
 
 /*--------------SE---------------*/
 #include "backup_strategy_edit_dialog.h"
@@ -58,7 +57,7 @@ void CBackupStrategyEditDialog::setupUi()
     m_pComboBoxFrequency->addItem(tr("持续进行"), static_cast<int>(BackupFrequency::RealTime));
     pFormBasic->addRow(tr("执行频率:"), m_pComboBoxFrequency);
 
-    // 数据源类型（新增）
+    // 数据源类型（仅作区分：该策略备文件系统 / 数据库 / 两者）
     m_pGroupDataSource = new QGroupBox(tr("数据源类型"), this);
     QFormLayout* pFormDataSource = new QFormLayout(m_pGroupDataSource);
     m_pComboBoxDataSource = new QComboBox(m_pGroupDataSource);
@@ -67,42 +66,9 @@ void CBackupStrategyEditDialog::setupUi()
     m_pComboBoxDataSource->addItem(tr("全部（文件+数据库）"), static_cast<int>(BackupDataSource::All));
     pFormDataSource->addRow(tr("数据源:"), m_pComboBoxDataSource);
 
-    // 数据库连接配置（新增，仅当数据源为数据库时可见）
-    m_pGroupDbConfig = new QGroupBox(tr("数据库连接配置"), this);
-    QFormLayout* pFormDbConfig = new QFormLayout(m_pGroupDbConfig);
-
-    m_pComboBoxDbType = new QComboBox(m_pGroupDbConfig);
-    m_pComboBoxDbType->addItem(tr("PostGIS / PostgreSQL"), static_cast<int>(DatabaseType::PostgreSQL));
-    m_pComboBoxDbType->addItem(tr("MySQL"), static_cast<int>(DatabaseType::MySQL));
-    m_pComboBoxDbType->addItem(tr("Oracle"), static_cast<int>(DatabaseType::Oracle));
-    m_pComboBoxDbType->addItem(tr("SQL Server"), static_cast<int>(DatabaseType::SQLServer));
-    pFormDbConfig->addRow(tr("数据库类型:"), m_pComboBoxDbType);
-
-    m_pLineEditDbHost = new QLineEdit(m_pGroupDbConfig);
-    m_pLineEditDbHost->setPlaceholderText("127.0.0.1");
-    pFormDbConfig->addRow(tr("主机地址:"), m_pLineEditDbHost);
-
-    m_pLineEditDbPort = new QLineEdit(m_pGroupDbConfig);
-    m_pLineEditDbPort->setText("5432");
-    pFormDbConfig->addRow(tr("端口:"), m_pLineEditDbPort);
-
-    m_pLineEditDbName = new QLineEdit(m_pGroupDbConfig);
-    m_pLineEditDbName->setPlaceholderText("gis_db");
-    pFormDbConfig->addRow(tr("数据库名:"), m_pLineEditDbName);
-
-    m_pLineEditDbSchema = new QLineEdit(m_pGroupDbConfig);
-    m_pLineEditDbSchema->setText("public");
-    pFormDbConfig->addRow(tr("Schema:"), m_pLineEditDbSchema);
-
-    m_pLineEditDbUser = new QLineEdit(m_pGroupDbConfig);
-    m_pLineEditDbUser->setPlaceholderText("postgres");
-    pFormDbConfig->addRow(tr("用户名:"), m_pLineEditDbUser);
-
-    m_pLineEditDbPassword = new QLineEdit(m_pGroupDbConfig);
-    m_pLineEditDbPassword->setEchoMode(QLineEdit::Password);
-    pFormDbConfig->addRow(tr("密码:"), m_pLineEditDbPassword);
-
-    m_pGroupDbConfig->setVisible(false);
+    // 【2026-09-15】原「数据库连接配置」组已删除：数据库连接的全部操作统一在
+    // 备份界面（groupBox_source）进行，本对话框的「数据源类型」只用于区分该策略
+    // 备份文件系统还是数据库，不再收集连接信息。
 
     // 执行时间设置
     m_pGroupTime = new QGroupBox(tr("执行时间设置"), this);
@@ -168,7 +134,6 @@ void CBackupStrategyEditDialog::setupUi()
     // 添加到主布局
     m_pMainLayout->addWidget(pGroupBasic);
     m_pMainLayout->addWidget(m_pGroupDataSource);
-    m_pMainLayout->addWidget(m_pGroupDbConfig);
     m_pMainLayout->addWidget(m_pGroupTime);
     m_pMainLayout->addWidget(pGroupStorage);
     
@@ -211,23 +176,10 @@ void CBackupStrategyEditDialog::loadStrategyToUi()
         m_pComboBoxDataSource->setCurrentIndex(dataSourceIndex);
     }
 
-    // 设置数据库配置
-    BackupDataSource ds = static_cast<BackupDataSource>(m_pComboBoxDataSource->currentData().toInt());
-    bool isDatabase = (ds == BackupDataSource::Database || ds == BackupDataSource::All);
-    m_pGroupDbConfig->setVisible(isDatabase);
+    // 【2026-09-15】这里不再读写数据库连接字段：本对话框已不承载数据库配置，
+    // m_strategy 里的 strDbHost/strDbName/... 原样进、原样出（不会被清空），
+    // 由备份界面负责填写与同步。
 
-    if (isDatabase)
-    {
-        int dbTypeIndex = m_pComboBoxDbType->findData(static_cast<int>(m_strategy.eDbType));
-        if (dbTypeIndex >= 0) m_pComboBoxDbType->setCurrentIndex(dbTypeIndex);
-        m_pLineEditDbHost->setText(m_strategy.strDbHost);
-        m_pLineEditDbPort->setText(QString::number(m_strategy.nDbPort));
-        m_pLineEditDbName->setText(m_strategy.strDbName);
-        m_pLineEditDbUser->setText(m_strategy.strDbUser);
-        m_pLineEditDbPassword->setText(m_strategy.strDbPassword);
-        m_pLineEditDbSchema->setText(m_strategy.strDbSchema);
-    }
-    
     // 解析执行时间
     QString execTime = m_strategy.strExecuteTime;
     
@@ -316,11 +268,8 @@ void CBackupStrategyEditDialog::updateVisibility()
     bool hasVisibleChild = showWeekDay || showMonthDay || showTimeEdit;
     if (m_pGroupTime)         m_pGroupTime->setVisible(hasVisibleChild);
     
-    // 根据数据源类型显示/隐藏数据库配置
-    BackupDataSource ds = static_cast<BackupDataSource>(m_pComboBoxDataSource->currentData().toInt());
-    bool isDatabase = (ds == BackupDataSource::Database || ds == BackupDataSource::All);
-    if (m_pGroupDbConfig)     m_pGroupDbConfig->setVisible(isDatabase);
-    
+    // 【2026-09-15】数据源类型不再驱动任何控件显隐（数据库连接配置区已从本对话框移除）
+
     // 关键：根据内容自动调整窗口大小
     adjustSize();
 }
@@ -333,22 +282,10 @@ void CBackupStrategyEditDialog::on_buttonBox_accepted()
     m_strategy.eStorageLocation = static_cast<StorageLocation>(m_pComboBoxStorageLocation->currentData().toInt());
     m_strategy.bEnabled = m_pCheckBoxEnabled->isChecked();
 
-    // 数据源配置
+    // 【2026-09-15】只保留数据源类型这一个"区分"字段；数据库连接信息不在这里产生，
+    // m_strategy 中已有的 strDbHost/strDbName/... 保持原值不动。
     m_strategy.eDataSource = static_cast<BackupDataSource>(m_pComboBoxDataSource->currentData().toInt());
-    BackupDataSource ds = m_strategy.eDataSource;
-    if (ds == BackupDataSource::Database || ds == BackupDataSource::All)
-    {
-        m_strategy.eDbType = static_cast<DatabaseType>(m_pComboBoxDbType->currentData().toInt());
-        m_strategy.strDbHost = m_pLineEditDbHost->text().trimmed();
-        m_strategy.nDbPort = m_pLineEditDbPort->text().trimmed().toInt();
-        if (m_strategy.nDbPort <= 0) m_strategy.nDbPort = 5432;
-        m_strategy.strDbName = m_pLineEditDbName->text().trimmed();
-        m_strategy.strDbUser = m_pLineEditDbUser->text().trimmed();
-        m_strategy.strDbPassword = m_pLineEditDbPassword->text();
-        m_strategy.strDbSchema = m_pLineEditDbSchema->text().trimmed();
-        if (m_strategy.strDbSchema.isEmpty()) m_strategy.strDbSchema = "public";
-    }
-    
+
     // 构建执行时间描述字符串
     QTime execTime = m_pTimeEditExecuteTime->time();
     QString timeStr = execTime.toString("hh:mm");

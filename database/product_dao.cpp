@@ -678,6 +678,39 @@ ProductMetadata ProductDAO::findByHash(const QString& hash)
 	return ProductMetadata::fromVariantMap(row);
 }
 
+// 按文件哈希取全部产品记录（GDB/MDB 图层级去重用：同一个 GDB 会有多条记录）
+QList<ProductMetadata> ProductDAO::getProductsByHash(const QString& hash)
+{
+	QList<ProductMetadata> results;
+	if (hash.isEmpty())
+		return results;
+
+	auto* db = PostgisConnector::instance();
+	auto rows = db->executeQuery(
+		"SELECT * FROM product_metadata WHERE file_hash = $1 ORDER BY id",
+		{hash}
+	);
+	for (const auto& row : rows)
+	{
+		auto meta = ProductMetadata::fromVariantMap(row.toMap());
+		meta.tags = getProductTags(meta.id).join(QLatin1Char(';'));
+		results.append(meta);
+	}
+	return results;
+}
+
+// 仅改挂载目录（孤儿记录重新挂到新节点下用）
+bool ProductDAO::updateProductParentDir(int productId, int newParentDirId)
+{
+	if (productId <= 0 || newParentDirId <= 0)
+		return false;
+
+	auto* db = PostgisConnector::instance();
+	return db->executeNonQuery(
+		"UPDATE product_metadata SET parent_dir_id = $1 WHERE id = $2",
+		{newParentDirId, productId});
+}
+
 // ===================== 版本管理 =====================
 int ProductDAO::insertVersionRecord(const VersionRecord& record)
 {

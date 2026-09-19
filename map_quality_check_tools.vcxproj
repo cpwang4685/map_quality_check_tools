@@ -84,6 +84,38 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_metadata_manager_dialog.h</Outputs>
       <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
     </CustomBuild>
+    <CustomBuild Include="ui_class\range_export.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_range_export.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui_class\range_export.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_range_export.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_range_export.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\main_area_clip.ui">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+	set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%%PATH%%"
+	"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\uic.exe" -o  D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\Release\ui_main_area_clip.h   D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\ui_class\main_area_clip.ui
+	if %%errorlevel%% neq 0 goto :cmEnd
+	:cmEnd
+	endlocal &amp; call :cmErrorLevel %%errorlevel%% &amp; goto :cmDone
+	:cmErrorLevel
+	exit /b %%1
+	:cmDone
+	if %%errorlevel%% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">UIC ui_main_area_clip.h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">GeneratedFiles\Release\ui_main_area_clip.h</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
     <CustomBuild Include="ui_class\access_control_dialog.ui">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
@@ -346,6 +378,9 @@ set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
     <ClCompile Include="GeneratedFiles\Release\moc_se_data_management.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_se_data_export.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_se_data_list_export.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_data_catalog_browser.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_range_export.cpp" />
+    <ClCompile Include="GeneratedFiles\Release\moc_se_main_area_clip.cpp" />
     <ClCompile Include="GeneratedFiles\Release\moc_map_tool_extent_picker.cpp" />
     <ClCompile Include="map_quality_check_tools.cpp" />
     <ClCompile Include="ui_class\se_vector_format_conversion.cpp" />
@@ -374,6 +409,13 @@ set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
     <ClCompile Include="ui_class\se_data_management.cpp" />
     <ClCompile Include="ui_class\se_data_export.cpp" />
     <ClCompile Include="ui_class\se_data_list_export.cpp" />
+    <!-- ====== 数据裁剪改造（2026-09-17）：平台数据目录浏览器 + 成果模块裁剪导出 ====== -->
+    <ClCompile Include="ui_class\data_catalog_browser.cpp" />
+    <ClCompile Include="ui_class\DataCatalogConnectionDialog.cpp" />
+    <ClCompile Include="ui_class\se_range_export.cpp" />
+    <ClCompile Include="ui_class\se_main_area_clip.cpp" />
+    <ClCompile Include="ui_class\map_extent_draw_tool.cpp" />
+    <ClCompile Include="core\clip_export_engine.cpp" />
     <ClCompile Include="ui_class\map_tool_extent_picker.cpp" />
     <ClCompile Include="ui_class\backup_strategy_edit_dialog.cpp" />
     <!-- ====== 参数配置/裁剪/合并/格式转换/要素自动接边 ====== -->
@@ -683,6 +725,8 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClInclude Include="ui_task\se_edge_merge_bridge.h" />
     <ClInclude Include="GeneratedFiles\Release\ui_scale_selector_dialog.h" />
     <ClInclude Include="GeneratedFiles\Release\ui_mapdata_download.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_range_export.h" />
+    <ClInclude Include="GeneratedFiles\Release\ui_main_area_clip.h" />
     <!-- 已有 MOC 头文件 -->
     <CustomBuild Include="ui_class\se_vector_format_conversion.h">
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
@@ -906,6 +950,51 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
 	exit /b %1
 	:cmDone
 	if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\data_catalog_browser.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\se_range_export.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="ui_class\se_main_area_clip.h">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+set "PATH=D:\LTZK\OSGeo4W_32815\bin;D:\LTZK\OSGeo4W_32815\apps\Qt5\bin;%PATH%"
+"D:\LTZK\OSGeo4W_32815\apps\Qt5\bin\moc.exe"  "%(FullPath)"  -o  "D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Moc%27ing %(FullPath)</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\GarMap\qgis_plugins\cplusplus\map_quality_check_tools\GeneratedFiles\$(ConfigurationName)\moc_%(Filename).cpp</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR_OSGEO4W)\bin\moc.exe;%(FullPath);%(AdditionalInputs)</AdditionalInputs>

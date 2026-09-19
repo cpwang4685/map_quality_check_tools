@@ -378,7 +378,12 @@ void readNewResultShps(const QString& dir, const QStringList& beforeFiles,
                        QgsVectorLayer* srcLayer, const QString& label,
                        QList<QPair<QgsFeature, QString>>& allErrors)
 {
-    const QSet<QString> before = QSet<QString>(beforeFiles.begin(), beforeFiles.end());
+    // 【2026-09-15】刻意不用 QSet 的迭代器区间构造 QSet(first, last)：那是 Qt 5.14 才加的，
+    // 麒麟（Qt 5.12.12）编不过。改为逐个 insert，5.12/5.15 都可用，且是本工程既有惯例
+    // （QSet 一律空白声明后 insert）。语义与原写法完全一致。
+    QSet<QString> before;
+    for (const QString& n : beforeFiles)
+        before.insert(n);
     for (const QString& name : shpNamesIn(dir)) {
         if (before.contains(name)) continue;
         readResultErrors(QDir(dir).filePath(name), srcLayer, label,

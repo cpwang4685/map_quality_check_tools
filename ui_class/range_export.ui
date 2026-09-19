@@ -1,0 +1,536 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SeRangeExportDialog</class>
+ <widget class="QDialog" name="SeRangeExportDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>660</width>
+    <height>520</height>
+   </rect>
+  </property>
+  <property name="font">
+   <font>
+    <family>微软雅黑</family>
+    <pointsize>9</pointsize>
+   </font>
+  </property>
+  <property name="windowTitle">
+   <string>按范围导出</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <layout class="QFormLayout" name="formLayout_mode">
+     <item row="0" column="0">
+      <widget class="QLabel" name="label_mode">
+       <property name="text">
+        <string>范围获取方式:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <layout class="QHBoxLayout" name="hLayout_modeButtons">
+       <item>
+        <widget class="QRadioButton" name="radioButton_inputCoord">
+         <property name="text">
+          <string>输入坐标</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="radioButton_manualDraw">
+         <property name="text">
+          <string>手动绘制</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="radioButton_selectFeature">
+         <property name="text">
+          <string>选择要素</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer_mode">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QStackedWidget" name="stackedWidget_pages">
+     <property name="currentIndex">
+      <number>2</number>
+     </property>
+     <widget class="QWidget" name="page_coord">
+      <layout class="QFormLayout" name="formLayout_coord">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_minX">
+         <property name="text">
+          <string>最小 X:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QDoubleSpinBox" name="doubleSpinBox_minX">
+         <property name="decimals">
+          <number>8</number>
+         </property>
+         <property name="minimum">
+          <double>-1000000000.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>1000000000.000000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>100.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_minY">
+         <property name="text">
+          <string>最小 Y:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QDoubleSpinBox" name="doubleSpinBox_minY">
+         <property name="decimals">
+          <number>8</number>
+         </property>
+         <property name="minimum">
+          <double>-1000000000.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>1000000000.000000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>100.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_maxX">
+         <property name="text">
+          <string>最大 X:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QDoubleSpinBox" name="doubleSpinBox_maxX">
+         <property name="decimals">
+          <number>8</number>
+         </property>
+         <property name="minimum">
+          <double>-1000000000.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>1000000000.000000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>100.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="label_maxY">
+         <property name="text">
+          <string>最大 Y:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QDoubleSpinBox" name="doubleSpinBox_maxY">
+         <property name="decimals">
+          <number>8</number>
+         </property>
+         <property name="minimum">
+          <double>-1000000000.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>1000000000.000000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>100.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="label_coordHint">
+         <property name="text">
+          <string>说明:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QLabel" name="label_coordHintValue">
+         <property name="text">
+          <string>请填写正确的坐标范围（外包矩形）。</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_draw">
+      <layout class="QGridLayout" name="gridLayout_draw">
+       <item row="0" column="0" colspan="2">
+        <widget class="QLabel" name="label_drawHint">
+         <property name="text">
+          <string>点击&quot;开始绘制&quot;后将自动最小化本窗口，请在主界面地图窗口中按住鼠标左键拖出矩形区域作为导出范围（松开左键完成，按 Esc 取消）；绘制完成后将自动返回本页并显示范围边界。</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0" colspan="2">
+        <widget class="QPushButton" name="Button_StartDraw">
+         <property name="text">
+          <string>开始绘制</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <layout class="QHBoxLayout" name="hLayout_drawLatMax">
+         <item>
+          <widget class="QLabel" name="label_drawLatMax">
+           <property name="text">
+            <string>上边界纬度:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="lineEdit_drawLatMax">
+           <property name="readOnly">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="2" column="1">
+        <layout class="QHBoxLayout" name="hLayout_drawLatMin">
+         <item>
+          <widget class="QLabel" name="label_drawLatMin">
+           <property name="text">
+            <string>下边界纬度:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="lineEdit_drawLatMin">
+           <property name="readOnly">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="3" column="0">
+        <layout class="QHBoxLayout" name="hLayout_drawLonMin">
+         <item>
+          <widget class="QLabel" name="label_drawLonMin">
+           <property name="text">
+            <string>左边界经度:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="lineEdit_drawLonMin">
+           <property name="readOnly">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="3" column="1">
+        <layout class="QHBoxLayout" name="hLayout_drawLonMax">
+         <item>
+          <widget class="QLabel" name="label_drawLonMax">
+           <property name="text">
+            <string>右边界经度:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="lineEdit_drawLonMax">
+           <property name="readOnly">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_feature">
+      <layout class="QGridLayout" name="gridLayout_feature">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_layer">
+         <property name="text">
+          <string>矢量图层:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <layout class="QHBoxLayout" name="hLayout_layerButtons">
+         <item>
+          <widget class="QComboBox" name="comboBox_layer"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="Button_OpenLayer">
+           <property name="maximumSize">
+            <size>
+             <width>75</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>打开本地矢量数据（shp / geojson / kml / gpkg 等）</string>
+           </property>
+           <property name="text">
+            <string>浏览...</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_field">
+         <property name="text">
+          <string>属性字段:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QComboBox" name="comboBox_field"/>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_value">
+         <property name="text">
+          <string>要素值:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QComboBox" name="comboBox_value">
+         <property name="editable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0" colspan="2">
+        <widget class="QLabel" name="label_featureHint">
+         <property name="text">
+          <string>说明：选择图层或打开本地矢量数据后自动读取属性字段；切换属性字段自动列出该字段的全部要素值；从要素值中选择一项后自动获取其外包矩形作为导出范围。</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0" colspan="2">
+        <widget class="QPushButton" name="Button_GetExtent">
+         <property name="text">
+          <string>获取范围</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0" colspan="2">
+        <layout class="QGridLayout" name="gridLayout_featRange">
+         <item row="0" column="0">
+          <layout class="QHBoxLayout" name="hLayout_featLatMax">
+           <item>
+            <widget class="QLabel" name="label_featLatMax">
+             <property name="text">
+              <string>上边界纬度:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="lineEdit_featLatMax">
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item row="0" column="1">
+          <layout class="QHBoxLayout" name="hLayout_featLatMin">
+           <item>
+            <widget class="QLabel" name="label_featLatMin">
+             <property name="text">
+              <string>下边界纬度:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="lineEdit_featLatMin">
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item row="1" column="0">
+          <layout class="QHBoxLayout" name="hLayout_featLonMin">
+           <item>
+            <widget class="QLabel" name="label_featLonMin">
+             <property name="text">
+              <string>左边界经度:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="lineEdit_featLonMin">
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item row="1" column="1">
+          <layout class="QHBoxLayout" name="hLayout_featLonMax">
+           <item>
+            <widget class="QLabel" name="label_featLonMax">
+             <property name="text">
+              <string>右边界经度:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="lineEdit_featLonMax">
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <layout class="QFormLayout" name="formLayout_output">
+     <item row="0" column="0">
+      <widget class="QLabel" name="label_format">
+       <property name="text">
+        <string>格式:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QComboBox" name="comboBox_format">
+       <property name="toolTip">
+        <string>ESRI Shapefile：输出到文件夹，每个成果导出为独立 shp；GeoPackage / GDB：所有矢量成果写入同一个文件（每个成果一个图层）</string>
+       </property>
+       <item>
+        <property name="text">
+         <string>ESRI Shapefile (.shp)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>GeoPackage (.gpkg)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>GDB (.gdb)</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="label_output">
+       <property name="text">
+        <string>输出文件夹:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <layout class="QHBoxLayout" name="hLayout_output">
+       <item>
+        <widget class="QLineEdit" name="lineEdit_output"/>
+       </item>
+       <item>
+        <widget class="QPushButton" name="Button_BrowseOutput">
+         <property name="text">
+          <string>浏览...</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="hLayout_buttons">
+     <item>
+      <widget class="QCheckBox" name="checkBox_autoLoad">
+       <property name="text">
+        <string>导出后自动加载到地图</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_buttons">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="Button_OK">
+       <property name="text">
+        <string>确定</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="Button_Cancel">
+       <property name="text">
+        <string>取消</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources/>
+ <connections/>
+</ui>

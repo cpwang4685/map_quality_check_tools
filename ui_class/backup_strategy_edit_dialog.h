@@ -7,7 +7,6 @@
 #include <QTimeEdit>
 #include <QCheckBox>
 #include <QLabel>
-#include <QLineEdit>
 #include <QGroupBox>
 #include <QVBoxLayout>
 
@@ -57,17 +56,10 @@ private:
     QComboBox* m_pComboBoxStorageLocation = nullptr;
     QCheckBox* m_pCheckBoxEnabled = nullptr;
 
-    // 数据源类型控件（新增）
+    // 数据源类型（【2026-09-15】只作"该策略备文件系统还是数据库"的区分用，
+    // 连接信息一律在备份界面配置，本对话框不再收集）
     QGroupBox* m_pGroupDataSource = nullptr;
     QComboBox* m_pComboBoxDataSource = nullptr;
-    QGroupBox* m_pGroupDbConfig = nullptr;
-    QComboBox* m_pComboBoxDbType = nullptr;
-    QLineEdit* m_pLineEditDbHost = nullptr;
-    QLineEdit* m_pLineEditDbPort = nullptr;
-    QLineEdit* m_pLineEditDbName = nullptr;
-    QLineEdit* m_pLineEditDbUser = nullptr;
-    QLineEdit* m_pLineEditDbPassword = nullptr;
-    QLineEdit* m_pLineEditDbSchema = nullptr;
 };
 
 #endif // BACKUP_STRATEGY_EDIT_DIALOG_H

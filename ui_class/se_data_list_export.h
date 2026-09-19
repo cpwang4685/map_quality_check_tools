@@ -12,6 +12,10 @@
 #include <QPoint>
 #include <qgsrectangle.h>   // QGIS 3 标准小写头；驼峰 QgsRectangle.h 仅 Windows SDK 有，麒麟无
 #include "se_database_connection.h"
+// 【2026-09-17 数据裁剪改造】列表控件改为 LTZK 平台左侧数据列表的移植实现
+#include "data_catalog_browser.h"
+// 裁剪导出执行引擎（从地图成果模块 map_product_clip_engine 移植）
+#include "core/clip_export_engine.h"
 
 class QgisInterface;
 class QgsMapCanvas;
@@ -327,16 +331,29 @@ public:
 
 	void setQgisInterface(QgisInterface* iface);
 
-	// 主界面"导出后自动加载到地图"开关（影响批量/条件/范围三种导出）
+	// 主界面"导出后自动加载到地图"开关（影响两个导出）
 	bool autoLoadAfterExport() const;
 
 public slots:
-	void on_Button_BrowseRoot_clicked();
-	void on_Button_Refresh_clicked();
-	void on_Button_ExpandAll_clicked();
-	void on_Button_CollapseAll_clicked();
-	void on_treeWidgetDataList_customContextMenuRequested(const QPoint& pos);
 	void reject() override;
+
+protected:
+	// 每次显示时刷新"地图图层"段：本对话框是非模态的，用户可能中途往工程里加了图层
+	void showEvent(QShowEvent* event) override;
+
+private slots:
+	// ---- 顶部按钮行：5 个按钮全部转调 CSE_DataCatalogBrowser 中与 LTZK 平台
+	//      DataCatalogWidget 同名的实现（选择数据库 / 刷新 / 选择文件夹 / 断开连接 / 刷新）----
+	void on_Button_ConnectDatabase_clicked();   // → 平台 connectDatabase()
+	void on_Button_RefreshDatabase_clicked();   // → 平台 refreshDatabaseData()
+	void on_Button_ConnectFolder_clicked();     // → 平台 connectLocalFolder()
+	void on_Button_DisconnectFolder_clicked();  // → 平台 disconnectSelectedLocalFolder()
+	void on_Button_RefreshLocal_clicked();      // → 平台 refreshLocalFolders()
+	// 列表右键（数据库段 / 本地段 / 地图图层段统一入口）
+	void onCatalogContextMenuRequested(const QPoint& globalPos,
+		const CSE_DataCatalogBrowser::CatalogItem& item);
+	// 列表双击 → 添加到地图
+	void onCatalogItemActivated(const CSE_DataCatalogBrowser::CatalogItem& item);
 
 private:
 	QgisInterface* m_pQgisIface = nullptr;
@@ -349,10 +366,9 @@ private:
 	QString m_strRootDir;
 	QString m_strOutputDir;
 
-	QTreeWidget* m_pTree = nullptr;
+	// 数据列表（数据库数据 / 本地数据 / 地图图层 三段），平台左侧数据列表的移植实现
+	CSE_DataCatalogBrowser* m_pBrowser = nullptr;
 	QTextEdit* m_pLog = nullptr;
-	QPushButton* m_btnConnectDb = nullptr;
-	QPushButton* m_btnRefreshLayers = nullptr;
 	QCheckBox* m_chkAutoLoadAfterExport = nullptr; // 主界面"导出后自动加载到地图"开关
 
 	// 已保存的数据库连接列表（连接名称 + 参数），生命周期内有效
@@ -361,8 +377,6 @@ private:
 private:
 	void populateDataList();
 	void addDirNode(QTreeWidgetItem* parent, const QString& dirPath);
-	void populateDatabaseRoot();
-	void populateMapLayersRoot();
 	static bool isDataFile(const QString& filePath);
 	static bool isRasterPath(const QString& filePath);
 	static bool isGdbPath(const QString& filePath);
@@ -410,11 +424,22 @@ private:
 	QString browseOutputDir();
 	static bool matchTime(const QFileInfo& fi, const QDateTime& dtStart, const QDateTime& dtEnd);
 
-	// 连接数据库
-	void on_Button_ConnectDb_clicked();
-	// 刷新列表中的数据库与地图图层节点
-	void on_Button_RefreshLayers_clicked();
+	// ---- 列表节点 → 裁剪数据源 → 成果模块裁剪引擎 ----
+	// 把命中的列表节点展开成引擎可消费的数据源列表
+	// （数据库表 / 本地数据文件 / GDB 子图层 / 目录下所有数据）
+	QList<ClipExportEngine::Source> sourcesFromCatalog(
+		const CSE_DataCatalogBrowser::CatalogItem& item) const;
+	// 按范围导出（CSE_RangeExportDialogUi + ClipExportEngine）
+	void exportByRangeFromCatalog(const CSE_DataCatalogBrowser::CatalogItem& item);
+	// 按制图导出（CSE_MainAreaClipDialogUi + ClipExportEngine）
+	void exportByMainAreaFromCatalog(const CSE_DataCatalogBrowser::CatalogItem& item);
+	// 添加到地图
+	void addCatalogItemToMap(const CSE_DataCatalogBrowser::CatalogItem& item);
+	// 执行裁剪并按需把结果自动加载到地图（两个导出共用）
+	void runClipExport(const QList<ClipExportEngine::Source>& sources,
+		const ClipExportEngine::Options& opt, const QString& title, bool bAutoLoad);
 
+	// ---- 以下为旧版自研导出流程的残留实现（已不再从右键菜单进入，保留以免改动过大）----
 	// 处理数据库/地图图层节点的导出与显示（依据 item 携带的 NodeType）
 	void doExportForItem(QTreeWidgetItem* item);
 	void loadItemToMap(QTreeWidgetItem* item);
@@ -424,6 +449,8 @@ private:
 	// 导出完成后自动加载到地图的辅助方法
 	void autoLoadToMap(const QString& filePath);          // 加载单文件
 	void autoLoadDirToMap(const QString& outDir);         // 批量加载目录下所有 shapefile/栅格
+	// 加载导出产物：普通文件转 autoLoadToMap；GPKG/GDB 容器枚举其内部图层逐个加载
+	void autoLoadOutputToMap(const QString& path);
 	// 读取主区矢量中用户所选要素的合并外包矩形，作为"按主区裁切导出"裁剪范围
 	// outCrs（可选）：返回该矩形所在的主区 layer 原始 CRS，供导出时把裁剪范围正确转换到源数据 CRS
 	QgsRectangle computeMainAreaClipRect(const QString& mainAreaPath,

@@ -70,13 +70,26 @@
 #include <qgsmaplayer.h>
 #include <qgsdatasourceuri.h>
 #include <qgsproviderregistry.h>
-#include <qgsogrprovidermetadata.h>
+// 【2026-09-17 数据裁剪改造】只需要基类 QgsProviderMetadata（querySublayers 声明在此）。
+// 用 qgsprovidermetadata.h 而不是 qgsogrprovidermetadata.h：前者已被 se_mission458_check.cpp
+// 在麒麟上用过，后者是插件里从没用过的头，麒麟 SDK 不保证装了。
+#include <qgsprovidermetadata.h>
 #include <qgsprovidersublayerdetails.h>
 #include <qgscoordinatetransform.h>
 #include <qgsunittypes.h>
 
 /* 数据库连接对话框 */
 #include "se_database_connection.h"
+
+/* 数据裁剪改造（2026-09-17）：列表控件 + 成果模块的两个导出对话框与裁剪引擎 */
+#include "data_catalog_browser.h"
+#include "se_range_export.h"
+#include "se_main_area_clip.h"
+#include "map_extent_draw_tool.h"
+#include "core/clip_export_engine.h"
+#include <qgsmimedatautils.h>
+#include <qgscoordinatereferencesystem.h>
+#include <qgsunittypes.h>
 
 /* 数据库访问 */
 #include <QSqlDatabase>
@@ -640,36 +653,47 @@ CSE_DataListExportDialog::CSE_DataListExportDialog(QWidget* parent)
 	setWindowTitle(tr("数据裁剪"));
 	// 去掉默认的问号帮助按钮（未实现帮助内容，多余）
 	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
-	resize(740, 580);
+	resize(920, 640);
 
-	QPushButton* btnBrowse = new QPushButton(tr("选择数据根目录"), this);
-	// "刷新"按钮承担一切刷新：本地数据列表 + 数据库节点 + 地图图层节点
-	QPushButton* btnRefresh = new QPushButton(tr("刷新"), this);
-	m_btnConnectDb = new QPushButton(tr("连接数据库"), this);
-	QPushButton* btnExpand = new QPushButton(tr("全部展开"), this);
-	QPushButton* btnCollapse = new QPushButton(tr("全部收起"), this);
+	// ---- 顶部按钮行：5 个按钮与 LTZK 平台左侧数据列表完全同源 ----
+	// 每个按钮只负责转调 CSE_DataCatalogBrowser 中与平台 DataCatalogWidget 同名的函数，
+	// 真正的连接/刷新逻辑都在浏览器里（平台实现），这里不重复实现一遍。
+	QPushButton* btnConnectDb = new QPushButton(tr("选择数据库"), this);
+	QPushButton* btnRefreshDb = new QPushButton(tr("刷新"), this);
+	btnRefreshDb->setToolTip(tr("刷新数据库数据"));
+	QPushButton* btnConnectFolder = new QPushButton(tr("选择文件夹"), this);
+	QPushButton* btnDisconnectFolder = new QPushButton(tr("断开连接"), this);
+	btnDisconnectFolder->setToolTip(tr("断开当前选中的文件夹"));
+	QPushButton* btnRefreshLocal = new QPushButton(tr("刷新"), this);
+	btnRefreshLocal->setToolTip(tr("刷新本地数据"));
+	// objectName 照平台 createCatalogButton() 拼写，以吃到平台注入的 QSS
+	{
+		const QString strCatalogButtonObjectName = QStringLiteral("catalogToolbarButton");
+		btnConnectDb->setObjectName(strCatalogButtonObjectName);
+		btnRefreshDb->setObjectName(strCatalogButtonObjectName);
+		btnConnectFolder->setObjectName(strCatalogButtonObjectName);
+		btnDisconnectFolder->setObjectName(strCatalogButtonObjectName);
+		btnRefreshLocal->setObjectName(strCatalogButtonObjectName);
+	}
 
-	// 主界面"导出后自动加载到地图"开关（影响批量/条件/范围三种导出）
+	// 主界面"导出后自动加载到地图"开关（影响按范围导出 / 按制图导出）
 	m_chkAutoLoadAfterExport = new QCheckBox(tr("导出后自动加载到地图"), this);
 	m_chkAutoLoadAfterExport->setChecked(true);
-	m_chkAutoLoadAfterExport->setToolTip(tr("勾选后，批量/条件/范围三种导出的结果会自动加载到 QGIS 地图画布"));
+	m_chkAutoLoadAfterExport->setToolTip(tr("勾选后，按范围导出 / 按制图导出的结果会自动加载到 QGIS 地图画布"));
 
 	QHBoxLayout* topLayout = new QHBoxLayout;
-	topLayout->addWidget(btnBrowse);
-	topLayout->addWidget(btnRefresh);
-	topLayout->addWidget(m_btnConnectDb);
+	topLayout->addWidget(btnConnectDb);
+	topLayout->addWidget(btnRefreshDb);
+	topLayout->addSpacing(12);
+	topLayout->addWidget(btnConnectFolder);
+	topLayout->addWidget(btnDisconnectFolder);
+	topLayout->addWidget(btnRefreshLocal);
 	topLayout->addStretch();
 	topLayout->addWidget(m_chkAutoLoadAfterExport);
-	topLayout->addWidget(btnExpand);
-	topLayout->addWidget(btnCollapse);
 
-	QLabel* lblTitle = new QLabel(tr("数据列表"), this);
-	m_pTree = new QTreeWidget(this);
-	m_pTree->setColumnCount(4);
-	m_pTree->setHeaderLabels(QStringList() << tr("名称") << tr("类型") << tr("修改时间") << tr("大小"));
-	m_pTree->header()->setStretchLastSection(true);
-	m_pTree->setContextMenuPolicy(Qt::CustomContextMenu);
-	m_pTree->setRootIsDecorated(true);
+	// 下方整个数据列表 = 平台左侧数据列表的移植控件
+	// （数据库数据 / 本地数据 / 地图图层 三段，排版与 objectName 全部照平台）
+	m_pBrowser = new CSE_DataCatalogBrowser(this);
 
 	m_pLog = new QTextEdit(this);
 	m_pLog->setReadOnly(true);
@@ -677,18 +701,24 @@ CSE_DataListExportDialog::CSE_DataListExportDialog(QWidget* parent)
 
 	QVBoxLayout* mainLayout = new QVBoxLayout(this);
 	mainLayout->addLayout(topLayout);
-	mainLayout->addWidget(lblTitle);
-	mainLayout->addWidget(m_pTree, 1);
+	mainLayout->addWidget(m_pBrowser, 1);
 	mainLayout->addWidget(m_pLog);
 
-	connect(btnBrowse, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_BrowseRoot_clicked);
-	// "刷新" 按钮：刷新本地文件列表 + 已连接数据库 + 当前地图图层（一次完成）
-	connect(btnRefresh, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_RefreshLayers_clicked);
-	connect(m_btnConnectDb, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_ConnectDb_clicked);
-	connect(btnExpand, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_ExpandAll_clicked);
-	connect(btnCollapse, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_CollapseAll_clicked);
-	connect(m_pTree, &QTreeWidget::customContextMenuRequested,
-		this, &CSE_DataListExportDialog::on_treeWidgetDataList_customContextMenuRequested);
+	connect(btnConnectDb, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_ConnectDatabase_clicked);
+	connect(btnRefreshDb, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_RefreshDatabase_clicked);
+	connect(btnConnectFolder, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_ConnectFolder_clicked);
+	connect(btnDisconnectFolder, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_DisconnectFolder_clicked);
+	connect(btnRefreshLocal, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_RefreshLocal_clicked);
+
+	connect(m_pBrowser, &CSE_DataCatalogBrowser::contextMenuRequested,
+		this, &CSE_DataListExportDialog::onCatalogContextMenuRequested);
+	connect(m_pBrowser, &CSE_DataCatalogBrowser::itemActivated,
+		this, &CSE_DataListExportDialog::onCatalogItemActivated);
+	connect(m_pBrowser, &CSE_DataCatalogBrowser::message, this,
+		[this](const QString& text, bool isError)
+		{
+			appendLog(isError ? tr("[错误] %1").arg(text) : text);
+		});
 
 	// ---- 与数据库连接配置 UI（DbConfigDialog）共享数据库连接 ----
 	// 【2026-08-24】更新版未预置任何连接；本项目按需求保留共享机制：
@@ -749,50 +779,534 @@ void CSE_DataListExportDialog::setQgisInterface(QgisInterface* iface)
 		m_pMapCanvas = iface->mapCanvas();
 }
 
-void CSE_DataListExportDialog::on_Button_BrowseRoot_clicked()
+// ============================================================
+// 顶部按钮：全部转调 CSE_DataCatalogBrowser 中与 LTZK 平台同名的实现，
+// 插件这边不重复实现一遍，保证与平台左侧数据列表行为一致。
+// ============================================================
+void CSE_DataListExportDialog::on_Button_ConnectDatabase_clicked()
 {
-	QString dir = QFileDialog::getExistingDirectory(this, tr("选择数据根目录"), m_strRootDir);
-	if (dir.isEmpty()) return;
-	m_strRootDir = dir;
-	populateDataList();
+	if (m_pBrowser) m_pBrowser->connectDatabase();               // 平台 connectDatabase()
 }
 
-void CSE_DataListExportDialog::on_Button_Refresh_clicked()
+void CSE_DataListExportDialog::on_Button_RefreshDatabase_clicked()
 {
-	populateDataList();
+	if (m_pBrowser) m_pBrowser->refreshDatabaseData();           // 平台 refreshDatabaseData()
 }
 
-void CSE_DataListExportDialog::on_Button_ExpandAll_clicked()
+void CSE_DataListExportDialog::on_Button_ConnectFolder_clicked()
 {
-	if (m_pTree) m_pTree->expandAll();
+	if (m_pBrowser) m_pBrowser->connectLocalFolder();            // 平台 connectLocalFolder()
 }
 
-void CSE_DataListExportDialog::on_Button_CollapseAll_clicked()
+void CSE_DataListExportDialog::on_Button_DisconnectFolder_clicked()
 {
-	if (m_pTree) m_pTree->collapseAll();
+	// 与平台一致：只断开当前选中的那个文件夹根节点
+	if (m_pBrowser) m_pBrowser->disconnectSelectedLocalFolder(); // 平台 disconnectSelectedLocalFolder()
+}
+
+void CSE_DataListExportDialog::on_Button_RefreshLocal_clicked()
+{
+	if (m_pBrowser) m_pBrowser->refreshLocalFolders();           // 平台 refreshLocalFolders()
 }
 
 void CSE_DataListExportDialog::populateDataList()
 {
-	if (!m_pTree) return;
-	m_pTree->clear();
-	if (m_strRootDir.isEmpty()) return;
+	// 数据库段 / 本地段由 CSE_DataCatalogBrowser 自己维护（连接与刷新都走平台实现），
+	// 这里只负责插件自有的"地图图层"段
+	if (m_pBrowser)
+	{
+		m_pBrowser->refreshMapLayers();
+	}
+}
 
-	QTreeWidgetItem* rootItem = new QTreeWidgetItem(m_pTree);
-	QFileInfo rootInfo(m_strRootDir);
-	rootItem->setText(0, rootInfo.fileName().isEmpty() ? m_strRootDir : rootInfo.fileName());
-	rootItem->setText(1, tr("目录"));
-	rootItem->setData(0, Qt::UserRole, QVariant(m_strRootDir));
-	rootItem->setData(0, Qt::UserRole + 1, QVariant(true));
-	rootItem->setIcon(0, style()->standardIcon(QStyle::SP_DirIcon));
+void CSE_DataListExportDialog::showEvent(QShowEvent* event)
+{
+	QDialog::showEvent(event);
+	// 非模态对话框可能被反复打开，每次显示都重新枚举当前工程里的图层
+	populateDataList();
+}
 
-	addDirNode(rootItem, m_strRootDir);
-	m_pTree->expandItem(rootItem);
+// ============================================================
+// 列表节点 → 裁剪数据源 → 成果模块裁剪引擎
+// ============================================================
+namespace
+{
+// 输出格式文本 → OGR 驱动名 + 是否把所有矢量成果合并写入单一容器文件。
+// 格式文本取值与成果模块两个对话框的 comboBox_format 完全一致。
+// 返回 false 表示当前环境不支持该格式（麒麟 GDAL 3.0.4 无法写文件型地理数据库）。
+bool seDriverForFormat(const QString& strFormat, QString& strDriver, bool& bMergeIntoOneFile)
+{
+	if (strFormat.contains(QStringLiteral("GeoPackage"), Qt::CaseInsensitive))
+	{
+		strDriver = QStringLiteral("GPKG");
+		bMergeIntoOneFile = true;
+		return true;
+	}
+	if (strFormat.contains(QStringLiteral("GDB"), Qt::CaseInsensitive))
+	{
+#if GDAL_VERSION_NUM >= 3060000
+		strDriver = QStringLiteral("OpenFileGDB");
+		bMergeIntoOneFile = true;
+		return true;
+#else
+		// 写文件型地理数据库需要 GDAL 3.6+ 的 OpenFileGDB 驱动（麒麟为 GDAL 3.0.4）
+		strDriver.clear();
+		bMergeIntoOneFile = false;
+		return false;
+#endif
+	}
+	if (strFormat.contains(QStringLiteral("Shapefile"), Qt::CaseInsensitive))
+	{
+		strDriver = QStringLiteral("ESRI Shapefile");
+		bMergeIntoOneFile = false;
+		return true;
+	}
+	strDriver.clear();
+	bMergeIntoOneFile = false;
+	return false;
+}
 
-	// 追加：当前已连接的数据库节点（每个数据库一个顶级节点）
-	populateDatabaseRoot();
-	// 追加：当前 QGIS 地图中已加载的图层节点
-	populateMapLayersRoot();
+// 去掉数据名末尾的数据扩展名（列表节点名可能带 .shp/.tif 等），
+// 避免自动命名时出现 "dem.tif.tif" 这类输出
+QString seStripDataSuffix(const QString& strName)
+{
+	static const char* const kSuffixes[] = {
+		".shp", ".tif", ".tiff", ".img", ".gpkg", ".geojson", ".json",
+		".kml", ".tab", ".mif", ".ecw", ".bmp", ".png", ".jpg", ".jpeg", nullptr
+	};
+	QString s = strName.trimmed();
+	for (int i = 0; kSuffixes[i]; ++i)
+	{
+		const QString suffix = QString::fromLatin1(kSuffixes[i]);
+		if (s.endsWith(suffix, Qt::CaseInsensitive))
+		{
+			s.chop(suffix.size());
+			break;
+		}
+	}
+	return s.isEmpty() ? strName.trimmed() : s;
+}
+} // namespace
+
+QList<ClipExportEngine::Source> CSE_DataListExportDialog::sourcesFromCatalog(
+	const CSE_DataCatalogBrowser::CatalogItem& item) const
+{
+	QList<ClipExportEngine::Source> sources;
+
+	// ① 数据库栅格：QGIS 侧的 postgresraster URI 喂不了 GDAL，改用浏览器给出的
+	//    "PG:..." 连接串候选（逐个 GDALOpen 探测，避免赌某个 GDAL 版本的 schema 写法）
+	if (item.kind == CSE_DataCatalogBrowser::CatalogItem::Database
+		&& item.isRaster && !item.rasterUriCandidates.isEmpty())
+	{
+		const QString strUri = ClipExportEngine::firstOpenableRasterUri(item.rasterUriCandidates);
+		if (!strUri.isEmpty())
+		{
+			ClipExportEngine::Source src;
+			src.name = seStripDataSuffix(item.detail.isEmpty() ? item.displayName : item.detail);
+			src.uri = strUri;
+			src.provider = QStringLiteral("gdal");
+			src.isRaster = true;
+			sources << src;
+		}
+		return sources;
+	}
+
+	// ② 其余节点（本地数据文件 / GDB 子图层 / 目录下所有数据 / 数据库矢量表）
+	//    统一走"节点 → QgsMimeDataUtils::Uri"这一层，不再依赖 QTreeWidget 的父子遍历
+	for (const QgsMimeDataUtils::Uri& uri : item.uris)
+	{
+		if (uri.uri.isEmpty()) continue;
+
+		ClipExportEngine::Source src;
+		src.uri = uri.uri;
+		src.name = seStripDataSuffix(uri.name.isEmpty() ? item.displayName : uri.name);
+		src.provider = uri.providerKey.isEmpty() ? QStringLiteral("ogr") : uri.providerKey;
+		src.isRaster = (uri.layerType == QStringLiteral("raster"));
+		if (src.name.isEmpty()) src.name = seStripDataSuffix(item.displayName);
+		sources << src;
+	}
+	return sources;
+}
+
+void CSE_DataListExportDialog::exportByRangeFromCatalog(
+	const CSE_DataCatalogBrowser::CatalogItem& item)
+{
+	const QList<ClipExportEngine::Source> sources = sourcesFromCatalog(item);
+	if (sources.isEmpty())
+	{
+		QMessageBox::information(this, tr("按范围导出"),
+			tr("请先选择具体的数据表 / 数据文件。"));
+		return;
+	}
+	if (!m_pMapCanvas)
+	{
+		QMessageBox::warning(this, tr("按范围导出"),
+			tr("未获取到地图画布，无法进行手动绘制或选择要素。"));
+		return;
+	}
+
+	// 与成果模块同款流程：对话框复用同一实例；用户点"开始绘制"时先关掉对话框，
+	// 在地图上框选后回填范围再重新弹出（每轮 exec 前必须 resetDrawRequested()）
+	CSE_RangeExportDialogUi dlg(m_pMapCanvas, m_pQgisIface, this);
+	dlg.setAutoLoadAfterExport(autoLoadAfterExport());
+	while (true)
+	{
+		dlg.resetDrawRequested();
+		if (dlg.exec() != QDialog::Accepted) return;
+		if (!dlg.drawRequested()) break;
+
+		QgsRectangle drawnRect;
+		if (MapExtentDrawTool::drawExtentOnCanvas(m_pMapCanvas, MapExtentDrawTool::DrawRect, drawnRect))
+		{
+			dlg.setExtent(drawnRect);
+			dlg.setExtentCrs(seCanvasDestCrs(m_pMapCanvas));
+			dlg.setModeIndex(CSE_RangeExportDialogUi::RangeManualDraw);
+		}
+	}
+
+	if (!dlg.hasExtent())
+	{
+		QMessageBox::warning(this, tr("按范围导出"), tr("请先定义导出范围。"));
+		return;
+	}
+	const QString strOut = dlg.outputPath();
+	if (strOut.isEmpty()) return;
+
+	ClipExportEngine::Options opt;
+	// 面状要素（多边形）直接用其几何做精确求交；线/点等退化为其外包矩形
+	opt.clipGeom = dlg.hasFeatureGeometry()
+		? dlg.exportFeatureGeometry()
+		: ClipExportEngine::polygonFromRect(dlg.exportExtent());
+	opt.clipCrs = dlg.exportExtentCrs();
+	opt.overwriteExisting = true;
+
+	if (!seDriverForFormat(dlg.format(), opt.vectorDriver, opt.mergeLayersIntoOneFile))
+	{
+		QMessageBox::warning(this, tr("按范围导出"),
+			tr("当前环境不支持所选输出格式：%1").arg(dlg.format()));
+		return;
+	}
+	if (opt.mergeLayersIntoOneFile)
+	{
+		// GeoPackage / GDB：所有矢量成果写入同一个容器文件；栅格写不进容器，
+		// 回落到该文件所在目录按数据名输出 .tif
+		opt.explicitOutputFile = strOut;
+		opt.outputDir = QFileInfo(strOut).absolutePath();
+	}
+	else
+	{
+		// Shapefile：输出路径是文件夹，每个数据一个 shp
+		opt.outputDir = strOut;
+	}
+
+	runClipExport(sources, opt, tr("按范围导出"), dlg.autoLoadAfterExport());
+}
+
+void CSE_DataListExportDialog::exportByMainAreaFromCatalog(
+	const CSE_DataCatalogBrowser::CatalogItem& item)
+{
+	const QList<ClipExportEngine::Source> sources = sourcesFromCatalog(item);
+	if (sources.isEmpty())
+	{
+		QMessageBox::information(this, tr("按制图导出"),
+			tr("请先选择具体的数据表 / 数据文件。"));
+		return;
+	}
+
+	// 与成果模块的"按主区裁切导出"完全同一套界面与算法：
+	// 裁切范围 = 内图廓宽/高(mm) × 比例尺 ÷ 1000 米，以主区所选要素外包矩形中心居中
+	CSE_MainAreaClipDialogUi dlg(this);
+	dlg.setSourcePath(item.detail.isEmpty() ? item.displayName : item.detail);
+	dlg.setAutoLoadAfterExport(autoLoadAfterExport());
+	if (dlg.exec() != QDialog::Accepted) return;
+
+	const QString strOut = dlg.outputFilePath();
+	if (strOut.isEmpty())
+	{
+		QMessageBox::warning(this, tr("按制图导出"), tr("请先指定输出路径。"));
+		return;
+	}
+
+	QgsCoordinateReferenceSystem clipCrs;
+	const QgsRectangle clipRect = dlg.computedClipRect(&clipCrs);
+	if (clipRect.isEmpty())
+	{
+		QMessageBox::warning(this, tr("按制图导出"),
+			tr("未能从主区数据中得到有效范围，请确认已选择要素。"));
+		return;
+	}
+
+	ClipExportEngine::Options opt;
+	opt.clipGeom = ClipExportEngine::polygonFromRect(clipRect);
+	opt.clipCrs = clipCrs;
+	opt.overwriteExisting = dlg.overwriteExisting();
+	const QString strEncoding = dlg.encoding().trimmed();
+	opt.fileEncoding = strEncoding.isEmpty() ? QStringLiteral("UTF-8") : strEncoding;
+
+	if (!seDriverForFormat(dlg.format(), opt.vectorDriver, opt.mergeLayersIntoOneFile))
+	{
+		QMessageBox::warning(this, tr("按制图导出"),
+			tr("当前环境不支持所选输出格式：%1").arg(dlg.format()));
+		return;
+	}
+	if (opt.mergeLayersIntoOneFile)
+	{
+		opt.explicitOutputFile = strOut;
+		opt.outputDir = QFileInfo(strOut).absolutePath();
+	}
+	else
+	{
+		opt.outputDir = strOut;
+	}
+
+	runClipExport(sources, opt, tr("按制图导出"), dlg.autoLoadAfterExport());
+}
+
+void CSE_DataListExportDialog::addCatalogItemToMap(
+	const CSE_DataCatalogBrowser::CatalogItem& item)
+{
+	// 地图图层节点：只是把视野缩放到该图层
+	if (item.kind == CSE_DataCatalogBrowser::CatalogItem::MapLayer)
+	{
+		QgsMapLayer* layer = QgsProject::instance()->mapLayer(item.mapLayerId);
+		if (!layer)
+		{
+			QMessageBox::warning(this, tr("添加到地图"), tr("图层已不存在或被移除。"));
+			return;
+		}
+		QgsMapCanvas* cvs = m_pQgisIface ? m_pQgisIface->mapCanvas() : nullptr;
+		if (!cvs) return;
+		cvs->setExtent(seXformRect(layer->extent(), layer->crs(), seCanvasDestCrs(cvs)));
+		cvs->refresh();
+		appendLog(tr("[添加到地图] 已聚焦地图图层：%1").arg(layer->name()));
+		return;
+	}
+
+	if (item.uris.isEmpty())
+	{
+		QMessageBox::information(this, tr("添加到地图"),
+			tr("该节点下没有可直接加载的数据。"));
+		return;
+	}
+
+	int nOk = 0;
+	for (const QgsMimeDataUtils::Uri& uri : item.uris)
+	{
+		if (uri.uri.isEmpty()) continue;
+		const bool bRaster = (uri.layerType == QStringLiteral("raster"));
+		const QString strProvider = uri.providerKey.isEmpty() ? QStringLiteral("ogr") : uri.providerKey;
+		const QString strName = uri.name.isEmpty() ? seStripDataSuffix(item.displayName) : uri.name;
+		QgsMapLayer* layer = bRaster
+			? (QgsMapLayer*)new QgsRasterLayer(uri.uri, strName, strProvider)
+			: (QgsMapLayer*)new QgsVectorLayer(uri.uri, strName, strProvider);
+		if (layer && layer->isValid())
+		{
+			QgsProject::instance()->addMapLayer(layer);
+			++nOk;
+		}
+		else if (layer)
+		{
+			delete layer;
+		}
+	}
+
+	if (nOk == 0)
+	{
+		QMessageBox::warning(this, tr("添加到地图"), tr("没有成功加载任何数据。"));
+		return;
+	}
+	appendLog(tr("[添加到地图] 已加载 %1 个数据：%2").arg(nOk).arg(item.displayName));
+
+	// 视野缩放到刚加载的数据范围
+	if (m_pQgisIface && m_pQgisIface->mapCanvas())
+	{
+		QgsRectangle extent;
+		const QMap<QString, QgsMapLayer*>& layers = QgsProject::instance()->mapLayers();
+		for (auto it = layers.begin(); it != layers.end(); ++it)
+		{
+			if (!it.value()) continue;
+			const QgsRectangle r = it.value()->extent();
+			if (r.isNull() || r.isEmpty()) continue;
+			extent.combineExtentWith(r);
+		}
+		if (!extent.isNull() && !extent.isEmpty())
+		{
+			QgsMapCanvas* cvs = m_pQgisIface->mapCanvas();
+			cvs->setExtent(extent);
+			cvs->refresh();
+		}
+	}
+}
+
+void CSE_DataListExportDialog::runClipExport(const QList<ClipExportEngine::Source>& sources,
+	const ClipExportEngine::Options& opt, const QString& title, bool bAutoLoad)
+{
+	// 引擎是同步执行的：用 QProgressDialog 显示"第 x/y 个数据"并支持中途取消
+	QProgressDialog progress(tr("准备导出…"), tr("取消"), 0, sources.size(), this);
+	progress.setWindowTitle(title);
+	progress.setWindowModality(Qt::WindowModal);
+	progress.setMinimumDuration(0);
+	progress.setAutoClose(false);
+	progress.setAutoReset(false);
+
+	ClipExportEngine::Options options = opt;
+	options.progress = [&progress](int done, int total, const QString& message) -> bool
+	{
+		if (progress.wasCanceled()) return false;
+		progress.setMaximum(total > 0 ? total : 1);
+		progress.setValue(done);
+		progress.setLabelText(message);
+		QApplication::processEvents();
+		return !progress.wasCanceled();
+	};
+
+	const QList<ClipExportEngine::Result> results = ClipExportEngine::clipSources(sources, options);
+	progress.close();
+
+	int nOk = 0;
+	int nCancelled = 0;
+	QStringList written;
+	QStringList failed;
+	for (const ClipExportEngine::Result& r : results)
+	{
+		if (r.ok)
+		{
+			++nOk;
+			written << r.outPath;
+			appendLog(tr("[%1] 已导出：%2 -> %3").arg(title, r.name, r.outPath));
+			if (!r.note.isEmpty()) appendLog(tr("    说明：%1").arg(r.note));
+		}
+		else if (r.error == QStringLiteral("已取消"))
+		{
+			++nCancelled;
+		}
+		else
+		{
+			failed << tr("%1：%2").arg(r.name, r.error);
+			appendLog(tr("[%1] 导出失败：%2 - %3").arg(title, r.name, r.error));
+		}
+	}
+
+	if (bAutoLoad)
+	{
+		for (const QString& p : written) autoLoadOutputToMap(p);
+	}
+
+	if (nOk > 0 && failed.isEmpty())
+	{
+		const QString strMsg = (nOk == 1)
+			? tr("%1完成：%2").arg(title, written.first())
+			: tr("%1完成，共导出 %2 个数据。").arg(title).arg(nOk);
+		showResult(true, title, strMsg, QString());
+	}
+	else if (nOk > 0)
+	{
+		QMessageBox::warning(this, title, tr("%1完成 %2 个，失败 %3 个：\n%4")
+			.arg(title).arg(nOk).arg(failed.size()).arg(failed.join("\n")));
+	}
+	else if (nCancelled > 0)
+	{
+		appendLog(tr("[%1] 已取消。").arg(title));
+	}
+	else
+	{
+		showResult(false, title, QString(),
+			failed.isEmpty() ? tr("没有可导出的数据。") : failed.join("\n"));
+	}
+}
+
+// 加载导出产物：GPKG / GDB 是"一个文件（目录）装多个图层"的容器，
+// 直接当单文件打开只会得到一个空图层，必须枚举其内部图层逐个加载
+void CSE_DataListExportDialog::autoLoadOutputToMap(const QString& path)
+{
+	if (!m_pQgisIface || !m_pQgisIface->mapCanvas() || path.isEmpty()) return;
+	const QFileInfo fi(path);
+	if (!fi.exists()) return;
+
+	const QString strExt = fi.suffix().toLower();
+	const bool bContainer = (strExt == "gpkg") || (strExt == "gdb");
+	if (!bContainer)
+	{
+		autoLoadToMap(path);
+		return;
+	}
+
+	QList<QgsProviderSublayerDetails> subs;
+	if (QgsProviderMetadata* md = QgsProviderRegistry::instance()->providerMetadata("ogr"))
+	{
+		try { subs = md->querySublayers(path, Qgis::SublayerQueryFlags(), nullptr); }
+		catch (...) { subs.clear(); }
+	}
+
+	int nOk = 0;
+	for (const QgsProviderSublayerDetails& sub : subs)
+	{
+		if (sub.providerKey() != QLatin1String("ogr")) continue;
+		QgsVectorLayer* layer = new QgsVectorLayer(sub.uri(), sub.name(), "ogr");
+		if (layer && layer->isValid())
+		{
+			QgsProject::instance()->addMapLayer(layer);
+			++nOk;
+			appendLog(tr("[自动加载] 已加载到地图：%1").arg(sub.name()));
+		}
+		else if (layer)
+		{
+			delete layer;
+		}
+	}
+	if (nOk == 0) appendLog(tr("[自动加载] 容器中没有可加载的图层：%1").arg(path));
+}
+
+// 列表右键：数据库段 / 本地段 / 地图图层段统一走这里，
+// 两个节点的菜单项完全一致（按范围导出 / 按制图导出 / 添加到地图）
+void CSE_DataListExportDialog::onCatalogContextMenuRequested(const QPoint& globalPos,
+	const CSE_DataCatalogBrowser::CatalogItem& item)
+{
+	if (!item.valid) return;
+
+	// 连接根节点 / schema 集合节点 / 地图图层节点不是"具体数据"，两个导出置灰
+	const bool bIsConcreteData = item.isLayer
+		|| !item.uris.isEmpty() || !item.rasterUriCandidates.isEmpty();
+
+	QMenu menu(this);
+	QAction* actRange = menu.addAction(tr("按范围导出"));
+	QAction* actMainArea = menu.addAction(tr("按制图导出"));
+	menu.addSeparator();
+	QAction* actAddToMap = menu.addAction(tr("添加到地图"));
+
+	actRange->setEnabled(bIsConcreteData);
+	actMainArea->setEnabled(bIsConcreteData);
+	if (!bIsConcreteData)
+	{
+		const QString strTip = tr("请先选择具体的数据表 / 数据文件");
+		actRange->setToolTip(strTip);
+		actMainArea->setToolTip(strTip);
+	}
+	actAddToMap->setEnabled(bIsConcreteData
+		|| item.kind == CSE_DataCatalogBrowser::CatalogItem::MapLayer);
+
+	QAction* chosen = menu.exec(globalPos);
+	if (!chosen) return;
+
+	if (chosen == actRange)
+	{
+		exportByRangeFromCatalog(item);
+	}
+	else if (chosen == actMainArea)
+	{
+		exportByMainAreaFromCatalog(item);
+	}
+	else if (chosen == actAddToMap)
+	{
+		addCatalogItemToMap(item);
+	}
+}
+
+void CSE_DataListExportDialog::onCatalogItemActivated(
+	const CSE_DataCatalogBrowser::CatalogItem& item)
+{
+	// 双击 = 添加到地图
+	if (item.valid) addCatalogItemToMap(item);
 }
 
 void CSE_DataListExportDialog::addDirNode(QTreeWidgetItem* parent, const QString& dirPath)
@@ -903,154 +1417,7 @@ bool CSE_DataListExportDialog::isRasterPath(const QString& filePath)
 		|| lower.endsWith(".bmp") || lower.endsWith(".ecw");
 }
 
-void CSE_DataListExportDialog::on_treeWidgetDataList_customContextMenuRequested(const QPoint& pos)
-{
-	if (!m_pTree) return;
-	QTreeWidgetItem* item = m_pTree->itemAt(pos);
-	if (!item) return;
-
-	QString strPath = item->data(0, Qt::UserRole).toString();
-	bool bIsDir = item->data(0, Qt::UserRole + 1).toBool();
-	int nodeType = item->data(0, Qt::UserRole + 1).toInt();
-	m_pTree->setCurrentItem(item);
-
-	QMenu menu(this);
-	QAction* actBatch = menu.addAction(tr("批量导出"));
-	QAction* actCondition = menu.addAction(tr("按条件导出"));
-	QAction* actRange = menu.addAction(tr("按范围导出"));
-	QAction* actMainArea = menu.addAction(tr("按主区裁切导出"));
-	menu.addSeparator();
-	QAction* actShowInMap = menu.addAction(tr("在地图显示"));
-
-	QAction* chosen = menu.exec(m_pTree->viewport()->mapToGlobal(pos));
-	if (!chosen) return;
-
-	// 数据库/地图图层节点：直接调用统一的导出与显示处理（仅当节点类型不是 0/1 时使用）
-	if (nodeType == (int)NodeDbTable || nodeType == (int)NodeMapLayer)
-	{
-		if (chosen == actShowInMap)
-		{
-			loadItemToMap(item);
-		}
-		else
-		{
-			doExportForItem(item);
-		}
-		return;
-	}
-
-	// 本地文件 / 目录：原流程
-	if (chosen == actBatch)
-	{
-		doBatchExport(bIsDir ? strPath : QFileInfo(strPath).absolutePath());
-	}
-	else if (chosen == actCondition)
-	{
-		doConditionExport(bIsDir ? strPath : QFileInfo(strPath).absolutePath());
-	}
-	else if (chosen == actRange)
-	{
-		doRangeExport(strPath);
-	}
-	else if (chosen == actMainArea)
-	{
-		// 直接弹出精简的"按主区裁切导出"对话框：只暴露主区+输出+纸张+比例尺等主区相关参数，
-		// 不再让用户在 4 个 tab 的完整数据管理 dialog 里二次选择裁切方式
-		CSE_MainAreaExportDialog dlg(this);
-		dlg.setSourcePath(strPath);
-		dlg.setWindowTitle(tr("按主区裁切导出 - %1").arg(QFileInfo(strPath).fileName()));
-		if (dlg.exec() != QDialog::Accepted) return;
-
-		// 收集待裁切数据（与"按范围导出"使用同一 exportFiles 流程，但将选取的主区作为范围）
-		QStringList files;
-		QFileInfo srcFi(strPath);
-		if (srcFi.isDir())
-		{
-			bool isGdb = isGdbPath(strPath);
-			if (isGdb)
-			{
-				// GDB 整目录导出
-				files << strPath;
-			}
-			else
-			{
-				files = collectDataFiles(strPath, true);
-			}
-		}
-		else
-		{
-			if (isGdbPath(strPath))
-			{
-				// GDB 单图层（实际上是 .gdb 父目录 + layerName）
-				files << strPath;
-			}
-			else
-			{
-				files = collectFromFile(strPath);
-			}
-		}
-		if (files.isEmpty())
-		{
-			appendLog(tr("没有可导出的数据文件。"));
-			return;
-		}
-
-		// 用主区数据生成裁剪范围：读主区 shp 中已选要素的 bbox，作为统一裁剪范围
-		QgsCoordinateReferenceSystem mainAreaCrs;
-		QgsRectangle clipRect = computeMainAreaClipRect(dlg.mainAreaPath(), dlg.mainAreaField(),
-			dlg.selectedFeatureIds(), &mainAreaCrs);
-		if (clipRect.isEmpty())
-		{
-			QMessageBox::warning(this, tr("按主区裁切导出"), tr("未能从主区数据中得到有效范围，请确认已选择要素。"));
-			return;
-		}
-
-		QString outPath = dlg.outputFilePath();
-		if (outPath.isEmpty()) return;
-
-		QString errMsg;
-		if (files.size() == 1)
-		{
-			// 单个数据 → 直接输出到用户选择的单个文件，自动加载该文件
-			QString dstPath;
-			bool ok = exportSingleToFile(files.first(), outPath, &clipRect, &mainAreaCrs, dstPath, errMsg);
-			showResult(ok, tr("按主区裁切导出"),
-				tr("按主区裁切导出完成：%1").arg(dstPath),
-				tr("按主区裁切导出失败：%1").arg(errMsg));
-			if (ok && dlg.autoLoadAfterExport()) autoLoadToMap(dstPath);
-		}
-		else
-		{
-			// 多数据源（目录）→ 输出目录形式，自动加载只加载本次导出的文件，不扫已有数据
-			QString outDir = outputDirFromPick(outPath);
-			QDir().mkpath(outDir);
-			QStringList written;
-			int ok = exportFiles(files, outDir, &clipRect, &mainAreaCrs, QString(), QString(), QString(),
-				QDateTime(), QDateTime(), false, errMsg, &written);
-			showResult(ok > 0, tr("按主区裁切导出"),
-				tr("按主区裁切导出完成，共导出 %1 个数据文件到：\n%2").arg(ok).arg(outDir),
-				tr("按主区裁切导出失败：%1").arg(errMsg));
-			if (ok > 0 && dlg.autoLoadAfterExport())
-			{
-				for (const QString& p : written) autoLoadToMap(p);
-			}
-		}
-	}
-	else if (chosen == actShowInMap)
-	{
-		// 仅对单个数据文件（非目录）执行加载；目录可交给批量加载或导出流程
-		if (bIsDir)
-		{
-			QMessageBox::information(this, tr("在地图显示"),
-				tr("目录项无法直接显示，请选择具体的数据文件。"));
-		}
-		else
-		{
-			loadDataFileToMap(strPath);
-		}
-	}
-}
-
+// 【2026-09-17 数据裁剪改造】旧版右键菜单实现（已不再从菜单进入）
 void CSE_DataListExportDialog::doBatchExport(const QString& dirPath)
 {
 	QMessageBox::StandardButton ret = QMessageBox::question(this, tr("批量导出"),
@@ -1329,8 +1696,10 @@ void CSE_DataListExportDialog::doRangeExport(const QString& dirPath)
 	// 1) GDB 子项：单独子图层导出 + 按范围
 	if (isGdbPath(dirPath))
 	{
-		QTreeWidgetItem* cur = m_pTree ? m_pTree->currentItem() : nullptr;
-		QString layerName = cur ? cur->data(0, Qt::UserRole + 5).toString() : QString();
+		// 【2026-09-17 数据裁剪改造】本函数已不再从右键菜单进入（两个导出统一走
+		// sourcesFromCatalog → ClipExportEngine），列表控件也不再是 QTreeWidget，
+		// GDB 内部图层名无从取得 → 这里按"整个 GDB"处理
+		QString layerName;
 		QgsRectangle drawnRect;
 		bool haveRect = false;
 		// 记录"范围获取方式"和"绘制类型"在用户两次打开之间的选择，避免重新弹对话框时退回首页
@@ -1832,150 +2201,6 @@ void CSE_DataListExportDialog::loadDataFileToMap(const QString& filePath)
 	appendLog(tr("[在地图显示] 已加载：%1").arg(filePath));
 }
 
-void CSE_DataListExportDialog::on_Button_ConnectDb_clicked()
-{
-	if (!m_pQgisIface)
-	{
-		QMessageBox::warning(this, tr("连接数据库"), tr("未连接到 QGIS 接口。"));
-		return;
-	}
-	CSE_DatabaseConnectionDialog dlg(this);
-	if (dlg.exec() != QDialog::Accepted) return;
-
-	DatabaseConnectionInfo info = dlg.getConnectionInfo();
-	if (!info.isValid())
-	{
-		QMessageBox::warning(this, tr("连接数据库"), tr("连接信息不完整。"));
-		return;
-	}
-
-	// 同名覆盖
-	for (int i = 0; i < m_dbConns.size(); ++i)
-	{
-		if (m_dbConns[i].strName == info.strName)
-		{
-			m_dbConns[i] = info;
-			appendLog(tr("[数据库] 已更新连接：%1").arg(info.strName));
-			populateDataList();
-			return;
-		}
-	}
-	m_dbConns.append(info);
-	appendLog(tr("[数据库] 已添加连接：%1 (%2@%3:%4/%5)")
-		.arg(info.strName, info.strUsername, info.strHost, info.strPort, info.strDbName));
-	populateDataList();
-}
-
-void CSE_DataListExportDialog::on_Button_RefreshLayers_clicked()
-{
-	populateDataList();
-}
-
-void CSE_DataListExportDialog::populateDatabaseRoot()
-{
-	if (!m_pTree) return;
-	for (int i = 0; i < m_dbConns.size(); ++i)
-	{
-		const DatabaseConnectionInfo& c = m_dbConns[i];
-
-		QTreeWidgetItem* dbRoot = new QTreeWidgetItem(m_pTree);
-		dbRoot->setText(0, QString("[DB] %1  (%2@%3:%4/%5)")
-			.arg(c.strName, c.strUsername, c.strHost, c.strPort, c.strDbName));
-		dbRoot->setText(1, tr("数据库"));
-		dbRoot->setIcon(0, style()->standardIcon(QStyle::SP_DriveNetIcon));
-		// 第 2 列存连接信息索引
-		dbRoot->setData(0, Qt::UserRole, QVariant(i));
-		dbRoot->setData(0, Qt::UserRole + 1, QVariant((int)NodeDbRoot));
-
-		// 使用 QSqlDatabase 列出 geometry/raster_columns 中的表
-		QString connName = QString("dlg_list_%1").arg(c.strName);
-		QSqlDatabase db = QSqlDatabase::contains(connName)
-			? QSqlDatabase::database(connName)
-			: QSqlDatabase::addDatabase("QPSQL", connName);
-		db.setHostName(c.strHost);
-		db.setPort(c.strPort.toInt());
-		db.setDatabaseName(c.strDbName);
-		db.setUserName(c.strUsername);
-		db.setPassword(c.strPassword);
-
-		if (!db.isOpen() && !db.open())
-		{
-			QTreeWidgetItem* errItem = new QTreeWidgetItem(dbRoot);
-			errItem->setText(0, tr("(连接失败：%1)").arg(db.lastError().text()));
-			errItem->setText(1, tr("错误"));
-			continue;
-		}
-
-		// 矢量表
-		QSqlQuery qv(db);
-		QString sqlV = R"(SELECT f_table_schema AS s, f_table_name AS t, type AS g FROM geometry_columns
-						 UNION ALL
-						 SELECT f_table_schema AS s, f_table_name AS t, type AS g FROM geography_columns
-						 ORDER BY s, t)";
-		if (qv.exec(sqlV))
-		{
-			while (qv.next())
-			{
-				QTreeWidgetItem* ti = new QTreeWidgetItem(dbRoot);
-				ti->setText(0, QString("%1.%2").arg(qv.value("s").toString(), qv.value("t").toString()));
-				ti->setText(1, tr("矢量表 (%1)").arg(qv.value("g").toString()));
-				ti->setIcon(0, style()->standardIcon(QStyle::SP_FileIcon));
-				ti->setData(0, Qt::UserRole, QVariant(i)); // 连接索引
-				ti->setData(0, Qt::UserRole + 1, QVariant((int)NodeDbTable));
-				ti->setData(0, Qt::UserRole + 2, QVariant(false)); // 非栅格
-				ti->setData(0, Qt::UserRole + 3, QVariant(qv.value("s").toString()));
-				ti->setData(0, Qt::UserRole + 4, QVariant(qv.value("t").toString()));
-			}
-		}
-
-		// 栅格表
-		QSqlQuery qr(db);
-		QString sqlR = R"(SELECT r_table_schema AS s, r_table_name AS t FROM raster_columns ORDER BY s, t)";
-		if (qr.exec(sqlR))
-		{
-			while (qr.next())
-			{
-				QTreeWidgetItem* ti = new QTreeWidgetItem(dbRoot);
-				ti->setText(0, QString("%1.%2").arg(qr.value("s").toString(), qr.value("t").toString()));
-				ti->setText(1, tr("栅格表"));
-				ti->setIcon(0, style()->standardIcon(QStyle::SP_FileIcon));
-				ti->setData(0, Qt::UserRole, QVariant(i));
-				ti->setData(0, Qt::UserRole + 1, QVariant((int)NodeDbTable));
-				ti->setData(0, Qt::UserRole + 2, QVariant(true));
-				ti->setData(0, Qt::UserRole + 3, QVariant(qr.value("s").toString()));
-				ti->setData(0, Qt::UserRole + 4, QVariant(qr.value("t").toString()));
-			}
-		}
-	}
-}
-
-void CSE_DataListExportDialog::populateMapLayersRoot()
-{
-	if (!m_pTree) return;
-	if (!m_pQgisIface || !m_pQgisIface->mapCanvas()) return;
-
-	QTreeWidgetItem* root = new QTreeWidgetItem(m_pTree);
-	root->setText(0, tr("[地图] 当前地图图层"));
-	root->setText(1, tr("地图"));
-	root->setIcon(0, style()->standardIcon(QStyle::SP_ComputerIcon));
-	root->setData(0, Qt::UserRole, QVariant(-1));
-	root->setData(0, Qt::UserRole + 1, QVariant((int)NodeMapLayerRoot));
-
-	const QMap<QString, QgsMapLayer*>& layers = QgsProject::instance()->mapLayers();
-	for (auto it = layers.begin(); it != layers.end(); ++it)
-	{
-		QgsMapLayer* layer = it.value();
-		if (!layer) continue;
-		QTreeWidgetItem* ti = new QTreeWidgetItem(root);
-		bool bIsRaster = (qobject_cast<QgsRasterLayer*>(layer) != nullptr);
-		ti->setText(0, layer->name());
-		ti->setText(1, bIsRaster ? tr("栅格图层") : tr("矢量图层"));
-		ti->setIcon(0, style()->standardIcon(QStyle::SP_FileIcon));
-		ti->setData(0, Qt::UserRole, QVariant(layer->id()));
-		ti->setData(0, Qt::UserRole + 1, QVariant((int)NodeMapLayer));
-		ti->setData(0, Qt::UserRole + 2, QVariant(bIsRaster));
-	}
-}
 
 QString CSE_DataListExportDialog::buildDbTableUri(const DatabaseConnectionInfo& conn,
 	const QString& schema, const QString& tableName, bool bRaster) const

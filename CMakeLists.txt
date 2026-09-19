@@ -115,6 +115,7 @@ set(PLUGIN_SOURCES
 
     # 核心工具
     core/calendar_helper.cpp
+    core/clip_export_engine.cpp
     core/data_importer.cpp
     core/file_storage_manager.cpp
     core/metadata_extractor.cpp
@@ -130,6 +131,9 @@ set(PLUGIN_SOURCES
     ui_class/auto_edge_match_dialog.cpp
     ui_class/backup_strategy_edit_dialog.cpp
     ui_class/clip_dialog.cpp
+    # 【2026-09-17 数据裁剪改造】平台左侧数据列表的移植实现 + 成果模块的两个导出对话框
+    ui_class/data_catalog_browser.cpp
+    ui_class/DataCatalogConnectionDialog.cpp
     ui_class/data_import_wizard.cpp
     ui_class/db_config_dialog.cpp
     ui_class/format_conversion_dialog.cpp
@@ -137,6 +141,7 @@ set(PLUGIN_SOURCES
     ui_class/generalization_config_dialog.cpp
     ui_class/layer_type_select_dialog.cpp
     ui_class/login_dialog.cpp
+    ui_class/map_extent_draw_tool.cpp
     ui_class/map_tool_extent_picker.cpp
     ui_class/mapdata_download.cpp
     ui_class/merge_dialog.cpp
@@ -153,6 +158,7 @@ set(PLUGIN_SOURCES
     ui_class/se_database_connection.cpp
     ui_class/se_db_manager.cpp
     ui_class/se_layer_mapping_dialog.cpp
+    ui_class/se_main_area_clip.cpp
     ui_class/se_metadata_viewer.cpp
     ui_class/se_mission453_check.cpp
     ui_class/se_mission454_check.cpp
@@ -161,6 +167,7 @@ set(PLUGIN_SOURCES
     ui_class/se_mission457_check.cpp
     ui_class/se_mission458_check.cpp
     ui_class/se_mission459_check.cpp
+    ui_class/se_range_export.cpp
     ui_class/se_vector_format_conversion.cpp
 
     # 后台任务（ui_task/）
@@ -189,7 +196,7 @@ file(GLOB PLUGIN_HEADERS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/ui_task/*.h
 )
 
-# UI 文件（19 个；uic 生成 ui_<basename>.h）
+# UI 文件（21 个；uic 生成 ui_<basename>.h）
 set(PLUGIN_UIS
     ui/auto_edge_match.ui
     ui/auto_quality_check.ui
@@ -207,9 +214,11 @@ set(PLUGIN_UIS
     ui_class/db_config_dialog.ui
     ui_class/gdb_layer_selector_dialog.ui
     ui_class/login_dialog.ui
+    ui_class/main_area_clip.ui
     ui_class/mapdata_download.ui
     ui_class/metadata_manager_dialog.ui
     ui_class/product_storage_dialog.ui
+    ui_class/range_export.ui
 )
 
 # 资源文件
@@ -217,7 +226,7 @@ set(PLUGIN_RCCS
     map_quality_check_tools.qrc
 )
 
-# AUTOUIC 关闭后，显式运行 uic 生成全部 ui_*.h（19 个 .ui basename 无重名，平铺进 build 目录）
+# AUTOUIC 关闭后，显式运行 uic 生成全部 ui_*.h（21 个 .ui basename 无重名，平铺进 build 目录）
 qt5_wrap_ui(PLUGIN_UI_HEADERS ${PLUGIN_UIS})
 
 # ================================================================

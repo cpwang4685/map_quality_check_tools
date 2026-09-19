@@ -46,6 +46,9 @@ if %errorlevel% neq 0 exit /b %errorlevel%
 "%UIC%" -o "%GEN%\ui_gdb_layer_selector_dialog.h" "%PROJ%\ui_class\gdb_layer_selector_dialog.ui"
 if %errorlevel% neq 0 exit /b %errorlevel%
 "%UIC%" -o "%GEN%\ui_mapdata_download.h" "%PROJ%\ui_class\mapdata_download.ui"
+"%UIC%" -o "%GEN%\ui_range_export.h" "%PROJ%\ui_class\range_export.ui"
+"%UIC%" -o "%GEN%\ui_main_area_clip.h" "%PROJ%\ui_class\main_area_clip.ui"
+if %errorlevel% neq 0 exit /b %errorlevel%
 if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo === MOC generation ===
@@ -91,5 +94,9 @@ echo === MOC generation ===
 "%MOC%" "%PROJ%\core\calendar_helper.h" -o "%GEN%\moc_calendar_helper.cpp"
 "%MOC%" "%PROJ%\core\data_importer.h" -o "%GEN%\moc_data_importer.cpp"
 "%MOC%" "%PROJ%\ui_class\data_import_wizard.h" -o "%GEN%\moc_data_import_wizard.cpp"
+"
+"%MOC%" "%PROJ%\ui_class\data_catalog_browser.h" -o "%GEN%\moc_data_catalog_browser.cpp"
+"%MOC%" "%PROJ%\ui_class\se_range_export.h" -o "%GEN%\moc_se_range_export.cpp"
+"%MOC%" "%PROJ%\ui_class\se_main_area_clip.h" -o "%GEN%\moc_se_main_area_clip.cpp"
 
 echo === DONE ===
