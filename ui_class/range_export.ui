@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>660</width>
-    <height>520</height>
+    <width>646</width>
+    <height>665</height>
    </rect>
   </property>
   <property name="font">
@@ -19,9 +19,9 @@
   <property name="windowTitle">
    <string>按范围导出</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
-   <item>
-    <layout class="QFormLayout" name="formLayout_mode">
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <layout class="QGridLayout" name="gridLayout_2">
      <item row="0" column="0">
       <widget class="QLabel" name="label_mode">
        <property name="text">
@@ -72,7 +72,7 @@
      </item>
     </layout>
    </item>
-   <item>
+   <item row="1" column="0">
     <widget class="QStackedWidget" name="stackedWidget_pages">
      <property name="currentIndex">
       <number>2</number>
@@ -282,23 +282,25 @@
      </widget>
      <widget class="QWidget" name="page_feature">
       <layout class="QGridLayout" name="gridLayout_feature">
-       <item row="0" column="0">
-        <widget class="QLabel" name="label_layer">
-         <property name="text">
-          <string>矢量图层:</string>
-         </property>
-        </widget>
-       </item>
        <item row="0" column="1">
-        <layout class="QHBoxLayout" name="hLayout_layerButtons">
-         <item>
+        <layout class="QGridLayout" name="gridLayout_3">
+         <property name="sizeConstraint">
+          <enum>QLayout::SetFixedSize</enum>
+         </property>
+         <item row="0" column="0">
           <widget class="QComboBox" name="comboBox_layer"/>
          </item>
-         <item>
+         <item row="0" column="1">
           <widget class="QPushButton" name="Button_OpenLayer">
+           <property name="minimumSize">
+            <size>
+             <width>120</width>
+             <height>0</height>
+            </size>
+           </property>
            <property name="maximumSize">
             <size>
-             <width>75</width>
+             <width>120</width>
              <height>16777215</height>
             </size>
            </property>
@@ -312,20 +314,10 @@
          </item>
         </layout>
        </item>
-       <item row="1" column="0">
-        <widget class="QLabel" name="label_field">
+       <item row="4" column="0" colspan="2">
+        <widget class="QPushButton" name="Button_GetExtent">
          <property name="text">
-          <string>属性字段:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="1">
-        <widget class="QComboBox" name="comboBox_field"/>
-       </item>
-       <item row="2" column="0">
-        <widget class="QLabel" name="label_value">
-         <property name="text">
-          <string>要素值:</string>
+          <string>获取范围</string>
          </property>
         </widget>
        </item>
@@ -336,20 +328,20 @@
          </property>
         </widget>
        </item>
-       <item row="3" column="0" colspan="2">
-        <widget class="QLabel" name="label_featureHint">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_layer">
          <property name="text">
-          <string>说明：选择图层或打开本地矢量数据后自动读取属性字段；切换属性字段自动列出该字段的全部要素值；从要素值中选择一项后自动获取其外包矩形作为导出范围。</string>
-         </property>
-         <property name="wordWrap">
-          <bool>true</bool>
+          <string>矢量图层:</string>
          </property>
         </widget>
        </item>
-       <item row="4" column="0" colspan="2">
-        <widget class="QPushButton" name="Button_GetExtent">
+       <item row="1" column="1">
+        <widget class="QComboBox" name="comboBox_field"/>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_value">
          <property name="text">
-          <string>获取范围</string>
+          <string>要素值:</string>
          </property>
         </widget>
        </item>
@@ -429,11 +421,28 @@
          </item>
         </layout>
        </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_field">
+         <property name="text">
+          <string>属性字段:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0" colspan="2">
+        <widget class="QLabel" name="label_featureHint">
+         <property name="text">
+          <string>说明：选择图层或打开本地矢量数据后自动读取属性字段；切换属性字段自动列出该字段的全部要素值；从要素值中选择一项后自动获取其外包矩形作为导出范围。</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
     </widget>
    </item>
-   <item>
+   <item row="2" column="0">
     <layout class="QFormLayout" name="formLayout_output">
      <item row="0" column="0">
       <widget class="QLabel" name="label_format">
@@ -487,7 +496,7 @@
      </item>
     </layout>
    </item>
-   <item>
+   <item row="3" column="0">
     <layout class="QHBoxLayout" name="hLayout_buttons">
      <item>
       <widget class="QCheckBox" name="checkBox_autoLoad">

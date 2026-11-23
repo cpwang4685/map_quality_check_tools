@@ -205,10 +205,13 @@ void checkOnBoundary(QgsVectorLayer* pointLayer, QgsVectorLayer* polyLayer,
 }
 
 // ====== 本地回退主入口 ======
+// checkLabel 非空时给每条子检查日志加前缀（M460 组传"居民点与道路拓扑"），
+// 为空则保持原有输出（"点必须重合(3个错误)"）。
 void executeLocal(QgsVectorLayer* pointLayer, QgsVectorLayer* lineLayer,
     QgsVectorLayer* polyLayer, QgsVectorLayer* refPointLayer,
     int processMode, const QHash<QString, double>& thresholds,
-    QList<QPair<QgsFeature, QString>>& allErrors, QStringList& executedChecks)
+    QList<QPair<QgsFeature, QString>>& allErrors, QStringList& executedChecks,
+    const QString& checkLabel)
 {
     if (!pointLayer) return;
     bool all = (processMode == 0);
@@ -221,7 +224,9 @@ void executeLocal(QgsVectorLayer* pointLayer, QgsVectorLayer* lineLayer,
         QList<QPair<QgsFeature, QString>> errs;
         fn(errs);
         allErrors.append(errs);
-        executedChecks.append(QString("%1(%2个错误)").arg(name).arg(errs.size()));
+        const QString tag = checkLabel.isEmpty()
+            ? name : QStringLiteral("%1：%2").arg(checkLabel, name);
+        executedChecks.append(QString("%1(%2个错误)").arg(tag).arg(errs.size()));
     };
 
     if (refPointLayer) {
@@ -245,10 +250,18 @@ namespace Mission454 {
 void execute(QgsVectorLayer* pointLayer, const QString& refLineShp,
              const QString& refPolyShp,
              int processMode, const QHash<QString, double>& thresholds,
-             QList<QPair<QgsFeature, QString>>& allErrors, QStringList& executedChecks)
+             QList<QPair<QgsFeature, QString>>& allErrors, QStringList& executedChecks,
+             const QString& checkLabel)
 {
+    // 检查项名称（M460组传"居民点与道路拓扑"，常规为"点拓扑检查"）
+    const QString label = checkLabel.isEmpty() ? QStringLiteral("点拓扑检查") : checkLabel;
+    const QString layerName = pointLayer
+        ? QFileInfo(pointLayer->source()).completeBaseName() : QString();
+    const QString labelWithLayer = layerName.isEmpty()
+        ? label : QStringLiteral("%1(%2)").arg(label, layerName);
+
     if (!pointLayer) {
-        executedChecks.append(QStringLiteral("点拓扑检查：无点要素图层，本次不涉及"));
+        executedChecks.append(QStringLiteral("%1：无点要素图层，本次不涉及").arg(label));
         return;
     }
 
@@ -257,7 +270,7 @@ void execute(QgsVectorLayer* pointLayer, const QString& refLineShp,
         QgsVectorLayer* refLine = openRefLayer(refLineShp);
         QgsVectorLayer* refPoly = openRefLayer(refPolyShp);
         executeLocal(pointLayer, refLine, refPoly, nullptr /*refPointShp 未用*/,
-                     processMode, thresholds, allErrors, executedChecks);
+                     processMode, thresholds, allErrors, executedChecks, checkLabel);
         delete refPoly;
         delete refLine;
         return;
@@ -266,7 +279,7 @@ void execute(QgsVectorLayer* pointLayer, const QString& refLineShp,
     // 每次执行使用独立临时工作目录（QTemporaryDir 析构自动清理）
     QTemporaryDir work;
     if (!work.isValid()) {
-        executedChecks.append(QStringLiteral("点拓扑检查：无法创建工作目录，本次未执行"));
+        executedChecks.append(QStringLiteral("%1：无法创建工作目录，本次未执行").arg(label));
         return;
     }
     const QString dir = work.path();
@@ -276,7 +289,8 @@ void execute(QgsVectorLayer* pointLayer, const QString& refLineShp,
     const QString pointShp = WujiMissionRunner::exportLayerShp(
         pointLayer, dir, QStringLiteral("point"), &errOut);
     if (pointShp.isEmpty()) {
-        executedChecks.append(QStringLiteral("点拓扑检查：无法导出点图层（%1），本次未执行").arg(errOut));
+        executedChecks.append(QStringLiteral("%1：无法导出点图层（%2），本次未执行")
+            .arg(label, errOut));
         return;
     }
     // 参考图层（其余类型的全部图层合并件）复制进任务目录：
@@ -293,18 +307,16 @@ void execute(QgsVectorLayer* pointLayer, const QString& refLineShp,
         processMode, thresholds.value(QStringLiteral("FuzzyTolerance"), 0.001), outShp);
 
     int errBefore = allErrors.size();
-    if (WujiMissionRunner::runMissionXml(xml, dir, QStringLiteral("点拓扑检查"),
+    if (WujiMissionRunner::runMissionXml(xml, dir, label,
                                          processMode, executedChecks)) {
         // 结果层：源点要素副本 + info_NM 字段（非空即错误）
         // 错误消息带图层名，如"点拓扑检查(一级河流)"，供合并输出时提取
-        WujiMissionRunner::readResultErrors(outShp, pointLayer,
-            QStringLiteral("点拓扑检查(%1)").arg(QFileInfo(pointLayer->source()).completeBaseName()),
+        WujiMissionRunner::readResultErrors(outShp, pointLayer, labelWithLayer,
             WujiMissionRunner::ReadInfoField,
             QStringLiteral("info_NM"), allErrors);
     }
     int added = allErrors.size() - errBefore;
-    executedChecks.append(QStringLiteral("点拓扑检查(%1)：%2")
-        .arg(QFileInfo(pointLayer->source()).completeBaseName())
+    executedChecks.append(QStringLiteral("%1：%2").arg(labelWithLayer)
         .arg(added == 0 ? QStringLiteral("未检出异常") : QStringLiteral("检出异常%1处").arg(added)));
 }
 

@@ -4,12 +4,14 @@
  */
 
 #include "generalization_config_dialog.h"
+#include "product_source_dialog.h"
 #include "layer_type_select_dialog.h"
 #include "param_config_dialog.h"
 #include "scale_selector_dialog.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
+#include <QGridLayout>
 // 【2026-09-10】数据源页签（QTabWidget）已去除，SHP / GDB 输入合并到同一个"矢量数据目录"
 #include <QSpacerItem>
 #include <QProcess>
@@ -24,10 +26,17 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QSet>
+#include <QRegularExpression>
 #include <QXmlStreamReader>
 #include <QTextStream>
+// 【2026-11-07】综合结果补 .cpg：需要判断 dbf 里中文的实际字节编码
+#include <QDirIterator>
+#include <QTextCodec>
 #include <gdal_priv.h>
 #include <ogr_api.h>
+// 【2026-10-23】路线B：插件自己把 GDB 转成 SHP 工作副本，需要 OGR 的 C++ 接口
+#include <ogrsf_frmts.h>
+#include <cpl_string.h>
 #include <qgsmessagelog.h>
 
 #ifdef _WIN32
@@ -111,19 +120,38 @@ GeneralizationConfigDialog::GeneralizationConfigDialog(QWidget* parent)
     vFile->setSpacing(4);
 
     // 第1行: 矢量数据目录
-    auto* hFileRow1 = new QHBoxLayout();
-    hFileRow1->addWidget(new QLabel(QString::fromUtf8("矢量数据目录:"), this));
+    // 【2026-10-18】改用网格布局：第二行的「从数据库获取数据」放在第 1 列，
+    // 与上一行输入框共用同一列，左边缘自动对齐（原先用 addSpacing(96) 估算，
+    // 字体或 DPI 一变就错位）。
+    auto* gridFile = new QGridLayout();
+    gridFile->setContentsMargins(0, 0, 0, 0);
+    gridFile->setHorizontalSpacing(6);
+    gridFile->setVerticalSpacing(4);
+
+    gridFile->addWidget(new QLabel(QString::fromUtf8("矢量数据目录:"), this), 0, 0);
     m_lineEditShpDir = new QLineEdit(this);
     // 【2026-09-10】同一入口同时接受 SHP 目录与 FileGDB 目录（GDB 会先转 SHP 再综合）
     m_lineEditShpDir->setPlaceholderText(
         QString::fromUtf8("选择包含SHP文件的目录，或FileGDB"));
-    hFileRow1->addWidget(m_lineEditShpDir, 1);
+    gridFile->addWidget(m_lineEditShpDir, 0, 1);
     auto* btnBrowseShpDir = new QPushButton(QString::fromUtf8("浏览"), this);
     btnBrowseShpDir->setFixedWidth(80);
     btnBrowseShpDir->setStyleSheet(kNarrowBtnStyle);
     connect(btnBrowseShpDir, &QPushButton::clicked, this, &GeneralizationConfigDialog::onBrowseShpDir);
-    hFileRow1->addWidget(btnBrowseShpDir);
-    vFile->addLayout(hFileRow1);
+    gridFile->addWidget(btnBrowseShpDir, 0, 2);
+
+    // 【2026-10-18】矢量数据目录下方：从数据库获取数据。
+    // 弹出成果库目录树（带复选框/右键导出），实现见 product_source_dialog.*
+    auto* btnProductSource = new QPushButton(
+        QString::fromUtf8("从数据库获取数据"), this);
+    btnProductSource->setFixedWidth(160);
+    btnProductSource->setStyleSheet(kNarrowBtnStyle);
+    connect(btnProductSource, &QPushButton::clicked,
+        this, &GeneralizationConfigDialog::onOpenProductSource);
+    gridFile->addWidget(btnProductSource, 1, 1, Qt::AlignLeft);
+
+    gridFile->setColumnStretch(1, 1);
+    vFile->addLayout(gridFile);
 
     // // 第2行: 图层类型过滤 (与 DB 面板一致的 LayerTypeSelectDialog)
     // auto* hFileRow2 = new QHBoxLayout();
@@ -213,16 +241,22 @@ GeneralizationConfigDialog::GeneralizationConfigDialog(QWidget* parent)
     vCfg->setSpacing(6);
 
     // 第1行: 配置文件选择
-    auto* hCfg = new QHBoxLayout();
-    hCfg->addWidget(new QLabel(QString::fromUtf8("配置文件:"), this));
+    // 【2026-10-18】改用网格布局：下面「自定义综合比例尺」按钮与输入框同列，
+    // 左边缘自动对齐（原先按钮行从最左边开始，比输入框靠左一个标签宽度）。
+    auto* gridCfg = new QGridLayout();
+    gridCfg->setContentsMargins(0, 0, 0, 0);
+    gridCfg->setHorizontalSpacing(6);
+    gridCfg->setVerticalSpacing(6);
+
+    gridCfg->addWidget(new QLabel(QString::fromUtf8("配置文件:"), this), 0, 0);
     m_lineEditConfigXml = new QLineEdit(this);
     m_lineEditConfigXml->setPlaceholderText(QString::fromUtf8("选择xml文件 ..."));
-    hCfg->addWidget(m_lineEditConfigXml, 1);
+    gridCfg->addWidget(m_lineEditConfigXml, 0, 1);
     auto* btnBrowseConfigXml = new QPushButton(QString::fromUtf8("浏览"), this);
     btnBrowseConfigXml->setFixedWidth(80);
     btnBrowseConfigXml->setStyleSheet(kNarrowBtnStyle);
     connect(btnBrowseConfigXml, &QPushButton::clicked, this, &GeneralizationConfigDialog::onBrowseConfigXml);
-    hCfg->addWidget(btnBrowseConfigXml);
+    gridCfg->addWidget(btnBrowseConfigXml, 0, 2);
     auto* btnParamConfig = new QPushButton(QString::fromUtf8("参数配置"), this);
     btnParamConfig->setFixedWidth(80);
     btnParamConfig->setStyleSheet(kNarrowBtnStyle);
@@ -255,11 +289,9 @@ GeneralizationConfigDialog::GeneralizationConfigDialog(QWidget* parent)
         dlg->raise();
         dlg->activateWindow();
     });
-    hCfg->addWidget(btnParamConfig);
-    vCfg->addLayout(hCfg);
+    gridCfg->addWidget(btnParamConfig, 0, 3);
 
     // 第2行: 自定义综合比例尺按钮
-    auto* hScale = new QHBoxLayout();
     auto* btnScaleSelector = new QPushButton(QString::fromUtf8("自定义综合比例尺"), this);
     btnScaleSelector->setMinimumHeight(32);
     // 原样式硬编码了浅色主题的 color:#333（深灰），在平台深色主题下文字近乎不可见，
@@ -269,17 +301,100 @@ GeneralizationConfigDialog::GeneralizationConfigDialog(QWidget* parent)
         "QPushButton { font-weight: bold; padding: 4px 16px; }"
         "QPushButton:hover { color: #ffffff; }");
     connect(btnScaleSelector, &QPushButton::clicked, this, [this]() {
+        // 【2026-10-09】初始比例尺改成“从主 XML 里识别出来的当前比例尺”，
+        // 不再是写死的 10000；识别结果在对话框里还能手改。
+        const QString xmlPath = m_lineEditConfigXml->text().trimmed();
         ScaleSelectorDialog dlg(this);
-        dlg.setXmlFilePath(m_lineEditConfigXml->text().trimmed());
-        dlg.setScale(10000);  // 默认 1:10000
+        dlg.setXmlFilePath(xmlPath);
+
+        const int curScale = xmlPath.isEmpty()
+                                 ? -1
+                                 : ScaleSelectorDialog::detectCurrentScale(xmlPath);
+        dlg.setScale(curScale > 0 ? curScale : 10000);
+
         if (dlg.exec() == QDialog::Accepted) {
-            int scale = dlg.selectedScale();
-            Q_UNUSED(scale);
+            // 【2026-10-09 之七】保存 / 另存为都可能换掉当前引用的 XML：保存可能在知识库
+            // 重命名里改了主 XML 的文件名，另存为则把配置换成了新目录下的副本。两者都按
+            // **完整路径**收回来，否则配置框会继续指着一个已经不存在（或仍是旧的）文件。
+            const QString newPath = dlg.xmlFilePath();
+            const QString normNew = QDir::cleanPath(newPath);
+            const QString normOld = xmlPath.isEmpty() ? QString() : QDir::cleanPath(xmlPath);
+            if (!normNew.isEmpty()
+                && normNew.compare(normOld, Qt::CaseInsensitive) != 0) {
+                m_lineEditConfigXml->setText(QDir::toNativeSeparators(newPath));
+            }
         }
     });
-    hScale->addWidget(btnScaleSelector);
-    hScale->addStretch();  // 按钮靠左，右侧填充弹性空间
-    vCfg->addLayout(hScale);
+    // 【2026-11-02】「自定义综合比例尺」右侧新增「制图主区名称」，整行放在网格
+    // 第 3 行、第 1 列（与上方「配置文件」「注记工程目录」输入框同列）。
+    // 名称由数据里的 BOUA5（县级行政区划面）自动识别，用户可手改；执行前据此校验
+    // 知识库里对应县的 XML 是否存在，并把主 XML 的县级 Link 切到该县。
+    auto* hScaleRow = new QHBoxLayout();
+    hScaleRow->setContentsMargins(0, 0, 0, 0);
+    hScaleRow->setSpacing(6);
+    hScaleRow->addWidget(btnScaleSelector);
+    hScaleRow->addWidget(new QLabel(QString::fromUtf8("制图主区名称:"), this));
+    m_lineEditMainRegion = new QLineEdit(this);
+    m_lineEditMainRegion->setPlaceholderText(QString::fromUtf8("自动识别自数据，可修改"));
+    m_lineEditMainRegion->setToolTip(QString::fromUtf8(
+        "从矢量数据中的县级行政区划面（BOUA5）自动识别，例如「永登县」。\n"
+        "执行前会用该名称校验知识库中对应县的 XML，并切换主 XML 的链接。"));
+    hScaleRow->addWidget(m_lineEditMainRegion, 1);
+    // 第 2 行控件多（按钮 + 标签 + 识别），只占第 1 列时输入框会被压到只剩几十像素，
+    // 所以整行跨到第 3 列（与上一行「参数配置」按钮右边缘对齐），并给一个最小宽度保底。
+    m_lineEditMainRegion->setMinimumWidth(180);
+    auto* btnDetectRegion = new QPushButton(QString::fromUtf8("识别"), this);
+    btnDetectRegion->setFixedWidth(60);
+    btnDetectRegion->setStyleSheet(kNarrowBtnStyle);
+    btnDetectRegion->setToolTip(QString::fromUtf8("按当前矢量数据重新识别主区名称"));
+    connect(btnDetectRegion, &QPushButton::clicked,
+            this, &GeneralizationConfigDialog::onDetectMainRegion);
+    hScaleRow->addWidget(btnDetectRegion);
+    gridCfg->addLayout(hScaleRow, 2, 1, 1, 3);   // 跨到第 3 列，给输入框留够宽度
+    gridCfg->setColumnStretch(1, 1);
+
+    // 第2行: 【2026-11-07】注记工程目录——原先放在「输出」区域，按需求移到 XML 配置区，
+    // 紧跟「配置文件」那一行下面。
+    // 甲方给的 .2dm 地图工程文件（道路代码/河流名称/道路名称等注记的定义）都放在一个
+    // 文件夹里。知识库里 <Mission id="405"> 的 <ProjectFile> 只写文件名，引擎按 DoXMLFile
+    // 的 relativePath（本插件传的就是"结果目录"）去解析，所以执行前要把这些 .2dm 拷进
+    // 结果目录，否则报"找不到 .2dm 文件"。
+    // 【2026-10-13】原先末尾挂的「复制到结果目录」复选框已按需求去掉：填了目录本来就只有
+    // "拷进结果目录"这一种有意义的行为，现在只要目录非空就一律拷（见 onExecute）。
+    // 【2026-11-07】标签放进网格第 0 列、输入框放第 1 列、浏览放第 2 列，与上面
+    // 「配置文件」那一行同列，两行的标签左边缘、输入框左边缘、浏览按钮左边缘全部对齐。
+    auto* lblLabelProj = new QLabel(QString::fromUtf8("注记工程目录:"), this);
+    gridCfg->addWidget(lblLabelProj, 1, 0);
+    m_lineEditLabelProjectDir = new QLineEdit(this);
+    m_lineEditLabelProjectDir->setPlaceholderText(
+        QString::fromUtf8("选择存放 .2dm 注记地图工程的文件夹..."));
+    gridCfg->addWidget(m_lineEditLabelProjectDir, 1, 1);
+    auto* btnBrowseLabelProj = new QPushButton(QString::fromUtf8("浏览"), this);
+    btnBrowseLabelProj->setFixedWidth(80);
+    btnBrowseLabelProj->setStyleSheet(kNarrowBtnStyle);
+    connect(btnBrowseLabelProj, &QPushButton::clicked, this, &GeneralizationConfigDialog::onBrowseLabelProjectDir);
+    gridCfg->addWidget(btnBrowseLabelProj, 1, 2);
+    // 【2026-11-08】「制作注记工程文件」——打开外部程序「无极地图工作系统」。
+    // 知识库 14_静态注记生成.xml 的 Mission 405「动态注记转静态注记」要读 .2dm
+    // 注记工程文件（<ProjectFile>），该文件原本由甲方在工作站里配好动态注记后另存。
+    // 这个按钮把"去工作站做工程"这一步收进对话框：做完把 .2dm 存进上面的
+    // 「注记工程目录」，综合执行时 copyLabelProjectFiles() 会把它拷进结果目录。
+    auto* btnMakeLabelProj = new QPushButton(QString::fromUtf8("制作注记工程文件"), this);
+    btnMakeLabelProj->setStyleSheet(kNarrowBtnStyle);
+    btnMakeLabelProj->setToolTip(QString::fromUtf8(
+        "打开无极地图工作系统，在里面对成果数据配置动态注记并另存为 .2dm，\n"
+        "存到上面的「注记工程目录」即可被综合任务的 405 注记步骤引用。"));
+    connect(btnMakeLabelProj, &QPushButton::clicked,
+            this, &GeneralizationConfigDialog::onOpenLabelProjectMaker);
+#if !defined(Q_OS_WIN)
+    // 无极工作站目前只有 Windows 版（build_hubei 是 MSVC 产物），麒麟上先置灰。
+    btnMakeLabelProj->setEnabled(false);
+    btnMakeLabelProj->setToolTip(QString::fromUtf8(
+        "无极地图工作系统当前仅提供 Windows 版本"));
+#endif
+    gridCfg->addWidget(btnMakeLabelProj, 1, 3);
+
+    vCfg->addLayout(gridCfg);
 
     mainLayout->addWidget(groupCfg);
 
@@ -290,8 +405,13 @@ GeneralizationConfigDialog::GeneralizationConfigDialog(QWidget* parent)
     groupOutput->setStyleSheet(
         QString::fromUtf8("QGroupBox::title { padding-top: 6px; } "
                           "QGroupBox { padding-top: 12px; }"));
-    auto* hOutput = new QHBoxLayout(groupOutput);
-    hOutput->addWidget(new QLabel(QString::fromUtf8("结果目录:"), this));
+    auto* vOutput = new QVBoxLayout(groupOutput);
+    vOutput->setSpacing(6);
+
+    auto* hOutput = new QHBoxLayout();
+    auto* lblOutputDir = new QLabel(QString::fromUtf8("结果目录:"), this);
+    lblOutputDir->setMinimumWidth(96);
+    hOutput->addWidget(lblOutputDir);
     m_lineEditOutputDir = new QLineEdit(this);
     m_lineEditOutputDir->setPlaceholderText(QString::fromUtf8("选择综合缩编结果输出目录..."));
     hOutput->addWidget(m_lineEditOutputDir, 1);
@@ -300,6 +420,8 @@ GeneralizationConfigDialog::GeneralizationConfigDialog(QWidget* parent)
     btnBrowseOutputDir->setStyleSheet(kNarrowBtnStyle);
     connect(btnBrowseOutputDir, &QPushButton::clicked, this, &GeneralizationConfigDialog::onBrowseOutputDir);
     hOutput->addWidget(btnBrowseOutputDir);
+    vOutput->addLayout(hOutput);
+
     mainLayout->addWidget(groupOutput);
 
     // ====================================================================
@@ -319,6 +441,12 @@ GeneralizationConfigDialog::GeneralizationConfigDialog(QWidget* parent)
     mainLayout->addLayout(hButtons);
 
     connectSignals();
+
+    // 【2026-11-02】恢复上一次使用的制图主区名称（选择数据源后会被重新识别覆盖）
+    {
+        QSettings st(QStringLiteral("GarMap"), QStringLiteral("MapGeneralization"));
+        m_lineEditMainRegion->setText(st.value(QStringLiteral("mainRegion")).toString());
+    }
 
     // 【2026-08-23】地图综合 PostGIS 数据库源已注释（与地图数据下载 UI 重复）：
     // 自动加载数据库连接配置 + 开对话框即自动测试连接，一并去掉
@@ -384,11 +512,61 @@ void GeneralizationConfigDialog::connectSignals()
 
 // ====== 属性访问器 ======
 
+void GeneralizationConfigDialog::setQgisInterface(QgisInterface* iface)
+{
+    m_pQgisIface = iface;
+}
+
+// 【2026-10-18】从数据库获取数据：非模态打开，保证「按范围导出」手动绘制时
+// 地图画布可用（模态子对话框会挡住画布交互）。
+void GeneralizationConfigDialog::onOpenProductSource()
+{
+    auto* dlg = new ProductSourceDialog(this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->setModal(false);
+    dlg->setQgisInterface(m_pQgisIface);
+    // 【2026-10-18】右键「…并设置为数据源」导出成功后，直接把结果填进矢量数据目录
+    connect(dlg, &ProductSourceDialog::dataSourceReady, this,
+        [this](const QString& path)
+        {
+            if (path.isEmpty()) return;
+            m_lineEditShpDir->setText(QDir::toNativeSeparators(path));
+            // 【2026-11-02】数据库侧导出的数据源同样触发主区名称识别
+            onDetectMainRegion();
+        });
+    // 【2026-11-07】「按范围导出」里点「开始绘制」时，数据源对话框会先藏起来让用户
+    // 在地图上框选。它本身是本对话框的子窗口，父窗口不藏的话会一直挡在地图前面，
+    // 所以这里跟着一起 hide()，绘制完（drawingFinished）再一起弹回来。
+    ProductSourceDialog* srcDlg = dlg;
+    connect(dlg, &ProductSourceDialog::drawingStarted, this, [this]() { hide(); });
+    connect(dlg, &ProductSourceDialog::drawingFinished, this, [this, srcDlg]() {
+        show();
+        raise();
+        activateWindow();
+        if (srcDlg)
+        {
+            srcDlg->show();
+            srcDlg->raise();
+            srcDlg->activateWindow();
+        }
+    });
+    dlg->show();
+    dlg->raise();
+    dlg->activateWindow();
+}
+
 QString GeneralizationConfigDialog::shpDirectory() const    { return m_lineEditShpDir->text().trimmed(); }
 QString GeneralizationConfigDialog::gdbDirectory() const    { return m_lineEditGdbDir->text().trimmed(); }
 QString GeneralizationConfigDialog::convXmlPath() const      { return m_lineEditConvXml->text().trimmed(); }
 QString GeneralizationConfigDialog::configXmlPath() const    { return m_lineEditConfigXml->text().trimmed(); }
 QString GeneralizationConfigDialog::outputDirectory() const  { return m_lineEditOutputDir->text().trimmed(); }
+// 【2026-10-10】注记工程目录（.2dm 所在文件夹）
+// 【2026-10-13】原来配套的「复制到结果目录」开关（copyLabelProjectToResult）已按需求
+// 连同复选框一起去掉：只要这个目录非空，执行前就一律把 *.2dm 拷进结果目录。
+QString GeneralizationConfigDialog::labelProjectDir() const
+{
+    return m_lineEditLabelProjectDir ? m_lineEditLabelProjectDir->text().trimmed() : QString();
+}
 bool    GeneralizationConfigDialog::isFileSystemSource() const { return true; }   // 仅文件系统数据源
 // bool GeneralizationConfigDialog::isDatabaseSource() const { return false; }     // 数据库源已注释
 
@@ -447,7 +625,184 @@ void GeneralizationConfigDialog::onBrowseShpDir()
 {
     QString dir = QFileDialog::getExistingDirectory(this,
         QString::fromUtf8("选择矢量数据目录"), m_lineEditShpDir->text());
-    if (!dir.isEmpty()) m_lineEditShpDir->setText(dir);
+    if (!dir.isEmpty()) {
+        m_lineEditShpDir->setText(dir);
+        // 【2026-11-02】换了数据源就重新识别主区名称（覆盖上一次的自动/手工值）
+        onDetectMainRegion();
+    }
+}
+
+// ====== 【2026-11-02】制图主区名称 ======
+
+void GeneralizationConfigDialog::onDetectMainRegion()
+{
+    if (!m_lineEditMainRegion) return;
+    const QString name = detectMainRegionName(shpDirectory());
+    if (!name.isEmpty())
+        m_lineEditMainRegion->setText(name);
+}
+
+// 从数据源的 BOUA5（县级行政区划面）识别主区名称。
+// 原始 GDB 里没有「县级行政区划面」这个图层，它是知识库任务 40 把 BOUA5 改名后的
+// 中间名（见 1数据预处理_区县\预处理新增.xml），所以这里直接读 BOUA5。
+QString GeneralizationConfigDialog::detectMainRegionName(const QString& dataPath) const
+{
+    if (dataPath.isEmpty()) return QString();
+
+    static bool gdalRegistered = false;
+    if (!gdalRegistered) { GDALAllRegister(); gdalRegistered = true; }
+
+    // 1. 定位 GDB：路径本身就是 .gdb 目录 → 直接用；否则在目录下找第一个 .gdb
+    QString gdbPath;
+    if (dataPath.endsWith(QStringLiteral(".gdb"), Qt::CaseInsensitive)
+        && QFileInfo(dataPath).isDir()) {
+        gdbPath = dataPath;
+    } else {
+        const QDir d(dataPath);
+        const QStringList subs = d.entryList(QStringList() << QStringLiteral("*.gdb"),
+                                             QDir::Dirs | QDir::NoDotAndDotDot);
+        if (!subs.isEmpty())
+            gdbPath = d.absoluteFilePath(subs.first());
+    }
+    if (gdbPath.isEmpty()) return QString();
+
+    // 2. 打开 GDB，取县级行政区划面图层
+    GDALDataset* ds = static_cast<GDALDataset*>(
+        GDALOpenEx(gdbPath.toUtf8().constData(), GDAL_OF_VECTOR,
+                   nullptr, nullptr, nullptr));
+    if (!ds) return QString();
+
+    OGRLayer* countyLayer = ds->GetLayerByName("BOUA5");
+    if (!countyLayer) {
+        const QString cnName = QString::fromUtf8("县级行政区划面");
+        for (int i = 0; i < ds->GetLayerCount() && !countyLayer; ++i) {
+            OGRLayer* l = ds->GetLayer(i);
+            if (l && QString::fromUtf8(l->GetName()).contains(cnName))
+                countyLayer = l;
+        }
+    }
+
+    // 3. 过滤 + 按几何面积取最大
+    QString best;
+    double  bestArea = -1.0;
+    if (countyLayer) {
+        countyLayer->ResetReading();
+        while (OGRFeature* f = countyLayer->GetNextFeature()) {
+            const QString name = QString::fromUtf8(f->GetFieldAsString("NAME")).trimmed();
+            do {
+                // 裁剪切出来的邻县碎片，NAME 形如「属民和回族土族自治县」
+                if (name.isEmpty() || name.startsWith(QString::fromUtf8("属"))) break;
+                // 只认甘肃的县：跨省范围里青海的县（AreaCode=630000）也会被裁进来
+                const int areaCode = f->GetFieldAsInteger("AreaCode");
+                if (areaCode != 0 && areaCode != 620000) break;
+                OGRGeometry* g = f->GetGeometryRef();
+                if (!g) break;
+                // 用 C API 求面积：OGRGeometry 基类没有 get_Area()。
+                // 地理坐标下单位是度²、投影坐标下是米²，但只在同一图层内比大小，无影响。
+                const double a = OGR_G_Area(reinterpret_cast<OGRGeometryH>(g));
+                if (a > bestArea) { bestArea = a; best = name; }
+            } while (false);
+            OGRFeature::DestroyFeature(f);
+        }
+    }
+    GDALClose(ds);
+    return best;
+}
+
+// 【2026-11-07】把主区名称写进「县预处理 XML 的 SQL」里，而不是去切 Link。
+// 步骤：
+//   1) 读主 XML，找到第一条 1数据预处理_区县\<县名>.xml 的 Link（跳过公共文件）；
+//   2) 打开它指向的那个县 XML；
+//   3) 只改 <Mission id="11" note="属性查询:县级行政区划面"> 块里
+//      <SQL>NAME LIKE '%<县名>'</SQL> 的县名，其它 Mission / 其它内容不动；
+//   4) 写回原文件（保持原 BOM 与换行），按需求不做 .bak 备份。
+// 县名用正则从 SQL 里现抓再换（不是写死"会宁县"），所以换成任何县、反复执行都幂等。
+int GeneralizationConfigDialog::applyMainRegionToXml(const QString& xmlPath,
+                                                     const QString& region)
+{
+    if (xmlPath.isEmpty() || region.isEmpty()) return 0;
+
+    // ---- 1. 主 XML：找 Link 指向的县预处理文件 ----
+    QFile f(xmlPath);
+    if (!f.open(QIODevice::ReadOnly)) return 0;
+    const QByteArray raw = f.readAll();
+    f.close();
+
+    const bool hasBom = raw.startsWith("\xEF\xBB\xBF");
+    const QString mainText = QString::fromUtf8(hasBom ? raw.mid(3) : raw);
+
+    // 预处理目录里的公共文件不是县文件，不作数
+    const QStringList skipPre = {
+        QString::fromUtf8("预处理"),
+        QString::fromUtf8("预处理新增"),
+        QString::fromUtf8("分层改名")
+    };
+
+    QString countyName;
+    {
+        const QRegularExpression reLink(QStringLiteral(
+            "1数据预处理_区县[\\\\/]([^<\\\\/]+)\\.xml"));
+        auto it = reLink.globalMatch(mainText);
+        while (it.hasNext()) {
+            const QString n = it.next().captured(1);
+            if (!skipPre.contains(n)) { countyName = n; break; }
+        }
+    }
+    if (countyName.isEmpty()) return 0;
+
+    // ---- 2. 打开被 Link 指向的县 XML ----
+    const QString kbDir = QFileInfo(xmlPath).absolutePath();
+    const QString countyPath = QDir(kbDir).absoluteFilePath(
+        QStringLiteral("1数据预处理_区县/%1.xml").arg(countyName));
+
+    QFile cf(countyPath);
+    if (!cf.open(QIODevice::ReadOnly)) return 0;
+    const QByteArray craw = cf.readAll();
+    cf.close();
+
+    const bool cBom = craw.startsWith("\xEF\xBB\xBF");
+    const QString text = QString::fromUtf8(cBom ? craw.mid(3) : craw);
+
+    // ---- 3. 只在「属性查询:县级行政区划面」这个 Mission 块内改 SQL ----
+    // 注意引擎不认 XML 注释，但这里仍按 note 精确匹配，省/市/乡镇级那些块一概不碰。
+    const QRegularExpression reMission(QStringLiteral(
+        "<Mission\\s+id=\"11\"\\s+note=\"属性查询:县级行政区划面\"[^>]*>(.*?)</Mission>"),
+        QRegularExpression::DotMatchesEverythingOption);
+    const QRegularExpressionMatch m = reMission.match(text);
+    if (!m.hasMatch()) return 0;
+
+    const QString block = m.captured(1);
+    // &apos; 与普通单引号两种写法都认
+    const QRegularExpression reSql(QStringLiteral(
+        "(<SQL>\\s*NAME\\s+LIKE\\s+&apos;%)([^&<]*)(&apos;\\s*</SQL>)"));
+
+    QString newBlock;
+    newBlock.reserve(block.size());
+    int last = 0, changed = 0;
+    auto it2 = reSql.globalMatch(block);
+    while (it2.hasNext()) {
+        const QRegularExpressionMatch sm = it2.next();
+        if (sm.captured(2) == region) continue;   // 已经是目标县名，不动
+        newBlock += block.mid(last, sm.capturedStart(2) - last);
+        newBlock += region;
+        last = sm.capturedEnd(2);
+        ++changed;
+    }
+    if (changed == 0) return 0;
+    newBlock += block.mid(last);
+
+    const QString newText = text.left(m.capturedStart(1))
+                          + newBlock
+                          + text.mid(m.capturedEnd(1));
+
+    // ---- 4. 写回县 XML（保持原 BOM；按需求不做备份） ----
+    QFile out(countyPath);
+    if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate)) return 0;
+    QByteArray bytes = newText.toUtf8();
+    if (cBom) bytes.prepend("\xEF\xBB\xBF");
+    const qint64 w = out.write(bytes);
+    out.close();
+    return w == bytes.size() ? changed : 0;
 }
 
 void GeneralizationConfigDialog::onBrowseGdbDir()
@@ -568,6 +923,64 @@ void GeneralizationConfigDialog::onBrowseOutputDir()
     QString dir = QFileDialog::getExistingDirectory(this,
         QString::fromUtf8("选择结果输出目录"), m_lineEditOutputDir->text());
     if (!dir.isEmpty()) m_lineEditOutputDir->setText(dir);
+}
+
+// 【2026-10-10】注记工程目录浏览：选的是"文件夹"（甲方把 .2dm 打包成一个目录给），
+// 不是单个文件——样例里一次要用两个 .2dm，选文件夹才能整包拷过去。
+void GeneralizationConfigDialog::onBrowseLabelProjectDir()
+{
+    QString startDir = m_lineEditLabelProjectDir->text().trimmed();
+    if (startDir.isEmpty()) startDir = m_lineEditOutputDir->text().trimmed();
+    QString dir = QFileDialog::getExistingDirectory(this,
+        QString::fromUtf8("选择注记工程目录（存放 .2dm 的文件夹）"), startDir);
+    if (!dir.isEmpty()) m_lineEditLabelProjectDir->setText(dir);
+}
+
+// 【2026-11-08】打开无极地图工作系统（只启动，不带工程参数）。
+// 目录约定：<LTZK 根>\无极工作站\无极地图工作系统.exe
+//   appDir 一般是 <LTZK 根>\bin（与 pluginsDir = appDir/../plugins 同源），故先按
+//   appDir/.. 拼；再退一步试 appDir 本身，兼容插件被平铺到根目录的部署。
+//   两个候选都找不到就把它们一起弹出来，现场改目录名/放错位置能一眼看出。
+// 为什么只启动不带参数：工作站的命令行只认一个位置参数（.2dm 工程路径），
+// 传不了数据目录；而 .2dm 里的符号与注记规则是几百行 DrawObject，程序生成不了，
+// 只能由人在工作站里配。
+void GeneralizationConfigDialog::onOpenLabelProjectMaker()
+{
+    const QString exeName = QString::fromUtf8("无极地图工作系统.exe");
+    const QString subDir  = QString::fromUtf8("无极工作站");
+    const QString appDir  = QCoreApplication::applicationDirPath();
+
+    QStringList candidates;
+    candidates << QDir::cleanPath(appDir + "/../" + subDir + "/" + exeName)
+               << QDir::cleanPath(appDir + "/" + subDir + "/" + exeName);
+
+    QString exePath;
+    for (const QString& cand : candidates) {
+        if (QFileInfo::exists(cand)) { exePath = cand; break; }
+    }
+
+    if (exePath.isEmpty()) {
+        QMessageBox::warning(this, QString::fromUtf8("制作注记工程文件"),
+            QString::fromUtf8("没有找到无极地图工作系统：\n\n%1\n\n"
+                              "请把工作站整个目录拷贝到 LTZK 安装目录下，命名为「%2」，\n"
+                              "并确保其中存在「%3」。")
+                .arg(candidates.join(QString::fromUtf8("\n或\n")), subDir, exeName));
+        genDebugLog(QStringLiteral("[注记工程] 未找到工作站，候选路径: %1")
+                        .arg(candidates.join(QStringLiteral(" | "))));
+        return;
+    }
+
+    const QString workDir = QFileInfo(exePath).absolutePath();
+    if (!QProcess::startDetached(exePath, QStringList(), workDir)) {
+        QMessageBox::warning(this, QString::fromUtf8("制作注记工程文件"),
+            QString::fromUtf8("启动无极地图工作系统失败：\n%1").arg(exePath));
+        genDebugLog(QStringLiteral("[注记工程] 启动失败: %1").arg(exePath));
+        return;
+    }
+
+    genDebugLog(QStringLiteral("[注记工程] 已启动工作站: %1").arg(exePath));
+    QgsMessageLog::logMessage(
+        QStringLiteral("已启动无极地图工作系统: %1").arg(exePath), LOG_TAG, Qgis::Info);
 }
 
 // 【2026-08-23】地图综合 PostGIS 数据库源已注释（与地图数据下载 UI 重复）：
@@ -990,6 +1403,76 @@ static int moveBackslashFilesToDirs(const QString& rootDir)
 {
     return moveBackslashFilesToDirsRec(rootDir);
 }
+
+// 【2026-11-03】Linux 专用：执行前把子 XML 里 <FilePath> 内容中的 Windows 反斜杠
+// 换成正斜杠，再生成一份临时副本交给 DoXMLFile。
+//
+// 背景：知识库 XML 的 <ParaOut>/<ParaIn> 用 Windows 习惯写路径
+// （如 <FilePath>10w\del2村道合_备份.shp</FilePath>）。Windows 上 \ 是分隔符；
+// Linux 上它只是普通文件名字符，SDK 会把整串当成一个文件名，于是在结果根目录
+// 产出"名字里带反斜杠"的单文件（麒麟实测 综合结果/10w\del2村道合_备份.shp）。
+// 输出侧表现为目录结构丢失，输入侧更隐蔽——ParaIn 读不到文件时该 Mission
+// 可能空跑而不报错。全库统计 978 处（ParaOut 642 / ParaIn 336）。
+//
+// 只动 <FilePath> 标签内的内容：SQL 标签里也有反斜杠（54 处，如 NAME='\'），
+// 那是转义字符，全局替换会改查询语义。
+//
+// 临时副本放在原 XML 同目录（文件名前加 '.' 隐藏、后加 __kylin__+pid 防撞），
+// 这样 XML 之间的相对引用不受影响；调用方用完删除。
+// 返回临时文件路径；无需替换（没有反斜杠路径）或无法安全处理时返回空串。
+static QString makeBackslashFixedXmlCopy(const QString& xmlPath)
+{
+    QFile f(xmlPath);
+    if (!f.open(QIODevice::ReadOnly))
+        return QString();
+    const QByteArray raw = f.readAll();
+    f.close();
+
+    // 只处理 UTF-8 / ASCII。UTF-8 的多字节序列不会出现 0x5C，按字符替换安全；
+    // GBK 的尾字节可能正好是 0x5C，按字节替换会把汉字拆坏，故非 UTF-8 一律放弃。
+    // 原文件的 BOM（若有）会以 U+FEFF 保留在字符串里，写回时原样输出。
+    QString text = QString::fromUtf8(raw);
+    if (text.contains(QChar(0xFFFD)))                     // 解不出 UTF-8
+        return QString();
+
+    static const QRegularExpression re(
+        QStringLiteral("<FilePath\\b[^>]*>([^<]*)</FilePath>"));
+    QString out;
+    int last = 0;
+    int changed = 0;
+    QRegularExpressionMatchIterator it = re.globalMatch(text);
+    while (it.hasNext()) {
+        const QRegularExpressionMatch m = it.next();
+        const QString body = m.captured(1);
+        if (!body.contains(QLatin1Char('\\')))
+            continue;
+        const int bodyStart = m.capturedStart(1);
+        out += text.mid(last, bodyStart - last);
+        QString fixed = body;
+        fixed.replace(QLatin1Char('\\'), QLatin1Char('/'));
+        out += fixed;
+        last = bodyStart + body.length();
+        changed++;
+    }
+    if (changed == 0)
+        return QString();
+    out += text.mid(last);
+
+    // 临时副本沿用原扩展名（.xml），避免 SDK 按后缀判断格式时出问题
+    const QFileInfo fi(xmlPath);
+    QString tmpPath = fi.absolutePath() + QLatin1Char('/')
+        + QLatin1Char('.') + fi.completeBaseName()
+        + QStringLiteral(".__kylin__")
+        + QString::number(QCoreApplication::applicationPid());
+    if (!fi.suffix().isEmpty())
+        tmpPath += QLatin1Char('.') + fi.suffix();
+    QFile tmp(tmpPath);
+    if (!tmp.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return QString();
+    tmp.write(out.toUtf8());
+    tmp.close();
+    return tmpPath;
+}
 #endif // _WIN32
 
 // ============================================================================
@@ -1158,6 +1641,235 @@ static QString writeGdb2ShpTempXml(const QString& tplPath, const QString& gdbDir
     return outPath;
 }
 
+
+// ============================================================================
+// 【2026-10-23】路线 B：知识库不自带 GDB→SHP 转换步骤时，插件自己转一份 SHP 工作副本
+//   背景（实测）：引擎本身能直接对 .gdb 综合——DoXMLFile 的 relativePath 指向 .gdb
+//   目录时，任务里写的 "xxx.shp" 会被当作 GDB 内的图层名，读写都在库内完成。甘肃这套
+//   库也正是按 GDB 写的（主 XML 的 relativePath 就是 .gdb，整链没有 gdb2shp 那一步）。
+//   但实测有两处硬伤，短时间内只能绕：
+//     ① 3_水系综合.xml 在 GDB 模式下必崩（RiverGeneralization.dll+0x61571，厂家自带的
+//        MapBatchProcessing.exe 跑同样崩）；同一份数据转成 SHP 目录再跑则正常；
+//     ② 405 注记步骤的 <ProjectFile>.2dm 与 <OutputDirectory> 都按 relativePath 解析，
+//        relativePath 是 .gdb 时既要把 .2dm 塞进 .gdb 目录，它产出的 .shp 还会写进
+//        .gdb 内部，之后 GDAL 会把该目录认成 Shapefile 驱动，GDB 等于废掉。
+//   所以这里改成：先在结果目录里铺一份 SHP 工作副本，再按 SHP 输入跑整条链。
+//   知识库一个字都不用改，也不需要它包含 gdb2shp 那一步。
+// ============================================================================
+
+// DBF 字段名上限 10 字节：按 UTF-8 字符边界截断，避免把汉字切成半个
+static QByteArray truncateUtf8Bytes(const QByteArray& s, int nMaxBytes)
+{
+    if (nMaxBytes <= 0 || s.size() <= nMaxBytes) return s;
+    int k = nMaxBytes;
+    while (k > 0 && ((unsigned char)s[k] & 0xC0) == 0x80) --k;
+    return s.left(k);
+}
+
+// 列出 FileGDB 里的图层名；打开失败返回 false
+static bool listGdbLayers(const QString& gdbDir, QStringList& names)
+{
+    names.clear();
+    GDALAllRegister();
+    const char* apszAllowed[] = { "OpenFileGDB", "FileGDB", nullptr };
+    GDALDataset* poDS = (GDALDataset*)GDALOpenEx(gdbDir.toUtf8().constData(),
+        GDAL_OF_VECTOR | GDAL_OF_READONLY, apszAllowed, nullptr, nullptr);
+    if (!poDS) return false;
+    for (int i = 0; i < poDS->GetLayerCount(); ++i) {
+        OGRLayer* poLayer = poDS->GetLayer(i);
+        if (poLayer) names << QString::fromUtf8(poLayer->GetName());
+    }
+    GDALClose(poDS);
+    return true;
+}
+
+// 读取知识库 XML 里 <LayerNameList> 的映射（源图层名 → 输出名）。
+// 注释掉的条目 QXmlStreamReader 会自动跳过，正好符合知识库的写法。
+static QVector<QPair<QString, QString> > readLayerNameList(const QString& xmlPath)
+{
+    QVector<QPair<QString, QString> > out;
+    QFile f(xmlPath);
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return out;
+    QXmlStreamReader xml(&f);
+    while (!xml.atEnd() && !xml.hasError()) {
+        xml.readNext();
+        if (!xml.isStartElement() || xml.name() != QStringLiteral("LayerName")) continue;
+        const QString newName =
+            xml.attributes().value(QStringLiteral("newname")).toString().trimmed();
+        const QString srcName = xml.readElementText().trimmed();
+        if (srcName.isEmpty()) continue;
+        out.append(qMakePair(srcName, newName.isEmpty() ? srcName : newName));
+    }
+    f.close();
+    return out;
+}
+
+// 把 FileGDB 的全部图层转成 SHP 写进 dstDir（输出名 = 图层名，DBF 编码 UTF-8）。
+// 口径与插件「格式转换」里的 GDB→SHP 一致：字段名按 UTF-8 边界截到 10 字节、重名补
+// _1/_2；SHP 不支持 Z/M，几何先拍平到 2D；.prj 用 ESRI WKT，ArcGIS 侧读着更稳。
+static bool convertGdbDirToShp(const QString& gdbDir, const QString& dstDir, QString& msg)
+{
+    GDALAllRegister();
+    const char* apszAllowed[] = { "OpenFileGDB", "FileGDB", nullptr };
+    GDALDataset* poSrcDS = (GDALDataset*)GDALOpenEx(gdbDir.toUtf8().constData(),
+        GDAL_OF_VECTOR | GDAL_OF_READONLY, apszAllowed, nullptr, nullptr);
+    if (!poSrcDS) {
+        msg = QStringLiteral("GDAL 无法打开 GDB：%1（%2）")
+                  .arg(gdbDir, QString::fromUtf8(CPLGetLastErrorMsg()));
+        return false;
+    }
+    GDALDriver* poShpDrv = GetGDALDriverManager()->GetDriverByName("ESRI Shapefile");
+    if (!poShpDrv) {
+        GDALClose(poSrcDS);
+        msg = QStringLiteral("GDAL 未找到 ESRI Shapefile 驱动");
+        return false;
+    }
+    if (!QDir().mkpath(dstDir)) {
+        GDALClose(poSrcDS);
+        msg = QStringLiteral("无法创建结果目录：%1").arg(dstDir);
+        return false;
+    }
+
+    const int nLayers = poSrcDS->GetLayerCount();
+    int nOk = 0, nBadLayer = 0, nBadFeature = 0;
+    QStringList failedLayers;
+
+    for (int iLayer = 0; iLayer < nLayers; ++iLayer) {
+        OGRLayer* poSrcLayer = poSrcDS->GetLayer(iLayer);
+        if (!poSrcLayer) { ++nBadLayer; continue; }
+        const QByteArray layerName(poSrcLayer->GetName());
+        if (layerName.isEmpty()) { ++nBadLayer; continue; }
+
+        const QString outBase = dstDir + QLatin1Char('/') + QString::fromUtf8(layerName);
+        // 必须带 .shp 后缀：Shapefile 驱动的 Create() 见到不带后缀的路径会当成
+        // “目录型数据集”，结果是每个图层建出一个同名文件夹而不是一个 .shp
+        GDALDataset* poOutDS = poShpDrv->Create(
+            (outBase + QStringLiteral(".shp")).toUtf8().constData(),
+            0, 0, 0, GDT_Unknown, nullptr);
+        if (!poOutDS) {
+            ++nBadLayer;
+            failedLayers << QString::fromUtf8(layerName);
+            continue;
+        }
+
+        OGRSpatialReference* poSRS = poSrcLayer->GetSpatialRef();
+        char** papszLco = nullptr;
+        papszLco = CSLSetNameValue(papszLco, "ENCODING", "UTF-8");
+        // 几何类型原样带过去（不拍平 Z）：SHP 本身支持 Z，拍平会悄悄丢高程，
+        // 而下游综合任务对 3D 面（保护区/国家公园）是照原样跑的
+        OGRLayer* poOutLayer = poOutDS->CreateLayer(
+            layerName.constData(), poSRS, poSrcLayer->GetGeomType(), papszLco);
+        CSLDestroy(papszLco);
+        if (!poOutLayer) {
+            GDALClose(poOutDS);
+            ++nBadLayer;
+            failedLayers << QString::fromUtf8(layerName);
+            continue;
+        }
+
+        // 字段：按 UTF-8 边界截到 10 字节并自己保证唯一，避免 GDAL 硬截断切坏汉字
+        const OGRFeatureDefn* poSrcDefn = poSrcLayer->GetLayerDefn();
+        QSet<QByteArray> usedFieldNames;
+        for (int f = 0; f < poSrcDefn->GetFieldCount(); ++f) {
+            OGRFieldDefn oField(poSrcDefn->GetFieldDefn(f));
+            QByteArray name(oField.GetNameRef() ? oField.GetNameRef() : "");
+            if (name.isEmpty()) name = QByteArray("field_") + QByteArray::number(f);
+            const QByteArray base = truncateUtf8Bytes(name, 10);
+            QByteArray cand = base;
+            int n = 1;
+            while (usedFieldNames.contains(cand.toLower())) {
+                const QByteArray suffix = QByteArray("_") + QByteArray::number(n++);
+                cand = truncateUtf8Bytes(base, 10 - suffix.size()) + suffix;
+            }
+            usedFieldNames.insert(cand.toLower());
+            oField.SetName(cand.constData());
+            poOutLayer->CreateField(&oField);
+        }
+
+        poSrcLayer->ResetReading();
+        OGRFeature* poFeature = nullptr;
+        while ((poFeature = poSrcLayer->GetNextFeature()) != nullptr) {
+            OGRFeature* poOut = OGRFeature::CreateFeature(poOutLayer->GetLayerDefn());
+            poOut->SetFrom(poFeature, TRUE);
+            if (poOutLayer->CreateFeature(poOut) != OGRERR_NONE) ++nBadFeature;
+            OGRFeature::DestroyFeature(poOut);
+            OGRFeature::DestroyFeature(poFeature);
+        }
+        GDALClose(poOutDS);
+
+        if (poSRS) {
+            OGRSpatialReference oTmp(*poSRS);
+            oTmp.morphToESRI();
+            char* pszWkt = nullptr;
+            if (oTmp.exportToWkt(&pszWkt) == OGRERR_NONE) {
+                QFile prj(outBase + QStringLiteral(".prj"));
+                if (prj.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+                    prj.write(pszWkt);
+                    prj.close();
+                }
+                CPLFree(pszWkt);
+            }
+        }
+        ++nOk;
+    }
+    GDALClose(poSrcDS);
+
+    msg = QStringLiteral("共 %1 个图层，成功 %2，失败 %3，失败要素 %4%5")
+              .arg(nLayers).arg(nOk).arg(nBadLayer).arg(nBadFeature)
+              .arg(failedLayers.isEmpty()
+                       ? QString()
+                       : QStringLiteral("（%1）").arg(failedLayers.join(QStringLiteral("、"))));
+    return nOk > 0;
+}
+
+// 按知识库导出步骤的 <LayerNameList>，把成果层从结果目录平铺拷到 dstDir 并改名。
+// GDB 模式下这步由引擎做，LayerNameList 写的是 "区县级成果_长城" 这种扁平层名；
+// 换成 SHP 工作目录后，源文件其实是 结果目录\区县级成果\长城.shp，所以这里按
+// "文件存在即命中"逐条解析：先按原名找，再按"前缀_后缀 → 前缀\后缀"找，
+// 不写死任何目录名。返回成功拷出的层数，未命中的层名回填 missing。
+static int exportResultLayers(const QString& outDir, const QString& dstDir,
+                              const QVector<QPair<QString, QString> >& nameMap,
+                              QStringList& missing)
+{
+    missing.clear();
+    const QStringList sidecars = QStringList()
+        << QStringLiteral("shp") << QStringLiteral("shx") << QStringLiteral("dbf")
+        << QStringLiteral("prj") << QStringLiteral("cpg");
+    if (!QDir().mkpath(dstDir)) return 0;
+
+    int nCopied = 0;
+    for (int i = 0; i < nameMap.size(); ++i) {
+        const QString srcName = nameMap[i].first;
+        const QString newName = nameMap[i].second;
+
+        QString srcBase;
+        if (QFile::exists(outDir + QLatin1Char('/') + srcName + QStringLiteral(".shp"))) {
+            srcBase = outDir + QLatin1Char('/') + srcName;
+        }
+        else {
+            const int us = srcName.indexOf(QLatin1Char('_'));
+            if (us > 0) {
+                const QString nested = outDir + QLatin1Char('/') + srcName.left(us)
+                                     + QLatin1Char('/') + srcName.mid(us + 1);
+                if (QFile::exists(nested + QStringLiteral(".shp")))
+                    srcBase = nested;
+            }
+        }
+        if (srcBase.isEmpty()) { missing << srcName; continue; }
+
+        for (int s = 0; s < sidecars.size(); ++s) {
+            const QString src = srcBase + QLatin1Char('.') + sidecars[s];
+            if (!QFile::exists(src)) continue;
+            const QString dst = dstDir + QLatin1Char('/') + newName
+                              + QLatin1Char('.') + sidecars[s];
+            if (QFile::exists(dst)) QFile::remove(dst);
+            QFile::copy(src, dst);
+        }
+        ++nCopied;
+    }
+    return nCopied;
+}
+
 // ====== GeneralizationWorker::process() — 在子线程中执行 ======
 void GeneralizationWorker::process()
 {
@@ -1200,11 +1912,26 @@ void GeneralizationWorker::process()
     // se_nmo_sdk_bridge.cpp 的 missionBuf 用法一致）。
     char missionBuf[4096] = {};
 
+#ifndef _WIN32
+    // 【2026-11-03】Linux: 每次交给 DoXMLFile 的 XML 先做一次 <FilePath> 反斜杠
+    // 转正斜杠（见 makeBackslashFixedXmlCopy 注释）。收集临时副本，结束时删除。
+    QStringList tmpXmlFiles;
+#endif
+
     if (m_links.isEmpty()) {
         // 直接 <MapGeneBatchProcessing> 格式: 只处理一个 XML
         emit progressChanged(1, 1, QString::fromUtf8("执行中..."));
 
-        QByteArray xmlBytes = m_xmlDir.toLocal8Bit();  // m_xmlDir 即完整路径
+        QString execXmlPath = m_xmlDir;  // m_xmlDir 即完整路径
+#ifndef _WIN32
+        const QString tmpXml = makeBackslashFixedXmlCopy(execXmlPath);
+        if (!tmpXml.isEmpty()) {
+            execXmlPath = tmpXml;
+            tmpXmlFiles << tmpXml;
+            emit logMessage(QStringLiteral("已生成临时副本（<FilePath> 反斜杠→正斜杠）"), 0);
+        }
+#endif
+        QByteArray xmlBytes = execXmlPath.toLocal8Bit();
         char xmlBuf[10240] = {};
         strncpy(xmlBuf, xmlBytes.constData(), sizeof(xmlBuf) - 1);
 
@@ -1237,7 +1964,18 @@ void GeneralizationWorker::process()
             current++;
             emit progressChanged(current, total, link.path);
 
-            QByteArray xmlBytes = subXmlPath.toLocal8Bit();
+            QString execXmlPath = subXmlPath;
+#ifndef _WIN32
+            const QString tmpXml = makeBackslashFixedXmlCopy(execXmlPath);
+            if (!tmpXml.isEmpty()) {
+                execXmlPath = tmpXml;
+                tmpXmlFiles << tmpXml;
+                emit logMessage(
+                    QStringLiteral("%1: 已生成临时副本（<FilePath> 反斜杠→正斜杠）")
+                        .arg(link.path), 0);
+            }
+#endif
+            QByteArray xmlBytes = execXmlPath.toLocal8Bit();
             char xmlBuf[10240] = {};
             strncpy(xmlBuf, xmlBytes.constData(), sizeof(xmlBuf) - 1);
 
@@ -1257,6 +1995,14 @@ void GeneralizationWorker::process()
                 ok ? 0 : 1);
         }
     }
+#ifndef _WIN32
+    // 删除本次生成的临时副本（知识库原文件始终未被修改）
+    for (const QString& tmpXml : tmpXmlFiles) {
+        if (QFile::exists(tmpXml))
+            QFile::remove(tmpXml);
+    }
+    tmpXmlFiles.clear();
+#endif
 #else
     // NMO SDK 未就绪：不执行综合缩编（对应菜单已在 initGui 中置灰，此处兜底）
     Q_UNUSED(current);
@@ -1351,17 +2097,45 @@ void GeneralizationConfigDialog::onWorkerFinished(int success, int total)
         return;   // 阶段2 结束时才走下面的常规完成弹框
     }
 
+    // 【2026-10-23】路线B：整链跑完后按导出步骤的 <LayerNameList> 把成果层平铺改名，
+    // 补上 GDB 模式下由引擎完成的那一步（SHP 工作目录下引擎做不了）
+    if (!m_gdbExportXml.isEmpty()) {
+        const QString exportXml = m_gdbExportXml;
+        m_gdbExportXml.clear();
+        runGdbExportStep(exportXml);
+    }
+
+    // 【2026-11-07】结果目录（含 区县级成果 / 成果数据 等子目录）里的 dbf 补 .cpg。
+    // 必须放在 runGdbExportStep 之后：那一步会把成果再拷一份到 成果数据，
+    // 先补的话新拷过去的那份又没 .cpg 了。
+    {
+        const int nCpg = writeDbfCpgFiles(outputDirectory());
+        if (nCpg > 0) {
+            const QString s = QStringLiteral("已为 %1 个 DBF 补写 .cpg 编码声明").arg(nCpg);
+            QgsMessageLog::logMessage(s, LOG_TAG, Qgis::Info);
+            genDebugLog(s);
+        }
+    }
+
     // 【2026-09-09】文案改用 m_taskLabel（综合 / gdb→shp 转换共用此回调），
     // 默认任务标签"综合缩编"，弹窗文案与改造前一致
     const QString title = m_taskLabel.isEmpty() ? QString::fromUtf8("综合缩编") : m_taskLabel;
+    // 【2026-10-23】路线B 若做了成果导出，顺带告诉用户落在哪儿
+    QString exportHint;
+    if (!m_exportSummary.isEmpty()) {
+        exportHint = QString::fromUtf8("\n\n成果数据已按导出步骤平铺到：\n%1")
+                         .arg(m_exportSummary);
+        m_exportSummary.clear();
+    }
+
     if (success == total && total > 0) {
         QMessageBox::information(this, title,
-            QString::fromUtf8("%1执行完成！\n\n 全部成功。").arg(title));
+            QString::fromUtf8("%1执行完成！\n\n 全部成功。%2").arg(title, exportHint));
     }
     else if (success > 0) {
         QMessageBox::warning(this, title,
-            QString::fromUtf8("%1部分完成。\n\n成功: %2 / 失败: %3")
-                .arg(title).arg(success).arg(total - success));
+            QString::fromUtf8("%1部分完成。\n\n成功: %2 / 失败: %3%4")
+                .arg(title).arg(success).arg(total - success).arg(exportHint));
     }
     else {
         QMessageBox::warning(this, title,
@@ -1484,12 +2258,222 @@ bool GeneralizationConfigDialog::prepareGdb2ShpStage(
     return true;
 }
 
+// ============================================================================
+// 【2026-10-23】路线B：成果导出
+//   知识库里那条 InputDataSource=EsriGDB 的步骤（甘肃库的 "GDB制图成果后处理"）做的事
+//   其实就是"把 区县级成果_xxx 平铺并改名"，而它只在 GDB 模式下有意义。换成 SHP 工作
+//   目录后源数据变成了 结果目录\区县级成果\xxx.shp，引擎那条链接打不开，所以链里剔掉，
+//   改由这里用文件拷贝还原。导出失败不影响综合结果本身——成果层仍在
+//   结果目录\区县级成果\ 下，只是没平铺改名。
+// ============================================================================
+void GeneralizationConfigDialog::runGdbExportStep(const QString& xmlPath)
+{
+    const QVector<QPair<QString, QString> > nameMap = readLayerNameList(xmlPath);
+    if (nameMap.isEmpty()) {
+        const QString s = QStringLiteral("成果导出步骤里没有 <LayerNameList>，跳过导出: %1")
+                              .arg(xmlPath);
+        QgsMessageLog::logMessage(s, LOG_TAG, Qgis::Warning);
+        genDebugLog(s);
+        return;
+    }
+
+    const QString outDir = outputDirectory();
+    const QString dstDir = QDir(outDir).absoluteFilePath(QStringLiteral("成果数据"));
+    QStringList missing;
+    const int nCopied = exportResultLayers(outDir, dstDir, nameMap, missing);
+
+    const QString s = QStringLiteral("成果导出: %1/%2 层 → %3%4")
+                          .arg(nCopied).arg(nameMap.size()).arg(dstDir)
+                          .arg(missing.isEmpty()
+                                   ? QString()
+                                   : QStringLiteral("；未找到: %1")
+                                         .arg(missing.join(QStringLiteral("、"))));
+    QgsMessageLog::logMessage(s, LOG_TAG, nCopied > 0 ? Qgis::Info : Qgis::Warning);
+    genDebugLog(s);
+    if (nCopied > 0)
+        m_exportSummary = QStringLiteral("%1（%2 个图层）").arg(dstDir).arg(nCopied);
+}
+
+// ============================================================================
+// 【2026-11-07】综合结果补 .cpg
+//   现象：结果目录里的 dbf 内容写的是 UTF-8，但文件头第 29 字节 LDID 固定是
+//         0x57（ANSI 936 / CP936），而且没有 .cpg。GDAL/QGIS 打开时没有 .cpg 可参考，
+//         直接按 Latin-1 解释 UTF-8 字节，属性表中文就全成 "æ»©" 这种乱码。
+//   实测（ogrinfo）：无 cpg → 乱码；补一个内容为 UTF-8 的 cpg → 正常。
+//   做法：递归遍历结果目录，给每个没有 .cpg 的 dbf 按它实际的字节写一个。
+//         编码靠"把第一条记录里的字符字段读出来试解码"判断，不写死，
+//         万一某个中间层真是 GBK 也能写对。
+//   返回：新写了多少个 .cpg。
+// ============================================================================
+int GeneralizationConfigDialog::writeDbfCpgFiles(const QString& rootDir)
+{
+    if (rootDir.isEmpty() || !QDir(rootDir).exists()) return 0;
+
+    QTextCodec* codecUtf8 = QTextCodec::codecForName("UTF-8");
+    QTextCodec* codecGbk  = QTextCodec::codecForName("GBK");
+
+    int written = 0;
+    QDirIterator it(rootDir, QStringList() << QStringLiteral("*.dbf"),
+                    QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext())
+    {
+        const QString dbfPath = it.next();
+        // 同名 .cpg 已存在就尊重原有声明，不覆盖
+        const QString cpgPath = QFileInfo(dbfPath).absolutePath() + QLatin1Char('/')
+                              + QFileInfo(dbfPath).completeBaseName() + QStringLiteral(".cpg");
+        if (QFile::exists(cpgPath)) continue;
+
+        QFile df(dbfPath);
+        if (!df.open(QIODevice::ReadOnly)) continue;
+
+        QByteArray hdr = df.read(32);
+        if (hdr.size() < 32) { df.close(); continue; }
+
+        const quint32 nrec  = quint32(quint8(hdr[4])) | (quint32(quint8(hdr[5])) << 8)
+                            | (quint32(quint8(hdr[6])) << 16) | (quint32(quint8(hdr[7])) << 24);
+        const quint16 hlen  = quint16(quint8(hdr[8]))  | (quint16(quint8(hdr[9]))  << 8);
+        const quint16 rlen  = quint16(quint8(hdr[10])) | (quint16(quint8(hdr[11])) << 8);
+        if (hlen < 33 || rlen < 2 || nrec == 0) { df.close(); continue; }
+
+        // 解析字段：只记字符型（C）的偏移与长度
+        const int nField = (hlen - 33) / 32;
+        QByteArray fdefs = df.read(nField * 32);
+        QVector<QPair<int, int> > cFields;   // (offset, len)
+        {
+            int off = 1;   // 记录首字节是删除标志
+            for (int i = 0; i < nField && i * 32 + 32 <= fdefs.size(); ++i)
+            {
+                const char type = fdefs.at(i * 32 + 11);
+                const int  len  = quint8(fdefs.at(i * 32 + 16));
+                if (type == 'C') cFields.append(qMakePair(off, len));
+                off += len;
+            }
+        }
+        if (cFields.isEmpty()) { df.close(); continue; }
+
+        // 跳到第一条记录，取字符字段里的非 ASCII 字节
+        if (!df.seek(hlen)) { df.close(); continue; }
+        const QByteArray rec = df.read(rlen);
+        df.close();
+        if (rec.size() < rlen || rec.at(0) == '*') continue;
+
+        QByteArray sample;
+        sample.reserve(64);
+        for (int i = 0; i < cFields.size(); ++i)
+        {
+            const int off = cFields.at(i).first, len = cFields.at(i).second;
+            if (off + len > rec.size()) continue;
+            QByteArray cell = rec.mid(off, len);
+            while (!cell.isEmpty() && (cell.endsWith(' ') || cell.endsWith('\0')))
+                cell.chop(1);
+            for (int k = 0; k < cell.size(); ++k)
+                if (quint8(cell.at(k)) >= 0x80) { sample += cell.mid(k); break; }
+            if (sample.size() >= 48) break;
+        }
+
+        QString enc;
+        if (sample.isEmpty())
+            enc = QStringLiteral("UTF-8");   // 没有中文，写哪个都一样
+        else if (codecUtf8 && codecUtf8->fromUnicode(codecUtf8->toUnicode(sample)) == sample)
+            enc = QStringLiteral("UTF-8");
+        else if (codecGbk && codecGbk->fromUnicode(codecGbk->toUnicode(sample)) == sample)
+            enc = QStringLiteral("CP936");
+        else
+            continue;    // 两种都解不了，宁可不写也别写错
+
+        QFile cf(cpgPath);
+        if (!cf.open(QIODevice::WriteOnly | QIODevice::Truncate)) continue;
+        cf.write(enc.toLatin1());
+        cf.close();
+        ++written;
+    }
+    return written;
+}
+
+// ============================================================================
+// 【2026-10-10】注记工程文件（.2dm）复制
+//   甲方把 .2dm 地图工程打包成一个文件夹给（样例里一次要两个：
+//   制图注记工程去路径.2dm、挂图点要素注记GDB去路径.2dm），知识库里的
+//   <Mission id="405"> 只写文件名，引擎按 DoXMLFile 的 relativePath
+//   （本插件传的是"结果目录"）去解析，所以执行前必须把这些文件放到结果目录下。
+//   目录留空 = 该知识库没有注记步骤 → 不拷、不报错，保持原有行为。
+// ============================================================================
+bool GeneralizationConfigDialog::copyLabelProjectFiles(const QString& outDir)
+{
+    const QString srcDir = labelProjectDir();
+
+    // 未填注记工程目录：该知识库没有 405 注记步骤，走原有流程
+    if (srcDir.isEmpty())
+        return true;
+
+    QDir dir(srcDir);
+    if (!dir.exists()) {
+        QMessageBox::warning(this, QString::fromUtf8("注记工程文件"),
+            QString::fromUtf8("注记工程目录不存在：\n%1").arg(srcDir));
+        return false;
+    }
+
+    const QStringList files = dir.entryList(QStringList() << QStringLiteral("*.2dm"),
+                                            QDir::Files, QDir::Name);
+    if (files.isEmpty()) {
+        const int btn = QMessageBox::warning(this, QString::fromUtf8("注记工程文件"),
+            QString::fromUtf8("注记工程目录里没有找到 .2dm 文件：\n%1\n\n"
+                              "继续执行的话，知识库里的注记任务（id=405 动态注记转静态注记）\n"
+                              "会报「找不到 .2dm 文件」。\n\n是否仍然继续？").arg(srcDir),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        return btn == QMessageBox::Yes;
+    }
+
+    if (!QDir().mkpath(outDir)) {
+        QMessageBox::warning(this, QString::fromUtf8("注记工程文件"),
+            QString::fromUtf8("无法创建结果目录：\n%1").arg(outDir));
+        return false;
+    }
+
+    // 若用户把"注记工程目录"直接选成了结果目录，源和目标是同一个文件，跳过以免自删
+    const QString srcCanon = QDir(srcDir).absolutePath();
+    const QString dstCanon = QDir(outDir).absolutePath();
+
+    QStringList copied;
+    for (const QString& name : files) {
+        const QString src = dir.absoluteFilePath(name);
+        const QString dst = QDir(outDir).absoluteFilePath(name);   // 保留原文件名
+
+        if (srcCanon == dstCanon) { copied << name; continue; }
+
+        // 结果目录常被复用：以本次所选的那份为准（先删后拷，QFile::copy 目标已存在会失败）
+        if (QFile::exists(dst) && !QFile::remove(dst)) {
+            QMessageBox::warning(this, QString::fromUtf8("注记工程文件"),
+                QString::fromUtf8("结果目录里已存在同名文件且无法覆盖：\n%1\n\n"
+                                  "请关闭占用它的程序后重试。").arg(dst));
+            return false;
+        }
+        if (!QFile::copy(src, dst)) {
+            QMessageBox::warning(this, QString::fromUtf8("注记工程文件"),
+                QString::fromUtf8("注记工程文件复制失败：\n%1\n→ %2\n\n"
+                                  "请检查文件是否被占用、磁盘是否有空间。").arg(src, dst));
+            return false;
+        }
+        copied << name;
+    }
+
+    const QString s = QStringLiteral("注记工程文件已复制到结果目录：%1")
+                          .arg(copied.join(QStringLiteral("、")));
+    QgsMessageLog::logMessage(s, LOG_TAG, Qgis::Info);
+    genDebugLog(s);
+    return true;
+}
+
 void GeneralizationConfigDialog::onExecute()
 {
     // ====== 1. 验证输入 ======
     const QString shpDir  = shpDirectory();
     const QString xmlPath = configXmlPath();
     const QString outDir  = outputDirectory();
+
+    // 【2026-10-23】清掉上一次运行遗留的路线B状态（上次中途 return 时可能没清）
+    m_gdbExportXml.clear();
+    m_exportSummary.clear();
 
     if (shpDir.isEmpty()) {
         QMessageBox::warning(this, QString::fromUtf8("综合缩编"),
@@ -1512,10 +2496,46 @@ void GeneralizationConfigDialog::onExecute()
         return;
     }
 
+    // ====== 1a. 【2026-11-07】制图主区名称：改县预处理 XML 里的 SQL，不切 Link ======
+    // 甲方的口径：知识库只维护一份县模板（如 会宁县.xml），主 XML 的 Link 固定不动，
+    // 程序按识别出的主区名称去改该 XML 里「属性查询:县级行政区划面」的 SQL 条件。
+    const QString mainRegion = m_lineEditMainRegion
+                                   ? m_lineEditMainRegion->text().trimmed()
+                                   : QString();
+    if (mainRegion.isEmpty()) {
+        // 主区名称为空不阻断综合：不改任何文件，按知识库原样执行。
+        genDebugLog(QStringLiteral("制图主区名称为空，跳过县 XML 的 SQL 改写"));
+    } else {
+        const int n = applyMainRegionToXml(xmlPath, mainRegion);
+        if (n > 0) {
+            const QString s =
+                QStringLiteral("制图主区名称=%1，已改写县预处理 XML 里"
+                               "「属性查询:县级行政区划面」的 SQL")
+                    .arg(mainRegion);
+            QgsMessageLog::logMessage(s, LOG_TAG, Qgis::Info);
+            genDebugLog(s);
+        } else {
+            genDebugLog(QStringLiteral(
+                "制图主区名称=%1，未找到可改写的县预处理 XML SQL（Link 或 Mission 11 不匹配）")
+                .arg(mainRegion));
+        }
+        // 记住本次填写，下次打开对话框时恢复
+        QSettings st(QStringLiteral("GarMap"), QStringLiteral("MapGeneralization"));
+        st.setValue(QStringLiteral("mainRegion"), mainRegion);
+    }
+
+    // ====== 1b. 【2026-10-10】注记工程文件（.2dm）拷进结果目录 ======
+    // 必须在起 worker 之前：知识库里 <Mission id="405"> 用 <ProjectFile>文件名.2dm</ProjectFile>
+    // 引用工程，引擎按 relativePath（= outDir）解析，文件不在那儿就报"找不到 .2dm 文件"。
+    // 【2026-10-13】不再有"复制到结果目录"复选框：目录非空就一律拷
+    //（copyLabelProjectFiles 内部：目录留空直接返回 true，不拷不报错）
+    if (!copyLabelProjectFiles(outDir))
+        return;   // 已弹错 / 用户选择中止
+
     genDebugLog(QStringLiteral("=== 综合缩编开始 数据目录=%1 XML=%2 输出=%3")
         .arg(shpDir, xmlPath, outDir));
 
-    // ====== 1b. 【2026-09-10】输入类型判定：SHP 目录 / FileGDB 目录 ======
+    // ====== 1c. 【2026-09-10】输入类型判定：SHP 目录 / FileGDB 目录 ======
     QString kindDetail;
     const InputKind kind = detectInputKind(shpDir, kindDetail);
     {
@@ -1613,22 +2633,100 @@ void GeneralizationConfigDialog::onExecute()
         xmlDir = xmlPath;
     }
 
-    // ====== 3b. 【2026-09-10】GDB 输入：准备阶段1（gdb→shp 转换）并分流 ======
+    // ====== 3b. 【2026-10-23】GDB 输入：先分清知识库里那条 GDB 输入步骤是
+    //   "源数据转换"还是"成果导出"，再决定走原有两阶段还是路线 B ======
     if (gdbInput) {
-        QString tempXml;
-        if (!prepareGdb2ShpStage(shpDir, outDir, isLinkContainer, links, tempXml))
-            return;   // 已弹错
+        const QString kbDir = QFileInfo(xmlPath).absolutePath();
+        const int gdbLinkIdx = isLinkContainer ? findGdb2ShpLinkIndex(kbDir, links) : -1;
 
-        // 阶段2（综合）参数先存好，等阶段1 的 finished 回调里启动
-        m_stage2XmlDir      = xmlDir;
-        m_stage2DataDir     = dataDir;
-        m_stage2DllDir      = testDllDir;
-        m_stage2Links       = links;   // prepareGdb2ShpStage 已剔除转换 Link
-        m_pendingGdb2ShpRun = true;
+        // 判据：把这条 Link 的 <LayerNameList> 拿去和源 GDB 的图层名对一遍。
+        // 一个都对不上 → 它是整链跑完后对成果做的导出/后处理（甘肃库的
+        // "GDB制图成果后处理"就是这样，LayerNameList 写的是 区县级成果_xxx）；
+        // 有对得上的 → 它确实是把源数据 GDB 转成 SHP 的转换步骤（天津库那种）。
+        bool isExportStep = false;
+        if (gdbLinkIdx >= 0) {
+            QString subXml = links[gdbLinkIdx].path;
+            subXml.replace(QLatin1Char('\\'), QLatin1Char('/'));
+            const QString subXmlPath = QDir::cleanPath(kbDir + "/" + subXml);
+            const QVector<QPair<QString, QString> > nameMap = readLayerNameList(subXmlPath);
+            if (!nameMap.isEmpty()) {
+                QStringList gdbLayers;
+                if (listGdbLayers(shpDir, gdbLayers)) {
+                    int nHit = 0;
+                    for (int i = 0; i < nameMap.size(); ++i)
+                        if (gdbLayers.contains(nameMap[i].first)) ++nHit;
+                    isExportStep = (nHit == 0);
+                }
+            }
+            const QString s = QStringLiteral("GDB 输入步骤判定: %1 | LayerName 共 %2 条 | %3")
+                                  .arg(subXmlPath).arg(nameMap.size())
+                                  .arg(isExportStep
+                                           ? QStringLiteral("成果导出（源库里无对应图层）")
+                                           : QStringLiteral("源数据转换"));
+            QgsMessageLog::logMessage(s, LOG_TAG, Qgis::Info);
+            genDebugLog(s);
+        }
 
-        // 阶段1：单个 XML 直接跑（links 为空 → worker 把 xmlDir 当完整文件路径）
-        startWorkerRun(tempXml, outDir, QVector<GeneralizationWorker::LinkEntry>(),
-                       testDllDir, QString::fromUtf8("GDB→SHP 转换"));
+        // ---- 情形1：知识库自带 GDB→SHP 转换步骤 → 沿用原有两阶段流程 ----
+        if (gdbLinkIdx >= 0 && !isExportStep) {
+            QString tempXml;
+            if (!prepareGdb2ShpStage(shpDir, outDir, isLinkContainer, links, tempXml))
+                return;   // 已弹错
+
+            // 阶段2（综合）参数先存好，等阶段1 的 finished 回调里启动
+            m_stage2XmlDir      = xmlDir;
+            m_stage2DataDir     = dataDir;
+            m_stage2DllDir      = testDllDir;
+            m_stage2Links       = links;   // prepareGdb2ShpStage 已剔除转换 Link
+            m_pendingGdb2ShpRun = true;
+
+            // 阶段1：单个 XML 直接跑（links 为空 → worker 把 xmlDir 当完整文件路径）
+            startWorkerRun(tempXml, outDir, QVector<GeneralizationWorker::LinkEntry>(),
+                           testDllDir, QString::fromUtf8("GDB→SHP 转换"));
+            return;
+        }
+
+        // ---- 情形2（路线B）：知识库里没有转换步骤，插件自己铺 SHP 工作副本 ----
+        // 如果找到的那条是成果导出，把它从链里摘出来，整链跑完后由插件执行导出。
+        if (gdbLinkIdx >= 0) {
+            QString subXml = links[gdbLinkIdx].path;
+            subXml.replace(QLatin1Char('\\'), QLatin1Char('/'));
+            m_gdbExportXml = QDir::cleanPath(kbDir + "/" + subXml);
+            links.removeAt(gdbLinkIdx);
+            const QString s = QStringLiteral(
+                "成果导出步骤不在链里跑（SHP 工作目录下它打不开），整链结束后由插件执行: %1")
+                    .arg(m_gdbExportXml);
+            QgsMessageLog::logMessage(s, LOG_TAG, Qgis::Info);
+            genDebugLog(s);
+        }
+
+        {
+            QProgressDialog convProgress(
+                QString::fromUtf8("正在把 GDB 转成 SHP 工作副本..."), QString(), 0, 0, this);
+            convProgress.setWindowModality(Qt::WindowModal);
+            convProgress.setCancelButton(nullptr);
+            convProgress.show();
+            QApplication::processEvents();
+
+            QString convMsg;
+            const bool convOk = convertGdbDirToShp(shpDir, outDir, convMsg);
+            convProgress.close();
+
+            const QString s = QStringLiteral("GDB→SHP 工作副本: %1").arg(convMsg);
+            QgsMessageLog::logMessage(s, LOG_TAG, convOk ? Qgis::Info : Qgis::Critical);
+            genDebugLog(s);
+            if (!convOk) {
+                m_gdbExportXml.clear();
+                QMessageBox::warning(this, QString::fromUtf8("综合缩编"),
+                    QString::fromUtf8("把 GDB 转成 SHP 工作副本失败，综合已中止。\n\n"
+                                      "%1\n\nGDB: %2\n结果目录: %3")
+                        .arg(convMsg, shpDir, outDir));
+                return;
+            }
+        }
+
+        // 转换完成后与 SHP 输入完全一致：数据铺在结果目录根，逐个 Link 跑
+        startWorkerRun(xmlDir, dataDir, links, testDllDir, QString::fromUtf8("综合缩编"));
         return;
     }
 

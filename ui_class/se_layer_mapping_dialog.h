@@ -22,6 +22,80 @@ struct LayerMappingItem {
     LayerMappingItem() : autoMatched(false), comboBox(nullptr) {}
 };
 
+// ---- 图层映射CSV格式兼容（主界面加载 / 映射弹窗导入导出共用） ----
+// 收到的工作表数据行是“源图层代码,源图层名称,标准成果图层,...”（代码在前），
+// 但表头文字写的是“源图层名称,源图层代码,...”（名称在前）；本工程旧配置又是
+// 名称在前。程序不靠表头判断，而是按每行前两列的内容自动识别：
+//   - 第1列像图层代码（ASCII 字母/数字/下划线）、第2列不像代码 → 代码在前
+//   - 否则 → 名称在前（第1列允许为空，如 ",,0A级景区_选取,..."）
+// 旧4列格式（源图层代码,源图层名称,成果图层名称,说明）继续兼容。
+namespace LayerMappingCsv {
+
+inline bool looksLikeSourceCode(const QString& s)
+{
+    const QString t = s.trimmed();
+    if (t.isEmpty()) return false;
+    for (const QChar c : t) {
+        const ushort u = c.unicode();
+        const bool ok = (u >= 'A' && u <= 'Z') || (u >= 'a' && u <= 'z')
+            || (u >= '0' && u <= '9') || u == '_';
+        if (!ok) return false;
+    }
+    return true;
+}
+
+inline bool isCodeFirst(const QStringList& parts)
+{
+    if (parts.size() < 6) return false;
+    const QString c0 = parts.value(0).trimmed();
+    const QString c1 = parts.value(1).trimmed();
+    if (!looksLikeSourceCode(c0)) return false;
+    // 第2列也是代码时无法判断（正常名称列不会全为ASCII代码），按名称在前处理
+    if (!c1.isEmpty() && looksLikeSourceCode(c1)) return false;
+    return true;
+}
+
+// 解析一行数据（不含表头/空行）。oldFormat 输出是否为旧4列格式。
+inline void parseRow(const QStringList& parts, LayerMappingItem& item, bool& oldFormat)
+{
+    oldFormat = (parts.size() < 5);
+    if (oldFormat) {
+        item.sourceCode = parts.value(0).trimmed();
+        item.sourceDesc = parts.value(1).trimmed();
+        item.stdName    = parts.value(2).trimmed();
+        item.note       = parts.value(3).trimmed();
+        return;
+    }
+    if (isCodeFirst(parts)) {
+        item.sourceCode = parts.value(0).trimmed();
+        item.sourceDesc = parts.value(1).trimmed();
+    } else {
+        item.sourceDesc = parts.value(0).trimmed();
+        item.sourceCode = parts.value(1).trimmed();
+    }
+    item.stdName   = parts.value(2).trimmed();
+    item.actualShp = parts.value(3).trimmed();
+    item.geomType  = parts.value(4).trimmed();
+    item.note      = parts.value(5).trimmed();
+}
+
+// 导出/保存统一按收到的工作表列序：代码,名称,标准图层,实际SHP,几何类型,备注
+inline QStringList codeFirstFields(const LayerMappingItem& item)
+{
+    QStringList f;
+    f << item.sourceCode << item.sourceDesc << item.stdName
+      << item.actualShp << item.geomType << item.note;
+    return f;
+}
+
+// 表头保持与收到的工作表一致（表头只是注释行，程序不读取）
+inline QString headerLine()
+{
+    return QStringLiteral("# 源图层名称,源图层代码,标准成果图层,实际数据SHP,几何类型,备注");
+}
+
+} // namespace LayerMappingCsv
+
 class QTableWidget;
 class QPushButton;
 class QLabel;

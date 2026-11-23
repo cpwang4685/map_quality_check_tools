@@ -834,8 +834,9 @@ void DataImportWizard::onStartImport()
 			if (ext == "gdb" || ext == "mdb")
 			{
 				QString base = fi.completeBaseName().isEmpty() ? fileName : fi.completeBaseName();
+				// 【2026-10-18】GDB 容器打 node_type=3，目录树里才能用 GDB 图标区分
 				importDirId = DirectoryHelper::createNamedChildDirectory(
-					mDirDao, vectorParent, base);
+					mDirDao, vectorParent, base, 3);
 				if (importDirId > 0) mImportUsedDirs.insert(importDirId);
 			}
 			else

@@ -1,5 +1,8 @@
 #include "se_mission459_check.h"
 
+#include "../ui_task/wuji_mission_runner.h"
+#include "../ui_task/wuji_mission_xml.h"
+
 #include "qgsvectorlayer.h"
 #include "qgsfeature.h"
 #include "qgsgeometry.h"
@@ -58,30 +61,25 @@ double angleAtVertexDeg(const QgsPointXY& a, const QgsPointXY& b, const QgsPoint
     return std::acos(cosv) * 180.0 / kPi;
 }
 
-// line：中间顶点处夹角；ring：全部顶点处夹角（末点与首点闭合）
-double minAngleDeg(const QgsPolylineXY& pts, bool isRing)
+// 去掉连续重复顶点（环同时去掉闭合重复点），避免重复点把尖角算成 180°
+QgsPolylineXY cleanVertices(const QgsPolylineXY& pts, bool isRing)
 {
-    const int n = pts.size();
-    double worst = 180.0;
-    if (isRing) {
-        const int m = n - 1; // 去掉闭合点
-        if (m < 3) return 180.0;
-        for (int i = 0; i < m; ++i) {
-            const QgsPointXY& a = pts[(i + m - 1) % m];
-            const QgsPointXY& b = pts[i];
-            const QgsPointXY& c = pts[(i + 1) % m];
-            worst = qMin(worst, angleAtVertexDeg(a, b, c));
-        }
-    } else {
-        for (int i = 1; i + 1 < n; ++i)
-            worst = qMin(worst, angleAtVertexDeg(pts[i - 1], pts[i], pts[i + 1]));
+    QgsPolylineXY out;
+    out.reserve(pts.size());
+    for (const QgsPointXY& p : pts) {
+        if (!out.isEmpty() && out.last().distance(p.x(), p.y()) <= 1e-9)
+            continue;
+        out.append(p);
     }
-    return worst;
+    if (isRing && out.size() > 1
+        && out.first().distance(out.last().x(), out.last().y()) <= 1e-9)
+        out.removeLast();
+    return out;
 }
 
 // ---- 自相交（线段对两两检测，跳过相邻段与环首尾闭合对） ----
 
-bool segmentsSelfIntersect(const QgsPolylineXY& pts, bool isRing)
+bool segmentsSelfIntersect(const QgsPolylineXY& pts, bool isRing, QgsPointXY* at = nullptr)
 {
     const int segCount = pts.size() - 1;
     if (segCount < 4) return false; // 少于 4 段不存在不相邻段相交
@@ -95,8 +93,10 @@ bool segmentsSelfIntersect(const QgsPolylineXY& pts, bool isRing)
                 QgsPoint(pts[i].x(), pts[i].y()), QgsPoint(pts[i + 1].x(), pts[i + 1].y()),
                 QgsPoint(pts[j].x(), pts[j].y()), QgsPoint(pts[j + 1].x(), pts[j + 1].y()),
                 ip, isIntersection, 1e-8, false);
-            if (ok && isIntersection)
+            if (ok && isIntersection) {
+                if (at) *at = QgsPointXY(ip.x(), ip.y());
                 return true;
+            }
         }
     }
     return false;
@@ -104,7 +104,8 @@ bool segmentsSelfIntersect(const QgsPolylineXY& pts, bool isRing)
 
 // ---- 节点最小距离（不相邻顶点对；环排除闭合对） ----
 
-double minVertexDistance(const QgsPolylineXY& pts, bool isRing)
+// at 非空时回填最近节点对的中点（用于错误结果定位）
+double minVertexDistance(const QgsPolylineXY& pts, bool isRing, QgsPointXY* at = nullptr)
 {
     const int n = pts.size();
     const int m = isRing ? n - 1 : n;
@@ -113,7 +114,12 @@ double minVertexDistance(const QgsPolylineXY& pts, bool isRing)
         for (int j = i + 1; j < m; ++j) {
             if (j == i + 1) continue;                           // 相邻顶点
             if (isRing && i == 0 && j == m - 1) continue;       // 环闭合对
-            best = qMin(best, pts[i].distance(pts[j].x(), pts[j].y()));
+            const double d = pts[i].distance(pts[j].x(), pts[j].y());
+            if (d < best) {
+                best = d;
+                if (at) *at = QgsPointXY((pts[i].x() + pts[j].x()) / 2.0,
+                                         (pts[i].y() + pts[j].y()) / 2.0);
+            }
         }
     }
     return best;
@@ -138,24 +144,43 @@ QString checkEmpty(const QgsFeature& f)
 }
 
 // 模式4：尖锐角检查（阈值：AcuteAngle，度）
-QString checkAcuteAngle(const QgsGeometry& g, double thr)
+// 每个超阈值的顶点各报一条（不再每要素只报最小角一条），消息末尾附
+// “（定位点 x,y）”= 该顶点坐标，供 *_pt.shp 定位到准确位置。
+QStringList checkAcuteAngles(const QgsGeometry& g, double thr)
 {
-    double worst = 180.0;
+    QStringList out;
+    auto scan = [&](const QgsPolylineXY& raw, bool ring) {
+        const QgsPolylineXY pts = cleanVertices(raw, ring);
+        const int n = pts.size();
+        auto hit = [&](const QgsPointXY& a, const QgsPointXY& b, const QgsPointXY& c) {
+            const double ang = angleAtVertexDeg(a, b, c);
+            if (ang < thr)
+                out << QStringLiteral("最小夹角 %1° 小于阈值 %2°（定位点 %3,%4）")
+                    .arg(ang, 0, 'f', 2).arg(thr, 0, 'f', 2)
+                    .arg(b.x(), 0, 'f', 3).arg(b.y(), 0, 'f', 3);
+        };
+        if (ring) {
+            if (n < 3) return;
+            for (int i = 0; i < n; ++i)
+                hit(pts[(i + n - 1) % n], pts[i], pts[(i + 1) % n]);
+        } else {
+            for (int i = 1; i + 1 < n; ++i)
+                hit(pts[i - 1], pts[i], pts[i + 1]);
+        }
+    };
     if (g.type() == QgsWkbTypes::LineGeometry) {
         const QgsMultiPolylineXY parts = g.asMultiPolyline();
         for (const QgsPolylineXY& p : parts)
-            worst = qMin(worst, minAngleDeg(p, false));
+            scan(p, false);
     } else {
         const QgsMultiPolygonXY parts = g.asMultiPolygon();
         for (const QgsPolygonXY& poly : parts) {
-            worst = qMin(worst, minAngleDeg(poly.at(0), true));
+            scan(poly.at(0), true);
             for (int r = 1; r < poly.size(); ++r)
-                worst = qMin(worst, minAngleDeg(poly.at(r), true));
+                scan(poly.at(r), true);
         }
     }
-    if (worst < thr)
-        return QStringLiteral("最小夹角 %1° 小于阈值 %2°").arg(worst, 0, 'f', 2).arg(thr, 0, 'f', 2);
-    return QString();
+    return out;
 }
 
 // 模式8：碎面检查（阈值：SliverArea；仅面图层适用，面积小于阈值即碎面）
@@ -205,44 +230,79 @@ QString checkSmallArea(const QgsGeometry& g, double thr)
 }
 
 // 模式256：自相交检查（线：线段自相交；面：边界环自相交）
+// 消息末尾附“（定位点 x,y）”= 第一处相交点坐标
 QString checkSelfIntersect(const QgsGeometry& g)
 {
+    QgsPointXY at;
+    bool hit = false;
     if (g.type() == QgsWkbTypes::LineGeometry) {
         const QgsMultiPolylineXY parts = g.asMultiPolyline();
-        for (const QgsPolylineXY& p : parts)
-            if (segmentsSelfIntersect(p, false))
-                return QStringLiteral("几何存在自相交");
+        for (const QgsPolylineXY& p : parts) {
+            if (segmentsSelfIntersect(p, false, &at)) {
+                hit = true;
+                break;
+            }
+        }
+        if (hit)
+            return QStringLiteral("几何存在自相交（定位点 %1,%2）")
+                .arg(at.x(), 0, 'f', 3).arg(at.y(), 0, 'f', 3);
     } else {
         const QgsMultiPolygonXY parts = g.asMultiPolygon();
         for (const QgsPolygonXY& poly : parts) {
-            if (segmentsSelfIntersect(poly.at(0), true))
-                return QStringLiteral("边界存在自相交");
-            for (int r = 1; r < poly.size(); ++r)
-                if (segmentsSelfIntersect(poly.at(r), true))
-                    return QStringLiteral("边界存在自相交");
+            bool inRing = false;
+            if (segmentsSelfIntersect(poly.at(0), true, &at))
+                inRing = true;
+            for (int r = 1; r < poly.size() && !inRing; ++r)
+                if (segmentsSelfIntersect(poly.at(r), true, &at))
+                    inRing = true;
+            if (inRing) {
+                hit = true;
+                break;
+            }
         }
+        if (hit)
+            return QStringLiteral("边界存在自相交（定位点 %1,%2）")
+                .arg(at.x(), 0, 'f', 3).arg(at.y(), 0, 'f', 3);
     }
     return QString();
 }
 
 // 模式512：节点最小距离检查（阈值：MinNodeDistance，节点绝对距离）
+// 消息末尾附“（定位点 x,y）”= 最近节点对的中点
 QString checkMinNodeDistance(const QgsGeometry& g, double thr)
 {
     double best = std::numeric_limits<double>::max();
+    QgsPointXY at;
+    bool hasPt = false;
+    auto consider = [&](const QgsPolylineXY& pts, bool ring) {
+        QgsPointXY p;
+        const double d = minVertexDistance(pts, ring, &p);
+        if (d < best) {
+            best = d;
+            at = p;
+            hasPt = true;
+        }
+    };
     if (g.type() == QgsWkbTypes::LineGeometry) {
         const QgsMultiPolylineXY parts = g.asMultiPolyline();
         for (const QgsPolylineXY& p : parts)
-            best = qMin(best, minVertexDistance(p, false));
+            consider(p, false);
     } else {
         const QgsMultiPolygonXY parts = g.asMultiPolygon();
         for (const QgsPolygonXY& poly : parts) {
-            best = qMin(best, minVertexDistance(poly.at(0), true));
+            consider(poly.at(0), true);
             for (int r = 1; r < poly.size(); ++r)
-                best = qMin(best, minVertexDistance(poly.at(r), true));
+                consider(poly.at(r), true);
         }
     }
-    if (best < thr)
-        return QStringLiteral("节点最小距离 %1 小于阈值 %2").arg(best, 0, 'f', 4).arg(thr, 0, 'f', 4);
+    if (best < thr) {
+        QString msg = QStringLiteral("节点最小距离 %1 小于阈值 %2")
+            .arg(best, 0, 'f', 4).arg(thr, 0, 'f', 4);
+        if (hasPt)
+            msg += QStringLiteral("（定位点 %1,%2）")
+                .arg(at.x(), 0, 'f', 3).arg(at.y(), 0, 'f', 3);
+        return msg;
+    }
     return QString();
 }
 
@@ -339,11 +399,21 @@ void execute(QgsVectorLayer* layer, int processMode,
         while (it.nextFeature(f)) {
             for (const int m : modes) {
                 if (!(nativeMask & m)) continue;
+                if (m == 4) {
+                    // 尖锐角：每个超阈值顶点各报一条（带准确定位点）
+                    const QStringList details = checkAcuteAngles(f.geometry(), acuteThr);
+                    for (const QString& detail : details) {
+                        allErrors.append(qMakePair(f,
+                            QStringLiteral("图形规范性检查(%1/%2)：%3")
+                                .arg(base, modeName(m), detail)));
+                        counts[m]++;
+                    }
+                    continue;
+                }
                 QString detail;
                 switch (m) {
                 case 1:   detail = checkMultipart(f.geometry()); break;
                 case 2:   detail = checkEmpty(f); break;
-                case 4:   detail = checkAcuteAngle(f.geometry(), acuteThr); break;
                 case 8:   detail = checkSliverArea(f.geometry(), sliverThr); break;
                 case 16:  detail = checkNarrowPolygon(f.geometry(), narrowThr); break;
                 case 32:  detail = checkSmallArea(f.geometry(), minAreaThr); break;

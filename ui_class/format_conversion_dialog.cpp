@@ -121,41 +121,18 @@ void FormatConversionDialog::Button_Save_clicked()
 {
     QString curPath = QCoreApplication::applicationDirPath();
 
-    // SHP 目标 / GDB 目标 → 选择输出目录
-    if (isShpTarget() || isGdbTarget())
+    // 【2026-10-09】三种目标格式统一"选输出文件夹"：
+    //   SHP  → 目录（单个 <图层名>.shp，批量每源一个）
+    //   GDB  → 目录（单个 <库名>.gdb；批量所有源汇入同一个 <库名>.gdb）
+    //   GPKG → 目录（单个 <图层名>.gpkg，批量每个源 <源名>.gpkg）
+    // 以前 GPKG 单文件模式是 getSaveFileName(*.gpkg) 选一个文件，跟另外两种不一致；
+    // 现在改成选目录，gpkg 的文件名改由"图层名"栏决定。
+    QString selectedDir = QFileDialog::getExistingDirectory(this,
+        tr("请选择转换后的数据存储路径"), curPath, QFileDialog::ShowDirsOnly);
+    if (!selectedDir.isEmpty())
     {
-        QString selectedDir = QFileDialog::getExistingDirectory(this,
-            tr("请选择转换后的数据存储路径"), curPath, QFileDialog::ShowDirsOnly);
-        if (!selectedDir.isEmpty())
-        {
-            ui.lineEdit_OutputPath->setText(selectedDir);
-            m_qstrSavePath = selectedDir;
-        }
-    }
-    // GPKG 目标 → 保存文件；批量模式每个源文件 → <源名>.gpkg，改为选输出目录
-    else
-    {
-        if (ui.radioButton_BatchMode->isChecked())
-        {
-            QString selectedDir = QFileDialog::getExistingDirectory(this,
-                tr("请选择转换后的数据存储路径"), curPath, QFileDialog::ShowDirsOnly);
-            if (!selectedDir.isEmpty())
-            {
-                ui.lineEdit_OutputPath->setText(selectedDir);
-                m_qstrSavePath = selectedDir;
-            }
-        }
-        else
-        {
-            QString filter = tr("gpkg 文件(*.gpkg)");
-            QString strFileName = QFileDialog::getSaveFileName(this,
-                tr("保存gpkg文件"), curPath, filter);
-            if (!strFileName.isEmpty())
-            {
-                ui.lineEdit_OutputPath->setText(strFileName);
-                m_qstrSavePath = strFileName;
-            }
-        }
+        ui.lineEdit_OutputPath->setText(selectedDir);
+        m_qstrSavePath = selectedDir;
     }
 }
 
@@ -487,9 +464,8 @@ void FormatConversionDialog::Button_OK_accepted()
         return;
     }
 
-    // 输出到文件夹时检查输出路径（SHP/GDB 输出均为目录；GPKG 批量模式也是目录）
-    if (isShpTarget() || isGdbTarget()
-        || (ui.radioButton_BatchMode->isChecked() && isGpkgTarget()))
+    // 输出路径一律是文件夹（SHP/GDB 本来就选目录；GPKG 改成选目录后也是目录，2026-10-09）
+    if (isShpTarget() || isGdbTarget() || isGpkgTarget())
     {
         if (!CheckFileOrDirExist(ui.lineEdit_OutputPath->text()))
         {
@@ -503,20 +479,14 @@ void FormatConversionDialog::Button_OK_accepted()
         }
     }
 
-    // 对于 GPKG 目标（单文件），确保父目录存在
-    if (ui.radioButton_geojson2gpkg->isChecked() || ui.radioButton_shp2gpkg->isChecked())
-    {
-        QFileInfo fi(ui.lineEdit_OutputPath->text());
-        QDir().mkpath(fi.absolutePath());
-    }
-
-    // SHP 目标需要填写图层名（批量模式按源文件名自动命名、gdb2shp 用 GDB 内图层原名，均无需填写）
-    if (!ui.radioButton_BatchMode->isChecked() && isShpTarget()
-        && !ui.radioButton_gdb2shp->isChecked())
+    // 单个模式要填"图层名"：SHP 目标=shp 的图层名，GPKG 目标=输出的 <名称>.gpkg
+    // （批量模式按源文件名自动命名、gdb2shp 用 GDB 内图层原名，均无需填写）
+    if (!ui.radioButton_BatchMode->isChecked() && !ui.radioButton_gdb2shp->isChecked()
+        && (isShpTarget() || isGpkgTarget()))
     {
         if (ui.lineEdit_LayerName->text().trimmed().isEmpty())
         {
-            QMessageBox::warning(this, tr("提示"), tr("请输入SHP图层名"));
+            QMessageBox::warning(this, tr("提示"), tr("请输入图层名"));
             return;
         }
     }
@@ -674,6 +644,11 @@ void FormatConversionDialog::restoreState()
     m_qstrInputDataPath  = settings.value(QStringLiteral("FormatConversion/InputDataPath"),  QDir::homePath(), QgsSettings::Section::Plugins).toString();
     m_qstrSavePath       = settings.value(QStringLiteral("FormatConversion/SavePath"),       QDir::homePath(), QgsSettings::Section::Plugins).toString();
     m_qstrOutputLogPath  = settings.value(QStringLiteral("FormatConversion/OutputLogPath"),  QDir::homePath(), QgsSettings::Section::Plugins).toString();
+
+    // 老版本的 GPKG 单文件模式在这儿存的是 *.gpkg 文件路径，现在输出路径一律是文件夹，
+    // 留着会被当成目录用（点确定直接报"文件夹不存在"），清掉让用户重选。
+    if (m_qstrSavePath.endsWith(QStringLiteral(".gpkg"), Qt::CaseInsensitive))
+        m_qstrSavePath.clear();
 }
 
 void FormatConversionDialog::resizeToContent()
@@ -694,6 +669,7 @@ void FormatConversionDialog::onConversionTypeChanged()
     bool bBatch = ui.radioButton_BatchMode->isChecked();
     bool bShpTarget = isShpTarget();
     bool bGdbTarget = isGdbTarget();
+    bool bGpkgTarget = isGpkgTarget();
 
     // 批量模式下切换格式后，旧清单按旧格式过滤已失效，清空重选
     if (bBatch)
@@ -720,10 +696,12 @@ void FormatConversionDialog::onConversionTypeChanged()
             bGdbSrc ? tr("请选择GDB数据目录") : tr("请选择单个数据文件"));
     }
 
-    // 批量模式下 SHP 图层名按源文件名自动命名，隐藏输入；
+    // 单个模式下"图层名"栏同时服务 SHP 目标和 GPKG 目标：两者输出路径都是文件夹，
+    // 名字都由这一栏定（SHP 是图层名，GPKG 是 <名称>.gpkg，2026-10-09）。
+    // 批量模式下 SHP/GPKG 都按源文件名自动命名，隐藏输入；
     // gdb2shp 的输出名一律用 GDB 内部图层自己的名字（2026-09-11 甲方口径），
     // 没有"图层名"需要用户填，一并隐藏 —— 否则会自动填入 GDB 目录名并拼进输出名。
-    bool bShowLayerName = bShpTarget && !bBatch && !bGdbSrc;
+    bool bShowLayerName = !bBatch && !bGdbSrc && (bShpTarget || bGpkgTarget);
     ui.label_layerName->setVisible(bShowLayerName);
     ui.lineEdit_LayerName->setVisible(bShowLayerName);
     if (!bShowLayerName) ui.lineEdit_LayerName->clear();
@@ -738,7 +716,7 @@ void FormatConversionDialog::onConversionTypeChanged()
     if (bShowGdbName && !bShowLayerName)
         ui.gridLayout_io->addWidget(mBtnResetName, 10, 1);   // 放到 GDB 库名行
     else if (bShowLayerName)
-        ui.gridLayout_io->addWidget(mBtnResetName, 8, 1);   // 放回 SHP 图层名行
+        ui.gridLayout_io->addWidget(mBtnResetName, 8, 1);   // 放回图层名行
 
     autoFillNames();
     resizeToContent();
@@ -752,7 +730,8 @@ void FormatConversionDialog::onBatchToggled(bool checked)
     ui.lineEdit_InputDataPath->clear();
     m_bLayerNameManual = false;
     m_bGdbNameManual = false;
-    // 批量模式输出到目录；单个模式 GPKG 选的是文件路径，切换后需重选目录
+    // 输出路径一律是文件夹，正常不需要清；这里只兜底清掉历史设置里留下的
+    // *.gpkg 文件路径（老版本单文件模式存过），免得被当成目录用
     if (checked)
     {
         QFileInfo outFi(ui.lineEdit_OutputPath->text());

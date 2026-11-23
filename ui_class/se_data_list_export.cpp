@@ -35,6 +35,7 @@
 #include <QStackedWidget>
 #include <QWidget>
 #include <QTextEdit>
+#include <QToolButton>
 #include <QStyle>
 #include <QSet>
 #include <QEventLoop>
@@ -653,62 +654,98 @@ CSE_DataListExportDialog::CSE_DataListExportDialog(QWidget* parent)
 	setWindowTitle(tr("数据裁剪"));
 	// 去掉默认的问号帮助按钮（未实现帮助内容，多余）
 	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
-	resize(920, 640);
+	resize(1000, 720);
+	setMinimumSize(760, 520);
 
-	// ---- 顶部按钮行：5 个按钮与 LTZK 平台左侧数据列表完全同源 ----
-	// 每个按钮只负责转调 CSE_DataCatalogBrowser 中与平台 DataCatalogWidget 同名的函数，
-	// 真正的连接/刷新逻辑都在浏览器里（平台实现），这里不重复实现一遍。
+	// ---- 说明文字：与「从数据库获取数据源」对话框一致的一行灰字 ----
+	m_pHintLabel = new QLabel(tr("勾选数据后可批量导出；也可右键某个节点单独导出。"), this);
+	m_pHintLabel->setStyleSheet(QStringLiteral("QLabel { color: #888; }"));
+
+	// ---- 状态行：连接的是哪个库 / 几个本地文件夹 / 几个地图图层 ----
+	m_pStatusLabel = new QLabel(tr("未连接数据库"), this);
+	m_pStatusLabel->setWordWrap(true);
+
+	// ---- 顶部工具行：三个按钮 + 右侧关键字过滤 ----
 	QPushButton* btnConnectDb = new QPushButton(tr("选择数据库"), this);
-	QPushButton* btnRefreshDb = new QPushButton(tr("刷新"), this);
-	btnRefreshDb->setToolTip(tr("刷新数据库数据"));
+	btnConnectDb->setToolTip(tr("连接 PostGIS 数据库，连上后「数据库数据」回自动刷新"));
 	QPushButton* btnConnectFolder = new QPushButton(tr("选择文件夹"), this);
-	QPushButton* btnDisconnectFolder = new QPushButton(tr("断开连接"), this);
-	btnDisconnectFolder->setToolTip(tr("断开当前选中的文件夹"));
-	QPushButton* btnRefreshLocal = new QPushButton(tr("刷新"), this);
-	btnRefreshLocal->setToolTip(tr("刷新本地数据"));
-	// objectName 照平台 createCatalogButton() 拼写，以吃到平台注入的 QSS
-	{
-		const QString strCatalogButtonObjectName = QStringLiteral("catalogToolbarButton");
-		btnConnectDb->setObjectName(strCatalogButtonObjectName);
-		btnRefreshDb->setObjectName(strCatalogButtonObjectName);
-		btnConnectFolder->setObjectName(strCatalogButtonObjectName);
-		btnDisconnectFolder->setObjectName(strCatalogButtonObjectName);
-		btnRefreshLocal->setObjectName(strCatalogButtonObjectName);
-	}
+	btnConnectFolder->setToolTip(tr("把一个本地文件夹加入数据列表"));
+	QPushButton* btnRefresh = new QPushButton(tr("刷新"), this);
+	btnRefresh->setToolTip(tr("重新读取数据库、本地文件夹和地图图层"));
 
-	// 主界面"导出后自动加载到地图"开关（影响按范围导出 / 按制图导出）
+	m_pFilterEdit = new QLineEdit(this);
+	m_pFilterEdit->setPlaceholderText(tr("输入关键字筛选数据..."));
+	m_pFilterEdit->setClearButtonEnabled(true);
+	m_pFilterEdit->setMaximumWidth(240);
+	m_pFilterEdit->setToolTip(tr("多个关键字用空格分隔，全部命中才显示"));
+	QLabel* lblFilter = new QLabel(tr("筛选："), this);
+
+	QHBoxLayout* topLayout = new QHBoxLayout;
+	topLayout->setSpacing(6);
+	topLayout->addWidget(btnConnectDb);
+	topLayout->addWidget(btnConnectFolder);
+	topLayout->addWidget(btnRefresh);
+	topLayout->addStretch();
+	topLayout->addWidget(lblFilter);
+	topLayout->addWidget(m_pFilterEdit);
+
+	// ---- 数据列表：数据库数据 / 本地数据 / 地图图层 合成的一棵勾选树 ----
+	m_pBrowser = new CSE_DataCatalogBrowser(this);
+
+	// ---- 日志区：默认收起，出错时自动展开 ----
+	m_pLog = new QTextEdit(this);
+	m_pLog->setReadOnly(true);
+	m_pLog->setMaximumHeight(120);
+	m_pLog->setVisible(false);
+
+	// ---- 底部按钮行 ----
+	m_btnRangeChecked = new QPushButton(tr("按范围导出勾选项"), this);
+	m_btnMainAreaChecked = new QPushButton(tr("按制图导出勾选项"), this);
+	m_btnRangeChecked->setEnabled(false);
+	m_btnMainAreaChecked->setEnabled(false);
+	m_btnRangeChecked->setToolTip(tr("把勾选的数据（含半选节点下仍勾着的部分）按同一个范围裁剪导出"));
+	m_btnMainAreaChecked->setToolTip(tr("把勾选的数据按同一个主区/制图范围裁剪导出"));
+
+	m_btnLog = new QToolButton(this);
+	m_btnLog->setText(tr("日志"));
+	m_btnLog->setCheckable(true);
+	m_btnLog->setToolButtonStyle(Qt::ToolButtonTextOnly);
+	m_btnLog->setToolTip(tr("显示/隐藏执行日志"));
+
+	QPushButton* btnClose = new QPushButton(tr("关闭"), this);
+
+	// 主界面"导出后自动加载到地图"开关（影响两个导出）
 	m_chkAutoLoadAfterExport = new QCheckBox(tr("导出后自动加载到地图"), this);
 	m_chkAutoLoadAfterExport->setChecked(true);
 	m_chkAutoLoadAfterExport->setToolTip(tr("勾选后，按范围导出 / 按制图导出的结果会自动加载到 QGIS 地图画布"));
 
-	QHBoxLayout* topLayout = new QHBoxLayout;
-	topLayout->addWidget(btnConnectDb);
-	topLayout->addWidget(btnRefreshDb);
-	topLayout->addSpacing(12);
-	topLayout->addWidget(btnConnectFolder);
-	topLayout->addWidget(btnDisconnectFolder);
-	topLayout->addWidget(btnRefreshLocal);
-	topLayout->addStretch();
-	topLayout->addWidget(m_chkAutoLoadAfterExport);
-
-	// 下方整个数据列表 = 平台左侧数据列表的移植控件
-	// （数据库数据 / 本地数据 / 地图图层 三段，排版与 objectName 全部照平台）
-	m_pBrowser = new CSE_DataCatalogBrowser(this);
-
-	m_pLog = new QTextEdit(this);
-	m_pLog->setReadOnly(true);
-	m_pLog->setMaximumHeight(120);
+	QHBoxLayout* bottomLayout = new QHBoxLayout;
+	bottomLayout->setSpacing(6);
+	bottomLayout->addWidget(m_btnRangeChecked);
+	bottomLayout->addWidget(m_btnMainAreaChecked);
+	bottomLayout->addStretch();
+	bottomLayout->addWidget(m_chkAutoLoadAfterExport);
+	bottomLayout->addWidget(m_btnLog);
+	bottomLayout->addWidget(btnClose);
 
 	QVBoxLayout* mainLayout = new QVBoxLayout(this);
+	mainLayout->setContentsMargins(10, 10, 10, 10);
+	mainLayout->setSpacing(6);
+	mainLayout->addWidget(m_pHintLabel);
+	mainLayout->addWidget(m_pStatusLabel);
 	mainLayout->addLayout(topLayout);
 	mainLayout->addWidget(m_pBrowser, 1);
 	mainLayout->addWidget(m_pLog);
+	mainLayout->addLayout(bottomLayout);
 
 	connect(btnConnectDb, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_ConnectDatabase_clicked);
-	connect(btnRefreshDb, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_RefreshDatabase_clicked);
 	connect(btnConnectFolder, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_ConnectFolder_clicked);
-	connect(btnDisconnectFolder, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_DisconnectFolder_clicked);
-	connect(btnRefreshLocal, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_RefreshLocal_clicked);
+	connect(btnRefresh, &QPushButton::clicked, this, &CSE_DataListExportDialog::on_Button_RefreshAll_clicked);
+	connect(btnClose, &QPushButton::clicked, this, &QDialog::close);
+	connect(m_btnRangeChecked, &QPushButton::clicked, this, &CSE_DataListExportDialog::onExportCheckedByRange);
+	connect(m_btnMainAreaChecked, &QPushButton::clicked, this, &CSE_DataListExportDialog::onExportCheckedByMainArea);
+	connect(m_btnLog, &QToolButton::toggled, this, &CSE_DataListExportDialog::onToggleLog);
+	connect(m_pFilterEdit, &QLineEdit::textChanged, this, &CSE_DataListExportDialog::onFilterTextChanged);
 
 	connect(m_pBrowser, &CSE_DataCatalogBrowser::contextMenuRequested,
 		this, &CSE_DataListExportDialog::onCatalogContextMenuRequested);
@@ -718,6 +755,17 @@ CSE_DataListExportDialog::CSE_DataListExportDialog(QWidget* parent)
 		[this](const QString& text, bool isError)
 		{
 			appendLog(isError ? tr("[错误] %1").arg(text) : text);
+		});
+	connect(m_pBrowser, &CSE_DataCatalogBrowser::statusTextChanged, this,
+		[this](const QString& text)
+		{
+			if (m_pStatusLabel) m_pStatusLabel->setText(text);
+		});
+	connect(m_pBrowser, &CSE_DataCatalogBrowser::checkedCountChanged, this,
+		[this](int count)
+		{
+			if (m_btnRangeChecked) m_btnRangeChecked->setEnabled(count > 0);
+			if (m_btnMainAreaChecked) m_btnMainAreaChecked->setEnabled(count > 0);
 		});
 
 	// ---- 与数据库连接配置 UI（DbConfigDialog）共享数据库连接 ----
@@ -780,33 +828,58 @@ void CSE_DataListExportDialog::setQgisInterface(QgisInterface* iface)
 }
 
 // ============================================================
-// 顶部按钮：全部转调 CSE_DataCatalogBrowser 中与 LTZK 平台同名的实现，
-// 插件这边不重复实现一遍，保证与平台左侧数据列表行为一致。
+// 顶部按钮 / 关键字过滤 / 底部批量导出
 // ============================================================
 void CSE_DataListExportDialog::on_Button_ConnectDatabase_clicked()
 {
-	if (m_pBrowser) m_pBrowser->connectDatabase();               // 平台 connectDatabase()
-}
-
-void CSE_DataListExportDialog::on_Button_RefreshDatabase_clicked()
-{
-	if (m_pBrowser) m_pBrowser->refreshDatabaseData();           // 平台 refreshDatabaseData()
+	if (m_pBrowser) m_pBrowser->connectDatabase();
 }
 
 void CSE_DataListExportDialog::on_Button_ConnectFolder_clicked()
 {
-	if (m_pBrowser) m_pBrowser->connectLocalFolder();            // 平台 connectLocalFolder()
+	if (m_pBrowser) m_pBrowser->connectLocalFolder();
 }
 
-void CSE_DataListExportDialog::on_Button_DisconnectFolder_clicked()
+void CSE_DataListExportDialog::on_Button_RefreshAll_clicked()
 {
-	// 与平台一致：只断开当前选中的那个文件夹根节点
-	if (m_pBrowser) m_pBrowser->disconnectSelectedLocalFolder(); // 平台 disconnectSelectedLocalFolder()
+	if (m_pBrowser) m_pBrowser->refreshAll();
+	appendLog(tr("[列表] 已重新读取数据库 / 本地文件夹 / 地图图层。"));
 }
 
-void CSE_DataListExportDialog::on_Button_RefreshLocal_clicked()
+void CSE_DataListExportDialog::onFilterTextChanged(const QString& text)
 {
-	if (m_pBrowser) m_pBrowser->refreshLocalFolders();           // 平台 refreshLocalFolders()
+	if (m_pBrowser) m_pBrowser->setFilterKeyword(text);
+}
+
+void CSE_DataListExportDialog::onToggleLog()
+{
+	if (!m_pLog || !m_btnLog) return;
+	m_pLog->setVisible(m_btnLog->isChecked());
+	if (m_pLog->isVisible()) m_pLog->ensureCursorVisible();
+}
+
+void CSE_DataListExportDialog::onExportCheckedByRange()
+{
+	const QList<CSE_DataCatalogBrowser::CatalogItem> items =
+		m_pBrowser ? m_pBrowser->checkedItems() : QList<CSE_DataCatalogBrowser::CatalogItem>();
+	if (items.isEmpty())
+	{
+		QMessageBox::information(this, tr("按范围导出"), tr("请先勾选要导出的数据。"));
+		return;
+	}
+	exportByRange(items);
+}
+
+void CSE_DataListExportDialog::onExportCheckedByMainArea()
+{
+	const QList<CSE_DataCatalogBrowser::CatalogItem> items =
+		m_pBrowser ? m_pBrowser->checkedItems() : QList<CSE_DataCatalogBrowser::CatalogItem>();
+	if (items.isEmpty())
+	{
+		QMessageBox::information(this, tr("按制图导出"), tr("请先勾选要导出的数据。"));
+		return;
+	}
+	exportByMainArea(items);
 }
 
 void CSE_DataListExportDialog::populateDataList()
@@ -928,10 +1001,30 @@ QList<ClipExportEngine::Source> CSE_DataListExportDialog::sourcesFromCatalog(
 	return sources;
 }
 
-void CSE_DataListExportDialog::exportByRangeFromCatalog(
-	const CSE_DataCatalogBrowser::CatalogItem& item)
+// 多个节点（勾选批量导出 / 单节点右键导出共用）→ 裁剪数据源。
+// 同一个数据源可能同时出现在"勾了的父目录"和"勾了的具体文件"里，按 uri 去重。
+QList<ClipExportEngine::Source> CSE_DataListExportDialog::sourcesFromCatalog(
+	const QList<CSE_DataCatalogBrowser::CatalogItem>& items) const
 {
-	const QList<ClipExportEngine::Source> sources = sourcesFromCatalog(item);
+	QList<ClipExportEngine::Source> sources;
+	QSet<QString> seen;
+	for (const CSE_DataCatalogBrowser::CatalogItem& item : items)
+	{
+		const QList<ClipExportEngine::Source> one = sourcesFromCatalog(item);
+		for (const ClipExportEngine::Source& src : one)
+		{
+			if (src.uri.isEmpty() || seen.contains(src.uri)) continue;
+			seen.insert(src.uri);
+			sources << src;
+		}
+	}
+	return sources;
+}
+
+void CSE_DataListExportDialog::exportByRange(
+	const QList<CSE_DataCatalogBrowser::CatalogItem>& items)
+{
+	const QList<ClipExportEngine::Source> sources = sourcesFromCatalog(items);
 	if (sources.isEmpty())
 	{
 		QMessageBox::information(this, tr("按范围导出"),
@@ -1002,10 +1095,10 @@ void CSE_DataListExportDialog::exportByRangeFromCatalog(
 	runClipExport(sources, opt, tr("按范围导出"), dlg.autoLoadAfterExport());
 }
 
-void CSE_DataListExportDialog::exportByMainAreaFromCatalog(
-	const CSE_DataCatalogBrowser::CatalogItem& item)
+void CSE_DataListExportDialog::exportByMainArea(
+	const QList<CSE_DataCatalogBrowser::CatalogItem>& items)
 {
-	const QList<ClipExportEngine::Source> sources = sourcesFromCatalog(item);
+	const QList<ClipExportEngine::Source> sources = sourcesFromCatalog(items);
 	if (sources.isEmpty())
 	{
 		QMessageBox::information(this, tr("按制图导出"),
@@ -1015,8 +1108,10 @@ void CSE_DataListExportDialog::exportByMainAreaFromCatalog(
 
 	// 与成果模块的"按主区裁切导出"完全同一套界面与算法：
 	// 裁切范围 = 内图廓宽/高(mm) × 比例尺 ÷ 1000 米，以主区所选要素外包矩形中心居中
+	// 批量导出时主区要素只能从"第一个勾选的数据"里选（与成果模块一致）
 	CSE_MainAreaClipDialogUi dlg(this);
-	dlg.setSourcePath(item.detail.isEmpty() ? item.displayName : item.detail);
+	dlg.setSourcePath(items.first().detail.isEmpty()
+		? items.first().displayName : items.first().detail);
 	dlg.setAutoLoadAfterExport(autoLoadAfterExport());
 	if (dlg.exec() != QDialog::Accepted) return;
 
@@ -1285,20 +1380,35 @@ void CSE_DataListExportDialog::onCatalogContextMenuRequested(const QPoint& globa
 	actAddToMap->setEnabled(bIsConcreteData
 		|| item.kind == CSE_DataCatalogBrowser::CatalogItem::MapLayer);
 
+	// 【2026-10-25】已连接的本地文件夹：右键可断开（顶部按钮行不再单放"断开连接"）
+	QAction* actDisconnect = nullptr;
+	if (item.isLocalFolderRoot)
+	{
+		menu.addSeparator();
+		actDisconnect = menu.addAction(tr("断开该文件夹"));
+	}
+
 	QAction* chosen = menu.exec(globalPos);
 	if (!chosen) return;
 
+	QList<CSE_DataCatalogBrowser::CatalogItem> items;
+	items << item;
+
 	if (chosen == actRange)
 	{
-		exportByRangeFromCatalog(item);
+		exportByRange(items);
 	}
 	else if (chosen == actMainArea)
 	{
-		exportByMainAreaFromCatalog(item);
+		exportByMainArea(items);
 	}
 	else if (chosen == actAddToMap)
 	{
 		addCatalogItemToMap(item);
+	}
+	else if (actDisconnect && chosen == actDisconnect)
+	{
+		if (m_pBrowser) m_pBrowser->disconnectSelectedLocalFolder();
 	}
 }
 
@@ -2138,7 +2248,15 @@ bool CSE_DataListExportDialog::exportRasterFile(const QString& srcPath, const QS
 
 void CSE_DataListExportDialog::appendLog(const QString& msg)
 {
-	if (m_pLog) m_pLog->append(msg);
+	if (!m_pLog) return;
+	m_pLog->append(msg);
+
+	// 【2026-10-25】日志区默认收起：出错时自动展开，否则用户看不到失败原因
+	if (!m_pLog->isVisible() && m_btnLog
+		&& (msg.startsWith(tr("[错误]")) || msg.contains(tr("失败"))))
+	{
+		m_btnLog->setChecked(true);   // 触发 onToggleLog() 展开
+	}
 }
 
 void CSE_DataListExportDialog::loadDataFileToMap(const QString& filePath)

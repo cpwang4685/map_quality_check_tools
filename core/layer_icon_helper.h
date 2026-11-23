@@ -5,6 +5,7 @@
 #include <QPixmap>
 #include <QPainter>
 #include <QApplication>
+#include <qgsapplication.h>
 #include "database/product_metadata.h"
 
 /**
@@ -72,6 +73,36 @@ inline int layerIconKindForProduct(const ProductMetadata& meta)
 			return 2;
 	}
 	return -1; // 其它
+}
+
+// GDB 文件夹图标：直接用 QGIS 主题自带的 mIconDbSchema.svg，
+// 与 LTZK 平台左侧「本地数据」里 .gdb 数据项的图标完全一致。
+inline QIcon gdbFolderIcon()
+{
+	static const QIcon icon = []() {
+		QIcon i = QgsApplication::getThemeIcon(QStringLiteral("mIconDbSchema.svg"));
+		if (i.isNull())
+			i = QIcon(QgsApplication::defaultThemePath() + QStringLiteral("/mIconDbSchema.svg"));
+		return i;
+	}();
+	return icon;
+}
+
+// 是否为 GDB 容器目录：新版入库会打 node_type=3；旧数据只能靠目录名 / 直属产品反推
+inline bool isGdbDirectory(int nodeType, const QString& dirName,
+	const QList<ProductMetadata>& directProducts)
+{
+	if (nodeType == 3)
+		return true;
+	if (dirName.endsWith(QStringLiteral(".gdb"), Qt::CaseInsensitive))
+		return true;
+	for (const auto& p : directProducts)
+	{
+		if (p.fileFormat.compare(QLatin1String("gdb"), Qt::CaseInsensitive) == 0
+			&& p.productName.startsWith(dirName + QLatin1Char('_')))
+			return true;
+	}
+	return false;
 }
 
 } // namespace LayerIconHelper

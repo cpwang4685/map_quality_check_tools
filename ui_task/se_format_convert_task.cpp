@@ -75,6 +75,8 @@ static bool IsValidUtf8(const QByteArray& raw)
         if (j + len > raw.size()) return false;
         for (int k = 1; k < len; ++k)
             if ((raw[j+k] & 0xC0) != 0x80) return false;
+        if (len == 1) { j += 1; continue; }   // 纯 ASCII 直接过：否则会落到下面 len==4 分支，
+                                              // 用后续字节拼出假码点(>0x10FFFF)而误判为非法
         unsigned int cp;
         if (len == 2) cp = ((c & 0x1F) << 6) | (raw[j+1] & 0x3F);
         else if (len == 3) cp = ((c & 0x0F) << 12) | ((raw[j+1] & 0x3F) << 6) | (raw[j+2] & 0x3F);
@@ -101,6 +103,36 @@ static std::string DecodeGdalTextUtf8(const char* sz, bool bForceLocal = false)
     if (IsValidUtf8(raw))
         return std::string(sz);
     return QString::fromLocal8Bit(raw).toUtf8().toStdString();
+}
+
+// 按 UTF-8 字符边界截断到不超过 nMaxBytes 字节（nMaxBytes<=0 表示不限）。
+// DBF 的字段名上限 10 字节、字符型字段宽度也按字节计；一个汉字在 GBK 占 2 字节、
+// 转成 UTF-8 占 3 字节，宽度不够时按原始字节硬截断就会切在汉字中间，
+// 写出去的不是合法 UTF-8，属性表里显示成半个字或"□"。
+static std::string TruncateUtf8Bytes(const std::string& s, int nMaxBytes)
+{
+    if (nMaxBytes <= 0 || (int)s.size() <= nMaxBytes)
+        return s;
+    int k = nMaxBytes;
+    // 续字节形如 10xxxxxx：从截断位置往回退到字符起始处
+    while (k > 0 && ((unsigned char)s[k] & 0xC0) == 0x80)
+        --k;
+    return s.substr(0, k);
+}
+
+// 仅折叠 ASCII 大小写（DBF 字段名判重不区分大小写，中文不受影响）
+static std::string AsciiLower(std::string s)
+{
+    std::transform(s.begin(), s.end(), s.begin(),
+        [](unsigned char c) { return (char)std::tolower(c); });
+    return s;
+}
+
+static bool HasNonAscii(const std::string& s)
+{
+    for (size_t i = 0; i < s.size(); i++)
+        if ((unsigned char)s[i] >= 0x80) return true;
+    return false;
 }
 
 // 打开源数据。SHP 源无 .cpg 时不做编码探测，直接 SHAPE_ENCODING="" 取 DBF 原始字节，
@@ -195,7 +227,8 @@ bool SeFormatConvertTask::run()
 
     bool bOk = false;
     // GDB 批量：所有源数据汇入同一个 .gdb（每个源文件一个要素类，学长口径）；
-    // GDB 单个：输出目录/<库名>.gdb；GPKG 批量：输出目录/<源名>.gpkg，单个：用户选定的文件
+    // GDB 单个：输出目录/<库名>.gdb；
+    // GPKG：输出目录/<名称>.gpkg —— 单个模式用"图层名"栏填的名字，批量按源文件名（2026-10-09）
     bool bGdbTarget = (m_strTgtDriverName == "OpenFileGDB");
     bool bGpkgTarget = (m_strTgtDriverName == "GPKG");
     int successCount = 0;
@@ -364,10 +397,8 @@ bool SeFormatConvertTask::run()
         }
 
         // 用 GDAL VSIMkdir 创建输出目录
-        // 单个 GPKG 输出时 m_strOutputPath 是完整文件路径，目录取其所在文件夹
+        // 输出路径一律是文件夹（GPKG 也改成选目录了，2026-10-09）
         string strOutDir = m_strOutputPath;
-        if (bGpkgTarget && m_bSingleInputFile)
-            strOutDir = string(CPLGetPath(m_strOutputPath.c_str()));
         if (VSIMkdir(strOutDir.c_str(), 0777) != 0)
         {
             // VSIMkdir 可能因目录已存在返回非0，用 QDir 兜底
@@ -442,9 +473,11 @@ bool SeFormatConvertTask::run()
             }
             else if (bGpkgTarget)
             {
-                string outFile = m_bSingleInputFile
-                    ? m_strOutputPath
-                    : strOutDir + "/" + srcBaseName + ".gpkg";
+                // 输出目录 + <名称>.gpkg：单个模式用"图层名"栏填的名字（留空退回源名），
+                // 批量模式按源文件名自动命名（2026-10-09）
+                string gpkgName = (m_bSingleInputFile && !m_strLayerName.empty())
+                    ? m_strLayerName : srcBaseName;
+                string outFile = strOutDir + "/" + gpkgName + ".gpkg";
                 // 图层范围在拷贝时顺手累计、写库前直接刷 gpkg_contents，避免二次全表扫描
                 bConvOk = ConvertToGPKG(srcFile, outFile, m_strSrcDriverName, progCb);
                 outDesc = string(CPLGetFilename(outFile.c_str()));
@@ -906,6 +939,26 @@ bool SeFormatConvertTask::CopyLayer(OGRLayer* poSrcLayer, OGRLayer* poTgtLayer,
     OGRFeatureDefn* poSrcDefn = poSrcLayer->GetLayerDefn();
     int nSrcFields = poSrcDefn->GetFieldCount();
 
+    // 【2026-10-23】DBF 字段名上限 10 字节，GDAL 按原始字节硬截断，会把汉字的 3 字节
+    // 序列切断（"行政区代码"→"行政区"+半个字），属性表里字段名就是乱码；重名时它补的
+    // "_1" 后缀还会再被截掉半个字。这里自己在字符边界截断并自己保证唯一。
+    // 纯 ASCII 名交给 GDAL 原样处理（按字节切不会切坏字符），输出与改动前一致。
+    const bool bShpTarget = (m_strTgtDriverName == "ESRI Shapefile");
+    std::set<std::string> usedFieldNames;
+    auto makeFieldName = [&](const std::string& utf8Name) -> std::string {
+        if (!bShpTarget || !HasNonAscii(utf8Name)) return utf8Name;
+        const std::string base = TruncateUtf8Bytes(utf8Name, 10);
+        std::string cand = base;
+        int n = 1;
+        while (usedFieldNames.count(AsciiLower(cand)))
+        {
+            const std::string suffix = "_" + std::to_string(n++);
+            cand = TruncateUtf8Bytes(base, 10 - (int)suffix.size()) + suffix;
+        }
+        usedFieldNames.insert(AsciiLower(cand));
+        return cand;
+    };
+
     std::vector<int> validSrcIdx;
     for (int i = 0; i < nSrcFields; i++)
     {
@@ -914,25 +967,45 @@ bool SeFormatConvertTask::CopyLayer(OGRLayer* poSrcLayer, OGRLayer* poTgtLayer,
         if (szName != nullptr && strlen(szName) > 0)
         {
             const std::string utf8Name = DecodeGdalTextUtf8(szName, bLocalText);
-            if (utf8Name == szName)
+            const std::string tgtName = makeFieldName(utf8Name);
+            if (tgtName == szName)
             {
                 poTgtLayer->CreateField(poSrcField);
             }
             else
             {
                 OGRFieldDefn oNewField(poSrcField);
-                oNewField.SetName(utf8Name.c_str());
+                oNewField.SetName(tgtName.c_str());
                 poTgtLayer->CreateField(&oNewField);
             }
         }
         else
         {
-            OGRFieldDefn oNewField(("field_" + std::to_string(i)).c_str(), poSrcField->GetType());
+            const std::string fallback = makeFieldName("field_" + std::to_string(i));
+            OGRFieldDefn oNewField(fallback.c_str(), poSrcField->GetType());
             oNewField.SetWidth(poSrcField->GetWidth());
             oNewField.SetPrecision(poSrcField->GetPrecision());
             poTgtLayer->CreateField(&oNewField);
         }
         validSrcIdx.push_back(i);
+    }
+
+    // 【2026-10-23】目标为 Shapefile 时字符型字段宽度按字节计：源库常把宽度定成刚好放下
+    // GBK 内容（2 字节/汉字），转成 UTF-8 后每个汉字 3 字节就装不下。GDAL 3.8 会退到字符
+    // 边界再截，但老版本（如麒麟侧的 GDAL 3.0.4）可能按字节硬截，属性表里留下半个汉字。
+    // 这里统一先按字符边界截到目标宽度，保证写进 DBF 的每个值都是合法 UTF-8。
+    OGRFeatureDefn* poTgtDefn = poTgtLayer->GetLayerDefn();
+    std::vector<int> tgtStrWidth;
+    if (bShpTarget && poTgtDefn)
+    {
+        tgtStrWidth.assign(validSrcIdx.size(), 0);
+        const int nTgtFields = poTgtDefn->GetFieldCount();
+        for (int t = 0; t < (int)tgtStrWidth.size() && t < nTgtFields; t++)
+        {
+            OGRFieldDefn* poTgtField = poTgtDefn->GetFieldDefn(t);
+            if (poTgtField && poTgtField->GetType() == OFTString)
+                tgtStrWidth[t] = poTgtField->GetWidth();
+        }
     }
 
     const GIntBig nTotal = poSrcLayer->GetFeatureCount();
@@ -978,7 +1051,9 @@ bool SeFormatConvertTask::CopyLayer(OGRLayer* poSrcLayer, OGRLayer* poTgtLayer,
                 {
                     // 字符串值按源编码解码成 UTF-8（PGeo 为 GBK，其他驱动已是 UTF-8 原样通过）
                     const char* pszVal = poFeature->GetFieldAsString(srcIdx);
-                    const std::string utf8Val = DecodeGdalTextUtf8(pszVal, bLocalText);
+                    std::string utf8Val = DecodeGdalTextUtf8(pszVal, bLocalText);
+                    if (!tgtStrWidth.empty() && tgtStrWidth[t] > 0)
+                        utf8Val = TruncateUtf8Bytes(utf8Val, tgtStrWidth[t]);
                     poTgtFeature->SetField(t, utf8Val.c_str());
                 }
                 else

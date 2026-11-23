@@ -3,7 +3,13 @@
 
 #include "qgisplugin.h"
 #include <QObject>
+// 【2026-10-09】插件工具窗口管理要用到这三个：哈希表存窗口注册表，
+// QPointer 做弱引用（窗口是"关窗即销毁"，必须能自动置空），QWidget 是父/宿主窗口类型。
+#include <QHash>
+#include <QPointer>
+#include <QWidget>
 
+#include <functional>
 #include <string>
 #include <vector>
 using namespace std;
@@ -131,9 +137,40 @@ private:
 
     void updateActions();
 
+protected:
+    // 【2026-10-09】监视平台主界面的关闭事件：主界面一关，本插件开着的窗口跟着关。
+    // 为什么要靠事件过滤器而不是"挂父对象"：见 hostWindow() 实现处的说明。
+    bool eventFilter(QObject* watched, QEvent* event) override;
+
 private:
 
+    // ===== 插件工具窗口管理【2026-10-09 新增】=====
+    //
+    // 要解决的两个毛病：
+    //   1. 平台主界面关掉后，本插件打开的窗口还留着不关（而且因为还有可见顶层窗口，
+    //      进程也不退出）；
+    //   2. 同一个菜单点两次会开出两个一模一样的窗口。
+    //
+    // 窗口仍然保持"无父对象的独立顶层窗口"（不挂到平台上，原因见 hostWindow()），
+    // 靠下面这三件事解决：注册表查重、关窗即销毁、主界面关闭时统一 close。
 
+    // 窗口注册表：key = 每个入口一个的稳定标识，value = 弱引用。
+    // 因为窗口都设了 WA_DeleteOnClose，必须用 QPointer —— 窗口被销毁后自动变空指针。
+    QHash<QString, QPointer<QWidget>> m_openToolWindows;
+
+    // 平台主界面（LTZK 下即 LTZK 主窗口本身），只用于装事件过滤器，不作为父对象。
+    QPointer<QWidget> m_hostWindow;
+
+    // 取平台主界面并在首次调用时装好关闭监视。
+    QWidget* hostWindow();
+
+    // 同一个 key 的窗口只保留一个：已经开着就拉到前台返回，否则用 factory 造一个。
+    // factory 里只做"构造 + 配置"，不要 show()（本函数统一 show）。
+    QWidget* openToolWindow(const QString& key, const std::function<QWidget*()>& factory);
+
+    // 关闭本插件打开的全部工具窗口。必须"主动 close"而不是等它们被连带隐藏：
+    // 有几个对话框的路径/设置写在 closeEvent 与析构里，只隐藏的话配置会丢。
+    void closeAllToolWindows();
 
 };
 

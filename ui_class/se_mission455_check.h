@@ -14,9 +14,11 @@ class QgsFeature;
 // 检查逻辑由引擎子进程完成，本模块负责数据存储准备、参数设置与结果收集。
 // 目标线图层每次一个（全部图层逐层检查）；参考图层为已合并好的
 // 点/面参考 SHP 路径（为空则不参与），进入任务目录时复制为相对路径。
+// 2026-10-28：悬挂节点（mode 1）改由本模块本地判定，端点与居民点
+// （refResidentShp）距离≤ResidentCoverTolerance 时不算悬挂；引擎不再执行 mode 1。
 namespace Mission455 {
     void execute(QgsVectorLayer* lineLayer, const QString& refPointShp,
-        const QString& refPolyShp,
+        const QString& refPolyShp, const QString& refResidentShp,
         int processMode, const QHash<QString, double>& thresholds,
         QList<QPair<QgsFeature, QString>>& allErrors, QStringList& executedChecks);
 }

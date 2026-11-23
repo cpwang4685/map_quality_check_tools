@@ -60,6 +60,7 @@ echo === MOC generation ===
 "%MOC%" "%PROJ%\ui_class\se_data_import.h" -o "%GEN%\moc_se_data_import.cpp"
 "%MOC%" "%PROJ%\ui_class\se_metadata_viewer.h" -o "%GEN%\moc_se_metadata_viewer.cpp"
 "%MOC%" "%PROJ%\ui_class\se_auto_quality_check.h" -o "%GEN%\moc_se_auto_quality_check.cpp"
+"%MOC%" "%PROJ%\ui_class\se_check_params_dialog.h" -o "%GEN%\moc_se_check_params_dialog.cpp"
 "%MOC%" "%PROJ%\ui_class\se_layer_mapping_dialog.h" -o "%GEN%\moc_se_layer_mapping_dialog.cpp"
 "%MOC%" "%PROJ%\map_check_backup_manager.h" -o "%GEN%\moc_map_check_backup_manager.cpp"
 "%MOC%" "%PROJ%\ui_class\backup_strategy_edit_dialog.h" -o "%GEN%\moc_backup_strategy_edit_dialog.cpp"
@@ -71,6 +72,7 @@ echo === MOC generation ===
 "%MOC%" "%PROJ%\ui_class\map_tool_extent_picker.h" -o "%GEN%\moc_map_tool_extent_picker.cpp"
 "%MOC%" "%PROJ%\ui_class\param_config_dialog.h" -o "%GEN%\moc_param_config_dialog.cpp"
 "%MOC%" "%PROJ%\ui_class\scale_selector_dialog.h" -o "%GEN%\moc_scale_selector_dialog.cpp"
+"%MOC%" "%PROJ%\ui_class\knowledge_rename_dialog.h" -o "%GEN%\moc_knowledge_rename_dialog.cpp"
 "%MOC%" "%PROJ%\ui_class\clip_dialog.h" -o "%GEN%\moc_clip_dialog.cpp"
 "%MOC%" "%PROJ%\ui_class\merge_dialog.h" -o "%GEN%\moc_merge_dialog.cpp"
 "%MOC%" "%PROJ%\ui_class\format_conversion_dialog.h" -o "%GEN%\moc_format_conversion_dialog.cpp"
@@ -98,5 +100,6 @@ echo === MOC generation ===
 "%MOC%" "%PROJ%\ui_class\data_catalog_browser.h" -o "%GEN%\moc_data_catalog_browser.cpp"
 "%MOC%" "%PROJ%\ui_class\se_range_export.h" -o "%GEN%\moc_se_range_export.cpp"
 "%MOC%" "%PROJ%\ui_class\se_main_area_clip.h" -o "%GEN%\moc_se_main_area_clip.cpp"
+"%MOC%" "%PROJ%\ui_class\product_source_dialog.h" -o "%GEN%\moc_product_source_dialog.cpp"
 
 echo === DONE ===

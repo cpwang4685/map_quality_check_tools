@@ -1,7 +1,6 @@
 /*--------------QT---------------*/
 #include <QFileDialog>
 #include <QMessageBox>
-#include <QInputDialog>
 #include <QFile>
 #include <QDir>
 #include <QDateTime>
@@ -87,10 +86,14 @@ CSE_DataRestoreDialog::CSE_DataRestoreDialog(QWidget* parent, Qt::WindowFlags fl
     this->setAttribute(Qt::WA_NoSystemBackground, false);
     this->setAttribute(Qt::WA_TranslucentBackground, false);
 
+    // 【2026-09-22】「备份范围」两个单选框已注释停用（data_restore.ui 里整行注释掉了），
+    // 这里对应的 QButtonGroup 一并注释。成员 m_pScopeGroup 也已在头文件里注释，
+    // 所以它现在是未定义状态 —— 以后要恢复"指定表备份"时，这三行和头文件里的成员
+    // 要同时恢复，否则编不过。
     // 初始化 QButtonGroup，使每组内部互斥，组之间不互斥
-    m_pScopeGroup = new QButtonGroup(this);
-    m_pScopeGroup->addButton(ui.radioButton_BackupAllData, 0);
-    m_pScopeGroup->addButton(ui.radioButton_BackupSelectedTables, 1);
+    // m_pScopeGroup = new QButtonGroup(this);
+    // m_pScopeGroup->addButton(ui.radioButton_BackupAllData, 0);
+    // m_pScopeGroup->addButton(ui.radioButton_BackupSelectedTables, 1);
 
     // 初始化默认备份策略
     initDefaultStrategies();
@@ -173,6 +176,17 @@ void CSE_DataRestoreDialog::showEvent(QShowEvent* event)
         // 仅一站式入口，会深度失效 + 多轮重算 + 锁定高度
         applyBackupLayout();
     });
+}
+
+void CSE_DataRestoreDialog::closeEvent(QCloseEvent* event)
+{
+    // 关窗即落盘，下次打开直接回到上次用的路径。
+    // 原来只在析构函数里存，而本对话框是 new 出来、无父对象、也没设 WA_DeleteOnClose，
+    // 关掉之后既不析构也无法再访问 —— 等于设置从来没写进去过（注册表里这两个键一直是空的，
+    // 所以每次打开"备份源/备份目标/数据库备份目标/恢复原始路径"都退回 QDir::homePath()，
+    // 也就是 C:\\Users\\<用户名>）。
+    saveState();
+    QDialog::closeEvent(event);
 }
 
 // ========== 初始化 ==========
@@ -261,35 +275,29 @@ void CSE_DataRestoreDialog::refreshBackupList()
     // 扫描备份目录
     scanBackupRecords(m_qstrBackupDir);
 
-    // 获取当前筛选条件
-    QString filterText = ui.comboBox_BackupTypeFilter->currentText();
-
-    // 过滤并显示
+    // 【2026-09-22】「备份类型过滤」下拉框已移除：备份策略现在只剩"全量备份"一种类型，
+    // 过滤条件恒等于"全部类型"，筛不筛结果一样。这里直接把扫描结果全量上表，
+    // 表格行号从此与 m_vecBackupRecords 下标一一对应（恢复/删除两个按钮依赖这一点）。
     int row = 0;
-    vector<BackupRecord> filtered;
+    ui.tableWidget_BackupList->setRowCount(static_cast<int>(m_vecBackupRecords.size()));
     for (const auto& record : m_vecBackupRecords)
-    {
-        if (filterText == tr("全部类型") || record.backupTypeName() == filterText)
-        {
-            filtered.push_back(record);
-        }
-    }
-
-    ui.tableWidget_BackupList->setRowCount(static_cast<int>(filtered.size()));
-    for (const auto& record : filtered)
     {
         QTableWidgetItem* itemName = new QTableWidgetItem(record.strName);
         itemName->setFlags(itemName->flags() & ~Qt::ItemIsEditable);
         ui.tableWidget_BackupList->setItem(row, 0, itemName);
 
-        QTableWidgetItem* itemType = new QTableWidgetItem(record.backupTypeName());
-        itemType->setFlags(itemType->flags() & ~Qt::ItemIsEditable);
-        ui.tableWidget_BackupList->setItem(row, 1, itemType);
-
+        // 【2026-09-22】按 .ui 表头顺序填：第 0 列 备份名称、第 1 列 备份时间、
+        // 第 2 列 备份类型、第 3 列 大小、第 4 列 路径。
+        // 原来这里把「类型」写进了第 1 列、「时间」写进了第 2 列，跟表头对不上，
+        // 界面上就是"备份时间"列显示类型、"备份类型"列显示时间，两列内容互换。
         QTableWidgetItem* itemTime = new QTableWidgetItem(
             record.dtCreateTime.toString("yyyy-MM-dd hh:mm:ss"));
         itemTime->setFlags(itemTime->flags() & ~Qt::ItemIsEditable);
-        ui.tableWidget_BackupList->setItem(row, 2, itemTime);
+        ui.tableWidget_BackupList->setItem(row, 1, itemTime);
+
+        QTableWidgetItem* itemType = new QTableWidgetItem(record.backupTypeName());
+        itemType->setFlags(itemType->flags() & ~Qt::ItemIsEditable);
+        ui.tableWidget_BackupList->setItem(row, 2, itemType);
 
         QTableWidgetItem* itemSize = new QTableWidgetItem(record.sizeDisplay());
         itemSize->setFlags(itemSize->flags() & ~Qt::ItemIsEditable);
@@ -313,9 +321,7 @@ void CSE_DataRestoreDialog::refreshBackupList()
     ui.tableWidget_BackupList->setMinimumHeight(qMax(nDesiredHeight, 160));
     ui.tableWidget_BackupList->setMaximumHeight(QWIDGETSIZE_MAX);
 
-    setStatusText(tr("已扫描 %1 个备份记录，显示 %2 个")
-        .arg(m_vecBackupRecords.size())
-        .arg(filtered.size()));
+    setStatusText(tr("已扫描 %1 个备份记录").arg(m_vecBackupRecords.size()));
 
     if (isVisible() && ui.tabWidget_main->currentIndex() == 1)
         adjustDialogHeightForBackupTab();
@@ -458,8 +464,12 @@ void CSE_DataRestoreDialog::restoreState()
     // 非连接字段（数据库连接字段已由上面的共享配置填充，不再从 QgsSettings 覆盖）
     m_eBackupDataSource = static_cast<BackupDataSource>(settings.value(
         QStringLiteral("DataRestore/BackupDataSource"), 0, QgsSettings::Section::Plugins).toInt());
-    int scopeIdx = settings.value(QStringLiteral("DataRestore/BackupDbScope"), 0, QgsSettings::Section::Plugins).toInt();
-    if (m_pScopeGroup) m_pScopeGroup->button(scopeIdx)->setChecked(true);
+    // 【2026-09-22】「备份范围」单选框停用，这里不再恢复选中项。
+    // 注意：这两行必须一起注掉，不能只注掉 setChecked 那行 ——
+    // m_pScopeGroup 里已经没有任何按钮，button(scopeIdx) 会返回 nullptr，
+    // 按原来的写法 ->setChecked(true) 会在打开对话框时直接崩溃。
+    // int scopeIdx = settings.value(QStringLiteral("DataRestore/BackupDbScope"), 0, QgsSettings::Section::Plugins).toInt();
+    // if (m_pScopeGroup) m_pScopeGroup->button(scopeIdx)->setChecked(true);
 
     // 恢复日志
     QString logText = settings.value(
@@ -496,9 +506,11 @@ void CSE_DataRestoreDialog::saveState()
     settings.setValue(QStringLiteral("DataRestore/BackupDbUser"), ui.lineEdit_backupDbUser->text(), QgsSettings::Section::Plugins);
     settings.setValue(QStringLiteral("DataRestore/BackupDbPassword"), ui.lineEdit_backupDbPassword->text(), QgsSettings::Section::Plugins);
 
+    // 【2026-09-22】「备份范围」单选框停用，不再保存这个键。
+    // 注册表里以前存下的 DataRestore/BackupDbScope 已经没人读了，留着无害。
     // 保存单选状态
-    int scopeIdx = m_pScopeGroup ? m_pScopeGroup->checkedId() : 0;
-    settings.setValue(QStringLiteral("DataRestore/BackupDbScope"), scopeIdx, QgsSettings::Section::Plugins);
+    // int scopeIdx = m_pScopeGroup ? m_pScopeGroup->checkedId() : 0;
+    // settings.setValue(QStringLiteral("DataRestore/BackupDbScope"), scopeIdx, QgsSettings::Section::Plugins);
 
     QString logText = ui.textEdit_Log->toPlainText();
     if (logText.length() > 10000)
@@ -512,6 +524,10 @@ void CSE_DataRestoreDialog::saveState()
     CMapCheckBackupManager::instance()->setEnabled(m_bEnableTimedBackup);
     CMapCheckBackupManager::instance()->setKeepExpired(m_bKeepExpired);
     CMapCheckBackupManager::instance()->saveSettings();
+
+    // 立即落盘：QgsSettings 靠析构或定时器才 sync，这里显式写一次，
+    // 保证"关窗后马上再开"和"关窗后进程被直接结束"两种情况都能读到刚才的路径。
+    settings.sync();
 }
 
 // ========== 日志 ==========
@@ -580,9 +596,12 @@ void CSE_DataRestoreDialog::adjustDialogHeightForBackupTab()
     if (!isVisible())
         return;
 
-    // 暂时解除尺寸锁定，让窗口能够自适应
-    setMinimumHeight(0);
-    setMaximumHeight(QWIDGETSIZE_MAX);
+    // 暂时解除尺寸锁定，让窗口能够自适应。
+    // 宽、高都要解：本函数末尾会把 min/max 锁成同一值（用户不可手动拉伸），
+    // 不先解开就锁不成新尺寸。宽度先记下来，末尾照原样锁回去。
+    const int nKeepWidth = qMax(width(), minimumWidth());
+    setMinimumSize(0, 0);
+    setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
 
     // 关键：在测量之前必须强制所有相关布局彻底失效。
     // 之前单层 invalidate+activate 无法 100% 触达子布局的 sizeHint 缓存，
@@ -612,12 +631,12 @@ void CSE_DataRestoreDialog::adjustDialogHeightForBackupTab()
             nTargetHeight = qMin(nTargetHeight, nMaxHeight);
     }
 
-    // 保持当前宽度，将窗口高度精确设置为当前内容高度
-    int nTargetWidth = qMax(width(), minimumWidth());
-    resize(nTargetWidth, nTargetHeight);
-
-    // 不锁定窗口高度：仅将高度 resize 为当前内容高度作为默认，用户仍可手动上下拉伸窗口
-    // （原 setFixedHeight 会把 min/max 高度都锁成同一值，导致窗口高度无法手动调整）
+    // 按当前内容把对话框尺寸锁死：setFixedSize 会把 min/max 宽度与高度都设成同一值，
+    // 用户拖边框、双击标题栏都不会改变窗口大小 —— 需求就是整个对话框不允许手动拉伸。
+    // 宽度沿用本函数开头记下的当前宽度（.ui 设计宽度，DialogFitHelper 已按平台 QSS
+    // 校验过不小于内容所需），高度取上面算出的当前内容高度。
+    // 程序侧仍能改尺寸：切 Tab、切「备份来源」时都会重新走本函数 → 解锁 → 重算 → 重锁。
+    setFixedSize(nKeepWidth, nTargetHeight);
 }
 
 int CSE_DataRestoreDialog::calculateHeightForCurrentTab()
@@ -731,9 +750,9 @@ void CSE_DataRestoreDialog::applyBackupLayout()
     if (!isVisible() || ui.tabWidget_main->currentIndex() != 0)
         return;
 
-    // 1. 先解锁窗口高度锁定，让后面 resize 才能生效
-    setMinimumHeight(0);
-    setMaximumHeight(QWIDGETSIZE_MAX);
+    // 1. 先解锁窗口尺寸锁定，让后面 resize 才能生效（宽高都要解，末尾会重新锁死）
+    setMinimumSize(0, 0);
+    setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
 
     // 2. 深度失效备份 Tab 内所有相关布局 + 数据库配置 Tab
     QWidget* pCurrentTab = ui.tabWidget_main->currentWidget();
@@ -895,35 +914,15 @@ void CSE_DataRestoreDialog::on_Button_ImmediateBackup_clicked()
     int row = ui.tableWidget_backup_strategy->currentRow();
     if (row < 0 || row >= static_cast<int>(m_vecStrategies.size()))
     {
-        QStringList items;
-        items << tr("全量备份") << tr("增量备份") << tr("WAL归档") << tr("逻辑导出备份") << tr("数据库备份");
-        bool ok = false;
-        QString selected = QInputDialog::getItem(
-            this, tr("选择备份类型"), tr("请选择要执行的备份类型:"),
-            items, 0, false, &ok);
-        if (!ok || selected.isEmpty())
-            return;
+        // 【2026-09-22】未选中备份策略时，直接提示"请先选择备份策略"。
+        // 原实现是弹「选择备份类型」输入框让用户临时挑一个类型，与设计要求不符：
+        // 立即备份执行的是"当前选中的这条策略"，没有策略就无从执行。
+        // 提示写法与同 Tab 相邻的「编辑策略」「删除策略」保持一致。
+        QMessageBox::warning(this, tr("提示"), tr("请先选择一条备份策略。"));
+        return;
+    }
 
-        if (selected == tr("全量备份"))
-        { strategy.eBackupType = BackupType::FullBackup; strategy.eFrequency = BackupFrequency::Weekly; }
-        else if (selected == tr("增量备份"))
-        { strategy.eBackupType = BackupType::IncrementalBackup; strategy.eFrequency = BackupFrequency::Daily; }
-        else if (selected == tr("WAL归档"))
-        { strategy.eBackupType = BackupType::WALArchive; strategy.eFrequency = BackupFrequency::Hourly; }
-        else if (selected == tr("逻辑导出备份"))
-        { strategy.eBackupType = BackupType::LogicalExportBackup; strategy.eFrequency = BackupFrequency::Monthly; }
-        else
-        { strategy.eBackupType = BackupType::DatabaseBackup; strategy.eFrequency = BackupFrequency::Daily; }
-        strategy.strExecuteTime = tr("立即执行");
-        strategy.strRetentionPeriod = tr("保留4周");
-        strategy.eStorageLocation = StorageLocation::Local;
-        strategy.bEnabled = true;
-        strategy.eDataSource = m_eBackupDataSource;
-    }
-    else
-    {
-        strategy = m_vecStrategies[row];
-    }
+    strategy = m_vecStrategies[row];
 
     // 如果是从UI设置的数据库备份模式覆盖数据源
     if (m_eBackupDataSource != BackupDataSource::FileSystem)
@@ -945,19 +944,32 @@ void CSE_DataRestoreDialog::on_Button_ImmediateBackup_clicked()
         strategy.strDbSchema = ui.lineEdit_backupDbSchema->text().trimmed();
         if (strategy.strDbSchema.isEmpty()) strategy.strDbSchema = "public";
 
-        // 备份范围（单选）
-        if (ui.radioButton_BackupAllData->isChecked())
-            strategy.eDbBackupScope = DatabaseBackupScope::WholeDatabase;
-        else
-            strategy.eDbBackupScope = DatabaseBackupScope::SelectedTables;
+        // 【2026-09-22】「备份范围」两个单选框已注释停用，"指定表备份"不再需要，
+        // 数据库备份范围现在恒为"整个数据库"——即 pg_dump 不加 -n / -t，
+        // 与以前选「备份全部数据」时的行为逐字一致。
+        // 原来这里由单选框决定：
+        // if (ui.radioButton_BackupAllData->isChecked())
+        //     strategy.eDbBackupScope = DatabaseBackupScope::WholeDatabase;
+        // else
+        //     strategy.eDbBackupScope = DatabaseBackupScope::SelectedTables;
+        //
+        // 必须在这里显式赋值，不能只靠「不赋值」或 TimedBackupStrategy 的构造默认值：
+        // strategy 是从 m_vecStrategies[row] 拷过来的，而 eDbBackupScope 会经由
+        // BackupManager 从注册表读回来（map_check_backup_manager.cpp:642）。如果以前
+        // 存过 SelectedTables(2)，不覆盖就会带着旧值去备份 —— 而且还会配着一份界面上
+        // 再也改不了的 lstDbTables，等于按一批用户看不见的表做局部备份。
+        strategy.eDbBackupScope = DatabaseBackupScope::WholeDatabase;
 
-        // 选中的表
+        // 选中的表 —— 表选择列表现在恒为隐藏（"指定表备份"已停用），不再从它收集表名。
+        // 明确清空，避免把以前存下来的旧表名继续带进策略里。
+        // 原实现：
+        // strategy.lstDbTables.clear();
+        // for (int i = 0; i < ui.listWidget_backupTables->count(); ++i)
+        // {
+        //     if (ui.listWidget_backupTables->item(i)->checkState() == Qt::Checked)
+        //         strategy.lstDbTables.append(ui.listWidget_backupTables->item(i)->text());
+        // }
         strategy.lstDbTables.clear();
-        for (int i = 0; i < ui.listWidget_backupTables->count(); ++i)
-        {
-            if (ui.listWidget_backupTables->item(i)->checkState() == Qt::Checked)
-                strategy.lstDbTables.append(ui.listWidget_backupTables->item(i)->text());
-        }
 
         // 备份方式固定为全量备份
         strategy.eDbBackupMethod = DatabaseBackupMethod::FullBackup;
@@ -1189,19 +1201,11 @@ void CSE_DataRestoreDialog::on_Button_Restore_clicked()
 		return;
 	}
 
-	// 获取当前筛选后的备份记录
-	QString filterText = ui.comboBox_BackupTypeFilter->currentText();
-	vector<BackupRecord> filtered;
-	for (const auto& r : m_vecBackupRecords)
-	{
-		if (filterText == tr("全部类型") || r.backupTypeName() == filterText)
-			filtered.push_back(r);
-	}
-
-	if (row >= static_cast<int>(filtered.size()))
+	// 【2026-09-22】不再按备份类型过滤，表格行号即 m_vecBackupRecords 下标，直接取。
+	if (row >= static_cast<int>(m_vecBackupRecords.size()))
 		return;
 
-	const BackupRecord& record = filtered[row];
+	const BackupRecord& record = m_vecBackupRecords[row];
 	bool result = false;
 	QString restoreTargetDesc;
 
@@ -1302,18 +1306,11 @@ void CSE_DataRestoreDialog::on_Button_DeleteBackup_clicked()
         return;
     }
 
-    QString filterText = ui.comboBox_BackupTypeFilter->currentText();
-    vector<BackupRecord> filtered;
-    for (const auto& r : m_vecBackupRecords)
-    {
-        if (filterText == tr("全部类型") || r.backupTypeName() == filterText)
-            filtered.push_back(r);
-    }
-
-    if (row >= static_cast<int>(filtered.size()))
+    // 【2026-09-22】不再按备份类型过滤，表格行号即 m_vecBackupRecords 下标，直接取。
+    if (row >= static_cast<int>(m_vecBackupRecords.size()))
         return;
 
-    const BackupRecord& record = filtered[row];
+    const BackupRecord& record = m_vecBackupRecords[row];
 
     QMessageBox::StandardButton reply = QMessageBox::question(
         this, tr("确认删除"),
@@ -1355,11 +1352,6 @@ void CSE_DataRestoreDialog::on_Button_RestoreApply_clicked()
     appendLog(tr("- 覆盖已存在文件: %1").arg(m_bOverwriteExisting ? tr("是") : tr("否")));
     setStatusText(tr("恢复配置已保存"));
     QMessageBox::information(this, tr("配置已保存"), tr("配置已保存"));
-}
-
-void CSE_DataRestoreDialog::on_comboBox_BackupTypeFilter_currentIndexChanged(int /*index*/)
-{
-    refreshBackupList();
 }
 
 void CSE_DataRestoreDialog::on_radioButton_RestoreToOriginal_toggled(bool checked)
@@ -1900,10 +1892,14 @@ void CSE_DataRestoreDialog::on_Button_GetBackupDbList_clicked()
                 setStatusText(tr("已加载 %1 个数据库表").arg(tableCount));
 
                 // 加载成功后，自动切到"手动选择备份"模式，让用户能直接选择要备份的表
+                // 【2026-09-22】这里是原实现的两行（"手动选择备份"单选框已注释停用）：
+                // ui.radioButton_BackupSelectedTables->setChecked(true);
+                // updateBackupScopeWidgets();
+                // 注掉后这个 if 里只剩"刷新列表内部布局"那几行；列表恒为隐藏状态，
+                // 所以本函数（以及它的两个调用方）在实际界面上已经点不到了，
+                // 代码保留是为了以后恢复"指定表备份"时改动最小。
                 if (tableCount > 0)
                 {
-                    ui.radioButton_BackupSelectedTables->setChecked(true);
-                    updateBackupScopeWidgets();
 
                     // 修复：列表内容填充后强制刷新内部布局，避免最后一行被按钮遮挡。
                     // doItemsLayout() 强制重新计算所有项位置/尺寸，
@@ -1933,32 +1929,37 @@ void CSE_DataRestoreDialog::on_Button_GetBackupDbList_clicked()
 
 void CSE_DataRestoreDialog::updateBackupScopeWidgets()
 {
-    bool bManualSelect = ui.radioButton_BackupSelectedTables->isChecked();
+    // 【2026-09-22】「手动选择备份」单选框已注释停用 → 表选择区再没有"要显示"的情况，
+    // 下面原来的 if (bManualSelect) { 显示… } else { 隐藏… } 恒走"隐藏"分支。
+    // 处理方式：把判断和"显示"那一整支注掉，保留原 else 的语句体作为普通语句块，
+    // 效果与改动前选「备份全部数据」时完全一致。
+    // bool bManualSelect = ui.radioButton_BackupSelectedTables->isChecked();
 
     // 使用 setVisible + setMaximumHeight(0) + setMinimumHeight(0) 三重组合确保隐藏控件完全折叠
     // QListWidget 即使 setVisible(false)，其 minimumSize 仍可能保留（80px），
     // 且其在 verticalLayout_postgres 中 verstretch=1，会强制占据剩余垂直空间
-    if (bManualSelect) {
-        ui.listWidget_backupTables->setVisible(true);
-        // 列表高度跟随内容自动收缩，最大不超过 180px（≈7-8行+滚动条）
-        // AdjustToContents: 有 N 行就撑 N 行，无多余空白；超出 180px 时自动出现垂直滚动条
-        ui.listWidget_backupTables->setMaximumHeight(180);
-        ui.listWidget_backupTables->setMinimumHeight(0);
-        ui.listWidget_backupTables->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-        ui.listWidget_backupTables->setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
-
-        ui.Button_SelectAllTables->setVisible(true);
-        ui.Button_SelectAllTables->setMaximumHeight(QWIDGETSIZE_MAX);
-        ui.Button_SelectAllTables->setMinimumHeight(0);
-
-        ui.Button_InvertTableSelection->setVisible(true);
-        ui.Button_InvertTableSelection->setMaximumHeight(QWIDGETSIZE_MAX);
-        ui.Button_InvertTableSelection->setMinimumHeight(0);
-
-        ui.Button_RefreshBackupTables->setVisible(true);
-        ui.Button_RefreshBackupTables->setMaximumHeight(QWIDGETSIZE_MAX);
-        ui.Button_RefreshBackupTables->setMinimumHeight(0);
-    } else {
+    // if (bManualSelect) {
+    //     ui.listWidget_backupTables->setVisible(true);
+    //     // 列表高度跟随内容自动收缩，最大不超过 180px（≈7-8行+滚动条）
+    //     // AdjustToContents: 有 N 行就撑 N 行，无多余空白；超出 180px 时自动出现垂直滚动条
+    //     ui.listWidget_backupTables->setMaximumHeight(180);
+    //     ui.listWidget_backupTables->setMinimumHeight(0);
+    //     ui.listWidget_backupTables->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    //     ui.listWidget_backupTables->setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
+    //
+    //     ui.Button_SelectAllTables->setVisible(true);
+    //     ui.Button_SelectAllTables->setMaximumHeight(QWIDGETSIZE_MAX);
+    //     ui.Button_SelectAllTables->setMinimumHeight(0);
+    //
+    //     ui.Button_InvertTableSelection->setVisible(true);
+    //     ui.Button_InvertTableSelection->setMaximumHeight(QWIDGETSIZE_MAX);
+    //     ui.Button_InvertTableSelection->setMinimumHeight(0);
+    //
+    //     ui.Button_RefreshBackupTables->setVisible(true);
+    //     ui.Button_RefreshBackupTables->setMaximumHeight(QWIDGETSIZE_MAX);
+    //     ui.Button_RefreshBackupTables->setMinimumHeight(0);
+    // } else {
+    {
         ui.listWidget_backupTables->setVisible(false);
         ui.listWidget_backupTables->setMaximumHeight(0);
         ui.listWidget_backupTables->setMinimumHeight(0);
@@ -1986,17 +1987,19 @@ void CSE_DataRestoreDialog::updateBackupScopeWidgets()
     applyBackupLayout();
 }
 
-void CSE_DataRestoreDialog::on_radioButton_BackupAllData_toggled(bool checked)
-{
-    // 切换到 "备份全部数据" 时隐藏表列表
-    updateBackupScopeWidgets();
-}
-
-void CSE_DataRestoreDialog::on_radioButton_BackupSelectedTables_toggled(bool checked)
-{
-    // 切换到 "手动选择备份" 时显示表列表
-    updateBackupScopeWidgets();
-}
+// 【2026-09-22】这两个槽对应的单选框已在 data_restore.ui 里注释停用，
+// 槽本身不会再被 connectSlotsByName 连上（控件不存在），一并注释掉。
+// void CSE_DataRestoreDialog::on_radioButton_BackupAllData_toggled(bool checked)
+// {
+//     // 切换到 "备份全部数据" 时隐藏表列表
+//     updateBackupScopeWidgets();
+// }
+//
+// void CSE_DataRestoreDialog::on_radioButton_BackupSelectedTables_toggled(bool checked)
+// {
+//     // 切换到 "手动选择备份" 时显示表列表
+//     updateBackupScopeWidgets();
+// }
 
 void CSE_DataRestoreDialog::on_Button_SelectAllTables_clicked()
 {
@@ -2020,8 +2023,9 @@ void CSE_DataRestoreDialog::on_Button_RefreshBackupTables_clicked()
     on_Button_GetBackupDbList_clicked();
 }
 
-void CSE_DataRestoreDialog::on_Button_GetDatabases_clicked()
-{
-    // "获取数据库"按钮的槽函数，与刷新表列表共用同一逻辑
-    on_Button_GetBackupDbList_clicked();
-}
+// 【2026-09-22】「获取数据库」按钮已在 data_restore.ui 里注释停用，槽函数一并注释。
+// void CSE_DataRestoreDialog::on_Button_GetDatabases_clicked()
+// {
+//     // "获取数据库"按钮的槽函数，与刷新表列表共用同一逻辑
+//     on_Button_GetBackupDbList_clicked();
+// }

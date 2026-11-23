@@ -61,6 +61,9 @@
     <ClCompile Include="GeneratedFiles\Release\moc_se_auto_quality_check.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
+    <ClCompile Include="GeneratedFiles\Release\moc_se_check_params_dialog.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
     <ClCompile Include="ui_class\layer_type_select_dialog.cpp" />
     <ClCompile Include="ui_class\generalization_config_dialog.cpp" />
     <ClCompile Include="ui_class\se_data_import.cpp">
@@ -70,6 +73,9 @@
       <Filter>ui_class</Filter>
     </ClCompile>
     <ClCompile Include="ui_class\se_auto_quality_check.cpp">
+      <Filter>ui_class</Filter>
+    </ClCompile>
+    <ClCompile Include="ui_class\se_check_params_dialog.cpp">
       <Filter>ui_class</Filter>
     </ClCompile>
     <ClCompile Include="ui_class\se_mission453_check.cpp">

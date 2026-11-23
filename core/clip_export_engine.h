@@ -43,6 +43,10 @@ namespace ClipExportEngine
         QgsGeometry clipGeom;
         QgsCoordinateReferenceSystem clipCrs;
 
+        // 【2026-10-18】不裁剪：按源数据自身范围完整导出（直接作为数据源用）。
+        // 为 true 时忽略 clipGeom/clipCrs，矢量/栅格都按自身范围原样写出。
+        bool noClip = false;
+
         // 输出目录（多源导出使用）
         QString outputDir;
         // 单源导出时直接写该文件（路径带扩展名，如 .shp/.gpkg/.tif）

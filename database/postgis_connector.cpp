@@ -6,6 +6,15 @@
 #include <QSet>
 #include <QStringList>
 #include <QFile>
+#include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
+#include <QSettings>
+#include <QSqlDatabase>
+#include <QSqlError>
+#include <QSqlQuery>
+#include <QVariant>
+#include <algorithm>
 
 // libpq Large Object 访问模式常量（兼容部分 SDK 头文件未导出）
 #ifndef INV_WRITE
@@ -44,6 +53,13 @@ PostgisConnector::~PostgisConnector()
 bool PostgisConnector::connect(const QString& host, int port, const QString& dbName,
 								const QString& user, const QString& password)
 {
+	// 自动连接会依次尝试多个候选库，覆盖前先释放上一次的连接，避免 libpq 句柄泄漏
+	if (m_conn)
+	{
+		PQfinish(m_conn);
+		m_conn = nullptr;
+	}
+
 	QString connInfo = QString("host=%1 port=%2 dbname=%3 user=%4 password=%5")
 		.arg(host)
 		.arg(port)
@@ -63,6 +79,8 @@ bool PostgisConnector::connect(const QString& host, int port, const QString& dbN
 	}
 
 	m_connected = true;
+	m_dbName = dbName;
+	m_connectSource.clear();
 
 	// 连接成功后恢复之前设置的 search_path
 	if (!m_searchPath.isEmpty())
@@ -125,6 +143,213 @@ bool PostgisConnector::isConnected() const
 QString PostgisConnector::lastError() const
 {
 	return m_lastError;
+}
+
+namespace
+{
+	// 按应用目录向上探测 config/<fileName>（与平台 LTZKAuthManager 的查找顺序一致）
+	QString platformConfigPath(const QString& fileName)
+	{
+		const QString appDir = QCoreApplication::applicationDirPath();
+		const QStringList candidates = {
+			appDir + QStringLiteral("/config/") + fileName,
+			QDir(appDir).absoluteFilePath(QStringLiteral("../config/") + fileName),
+			QDir(appDir).absoluteFilePath(QStringLiteral("../../config/") + fileName),
+			QDir::currentPath() + QStringLiteral("/config/") + fileName
+		};
+		for (const QString& candidate : candidates)
+		{
+			if (QFileInfo::exists(candidate))
+				return QFileInfo(candidate).absoluteFilePath();
+		}
+		return QString();
+	}
+
+	// 越小越优先：平台左侧数据库列表 > 平台登录 > 本插件数据浏览 > 其它
+	int platformConnectionPriority(const QString& name)
+	{
+		if (name.startsWith(QStringLiteral("LTZKDataCatalogPostgisConnection")))
+			return 0;
+		if (name.startsWith(QStringLiteral("LTZKAuthPostgisConnection")))
+			return 1;
+		if (name.startsWith(QStringLiteral("CSE_DataCatalogPostgisConnection")))
+			return 2;
+		return 3;
+	}
+}
+
+bool PostgisConnector::ensureConnected(QString* outError)
+{
+	if (isConnected())
+		return true;
+
+	QString lastError;
+
+	// 只有真正含成果库数据表的库才可复用，避免连到平台里其它业务库
+	auto hasProductCatalog = [this]() -> bool
+	{
+		const QVariantMap row = executeQueryOne(
+			QStringLiteral("SELECT to_regclass('product_metadata') AS reg"));
+		return !row.value(QStringLiteral("reg")).toString().isEmpty();
+	};
+	auto rememberNoCatalog = [&lastError](const QString& database)
+	{
+		lastError = QString::fromUtf8("数据库「%1」中没有成果库数据表 product_metadata").arg(database);
+	};
+
+	// 1) 复用进程内已打开的 QPSQL 连接。插件与 LTZK 主程序在同一进程、
+	//    共用同一份 Qt5Sql，所以平台建立的连接（含内存中的密码）在这里可见。
+	QStringList connectionNames = QSqlDatabase::connectionNames();
+	std::stable_sort(connectionNames.begin(), connectionNames.end(),
+		[](const QString& a, const QString& b)
+		{
+			return platformConnectionPriority(a) < platformConnectionPriority(b);
+		});
+
+	for (const QString& name : connectionNames)
+	{
+		if (!QSqlDatabase::contains(name))
+			continue;
+		const QSqlDatabase sqlDb = QSqlDatabase::database(name, false);
+		if (!sqlDb.isValid() || !sqlDb.isOpen())
+			continue;
+		if (sqlDb.driverName().compare(QStringLiteral("QPSQL"), Qt::CaseInsensitive) != 0)
+			continue;
+		if (sqlDb.hostName().isEmpty() || sqlDb.databaseName().isEmpty())
+			continue;
+
+		QString schema = QStringLiteral("public");
+		QSqlQuery schemaQuery(sqlDb);
+		if (schemaQuery.exec(QStringLiteral("SELECT current_schema()")) && schemaQuery.next())
+		{
+			const QString current = schemaQuery.value(0).toString().trimmed();
+			if (!current.isEmpty())
+				schema = current;
+		}
+
+		const int port = sqlDb.port() > 0 ? sqlDb.port() : 5432;
+		if (connect(sqlDb.hostName(), port, sqlDb.databaseName(),
+			sqlDb.userName(), sqlDb.password()))
+		{
+			setSearchPath(schema);
+			if (hasProductCatalog())
+			{
+				const bool fromPlatform = platformConnectionPriority(name) <= 1;
+				m_connectSource = fromPlatform
+					? QString::fromUtf8("LTZK 平台数据库连接")
+					: QString::fromUtf8("已打开的数据库连接");
+				return true;
+			}
+			rememberNoCatalog(sqlDb.databaseName());
+			disconnect();
+			continue;
+		}
+		lastError = m_lastError;
+	}
+
+	// 2) 平台配置文件 config/database.ini（平台登录使用的连接，含密码）
+	const QString authIni = platformConfigPath(QStringLiteral("database.ini"));
+	if (!authIni.isEmpty())
+	{
+		QSettings ini(authIni, QSettings::IniFormat);
+		ini.setIniCodec("UTF-8");
+		const QString host = ini.value(QStringLiteral("db/host"), QStringLiteral("localhost")).toString().trimmed();
+		const int port = ini.value(QStringLiteral("db/port"), 5432).toInt();
+		const QString database = ini.value(QStringLiteral("db/database")).toString().trimmed();
+		const QString user = ini.value(QStringLiteral("db/user"), QStringLiteral("postgres")).toString().trimmed();
+		const QString password = ini.value(QStringLiteral("db/password")).toString();
+		const QString schema = ini.value(QStringLiteral("db/schema"), QStringLiteral("public")).toString().trimmed();
+		if (!database.isEmpty())
+		{
+			if (connect(host, port, database, user, password))
+			{
+				setSearchPath(schema);
+				if (hasProductCatalog())
+				{
+					m_connectSource = QString::fromUtf8("LTZK 平台配置 database.ini");
+					return true;
+				}
+				rememberNoCatalog(database);
+				disconnect();
+			}
+			else
+			{
+				lastError = m_lastError;
+			}
+		}
+	}
+
+	// 3) 平台左侧数据库列表保存的连接（默认不保存密码，靠 .pgpass/trust 时可用）
+	const QString catalogIni = platformConfigPath(QStringLiteral("data_catalog_connection.ini"));
+	if (!catalogIni.isEmpty())
+	{
+		QSettings ini(catalogIni, QSettings::IniFormat);
+		ini.setIniCodec("UTF-8");
+		if (ini.value(QStringLiteral("connection/remembered"), false).toBool())
+		{
+			const QString host = ini.value(QStringLiteral("connection/host")).toString().trimmed();
+			const int port = ini.value(QStringLiteral("connection/port"), QStringLiteral("5432")).toInt();
+			const QString database = ini.value(QStringLiteral("connection/database")).toString().trimmed();
+			const QString user = ini.value(QStringLiteral("connection/user")).toString().trimmed();
+			const QString password = ini.value(QStringLiteral("connection/password")).toString();
+			const QString schema = ini.value(QStringLiteral("connection/schema"), QStringLiteral("public")).toString().trimmed();
+			if (!host.isEmpty() && !database.isEmpty())
+			{
+				if (connect(host, port, database, user, password))
+				{
+					setSearchPath(schema);
+					if (hasProductCatalog())
+					{
+						m_connectSource = QString::fromUtf8("LTZK 平台数据库列表配置");
+						return true;
+					}
+					rememberNoCatalog(database);
+					disconnect();
+				}
+				else
+				{
+					lastError = m_lastError;
+				}
+			}
+		}
+	}
+
+	// 4) 本插件「数据库连接配置」保存过的参数
+	QSettings pluginSettings(QStringLiteral("GarMap"), QStringLiteral("MapProductManager"));
+	const QString pluginDb = pluginSettings.value(QStringLiteral("db/database")).toString().trimmed();
+	if (!pluginDb.isEmpty())
+	{
+		const QString host = pluginSettings.value(QStringLiteral("db/host"), QStringLiteral("localhost")).toString().trimmed();
+		const int port = pluginSettings.value(QStringLiteral("db/port"), 5432).toInt();
+		const QString user = pluginSettings.value(QStringLiteral("db/user"), QStringLiteral("postgres")).toString().trimmed();
+		const QString password = pluginSettings.value(QStringLiteral("db/savePassword"), false).toBool()
+			? pluginSettings.value(QStringLiteral("db/password")).toString()
+			: QString();
+		const QString schema = pluginSettings.value(QStringLiteral("db/schema"), QStringLiteral("public")).toString().trimmed();
+		if (connect(host, port, pluginDb, user, password))
+		{
+			setSearchPath(schema);
+			if (hasProductCatalog())
+			{
+				m_connectSource = QString::fromUtf8("插件已保存的数据库连接");
+				return true;
+			}
+			rememberNoCatalog(pluginDb);
+			disconnect();
+		}
+		else
+		{
+			lastError = m_lastError;
+		}
+	}
+
+	if (outError)
+	{
+		*outError = lastError.isEmpty()
+			? QString::fromUtf8("未找到可用的数据库连接参数（LTZK 平台未连接数据库，插件也未保存连接配置）")
+			: lastError;
+	}
+	return false;
 }
 
 PGresult* PostgisConnector::executeSQL(const QString& sql, const QVariantList& params)

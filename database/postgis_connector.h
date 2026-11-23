@@ -35,6 +35,16 @@ public:
 	bool isConnected() const;
 	QString lastError() const;
 
+	// 【2026-10-18】平台已连接数据库时自动复用连接：
+	// 依次尝试进程内已打开的 QPSQL 连接（平台登录 / 平台左侧数据库列表 /
+	// 本插件数据浏览）、平台 config/database.ini、插件已保存的连接参数。
+	// 当前已连接时直接返回 true，不做任何尝试。
+	bool ensureConnected(QString* outError = nullptr);
+
+	// 当前连接使用的数据库名 / 自动连接的来源说明（仅用于界面提示）
+	QString databaseName() const { return m_dbName; }
+	QString lastConnectSource() const { return m_connectSource; }
+
 	// Schema 搜索路径管理
 	void setSearchPath(const QString& schema);
 	QString searchPath() const;
@@ -89,6 +99,8 @@ private:
 	PGconn* m_conn = nullptr;
 	QString m_lastError;
 	QString m_searchPath;
+	QString m_dbName;
+	QString m_connectSource;
 	bool m_connected = false;
 };
 

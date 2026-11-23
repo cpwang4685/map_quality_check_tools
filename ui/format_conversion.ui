@@ -178,7 +178,7 @@
          </item>
          <item row="7" column="0">
           <widget class="QLabel" name="label_layerName">
-           <property name="text"><string>SHP图层名</string></property>
+           <property name="text"><string>图层名</string></property>
           </widget>
          </item>
          <item row="8" column="0">

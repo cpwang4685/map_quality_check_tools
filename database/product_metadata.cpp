@@ -538,6 +538,9 @@ DirectoryNode DirectoryNode::fromVariantMap(const QVariantMap& map)
 	node.sortOrder = map.value("sort_order", 0).toInt();
 	node.createdBy = map.value("created_by").toString();
 	node.createdAt = QDateTime::fromString(map.value("created_at").toString(), Qt::ISODate);
+	// 【2026-10-18】补读节点类型：原先漏了这一行，导致 node_type 恒为 0，
+	// 图层节点（1）与 GDB 容器目录（3）都无法识别
+	node.nodeType = map.value("node_type", 0).toInt();
 	return node;
 }
 

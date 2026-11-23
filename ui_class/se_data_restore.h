@@ -4,7 +4,9 @@
 #include <QDialog>
 #include <QDateTime>
 #include <QDir>
-#include <QButtonGroup>
+// 【2026-09-22】m_pScopeGroup 已注释停用（「备份范围」单选框整行注释掉了），
+// 这个头文件暂时没有别的用处，一并注释。
+// #include <QButtonGroup>
 
 #include "ui_data_restore.h"
 #include "map_check_common.h"
@@ -44,6 +46,11 @@ protected:
     // 第一次 show 时真正应用布局的 sizeHint
     void showEvent(QShowEvent* event) override;
 
+    // 关闭（点 X / Esc / 程序退出时的自动关闭）时先把路径等设置落盘。
+    // 这个对话框是 new 出来且没有父对象的，光靠析构函数存不住：以前 saveState()
+    // 只在析构里调用，而对话框从来不析构，所以设置一次都没写进注册表。
+    void closeEvent(QCloseEvent* event) override;
+
 private:
     Ui_DataRestoreDialog ui;
 
@@ -57,8 +64,10 @@ private:
     // ===== 数据库备份配置（新增） =====
     BackupDataSource m_eBackupDataSource = BackupDataSource::FileSystem;
 
+    // 【2026-09-22】「备份范围」两个单选框已注释停用，这个按钮组不再需要。
+    // 恢复"指定表备份"时，这一行要和 se_data_restore.cpp 构造函数里那三行同时恢复。
     // 数据库备份范围/方式/格式的 QButtonGroup（分组互斥）
-	QButtonGroup* m_pScopeGroup = nullptr;
+	// QButtonGroup* m_pScopeGroup = nullptr;
 
     // ===== 恢复相关成员 =====
     QString m_qstrBackupDir;         // 备份存放目录
@@ -149,9 +158,11 @@ public slots:
     void on_radioButton_SourceDatabase_toggled(bool checked);
     void on_radioButton_SourceAll_toggled(bool checked);
     void on_Button_GetBackupDbList_clicked();
-    void on_Button_GetDatabases_clicked();
-    void on_radioButton_BackupAllData_toggled(bool checked);
-    void on_radioButton_BackupSelectedTables_toggled(bool checked);
+    // 【2026-09-22】以下三个槽对应的控件已在 data_restore.ui 里注释停用，
+    // 声明与定义（se_data_restore.cpp 末尾）同时注释。
+    // void on_Button_GetDatabases_clicked();
+    // void on_radioButton_BackupAllData_toggled(bool checked);
+    // void on_radioButton_BackupSelectedTables_toggled(bool checked);
     void on_Button_DbTargetBrowse_clicked();
     void on_lineEdit_DbTargetPath_textChanged(const QString& text);
     void on_Button_SelectAllTables_clicked();
@@ -167,7 +178,6 @@ public slots:
     void on_Button_DeleteBackup_clicked();
     void on_Button_RestoreApply_clicked();
 
-    void on_comboBox_BackupTypeFilter_currentIndexChanged(int index);
     void on_radioButton_RestoreToOriginal_toggled(bool checked);
     void on_radioButton_RestoreToCustom_toggled(bool checked);
     void on_radioButton_RestoreToDatabase_toggled(bool checked);

@@ -1,5 +1,6 @@
 /*--------------SE---------------*/
 #include "se_range_export.h"
+#include "core/dialog_size_helper.h"
 
 /*--------------QT---------------*/
 #include <QSignalBlocker>
@@ -101,6 +102,9 @@ CSE_RangeExportDialogUi::CSE_RangeExportDialogUi(QgsMapCanvas* canvas, QgisInter
     // 注意：按钮/单选按钮信号已由 setupUi() 中的 connectSlotsByName 自动连接
     //（on_radioButton_inputCoord_toggled / on_comboBox_field_currentIndexChanged 等），
     // 不需要手动 connect，否则会造成槽函数被调用两次。
+
+    // 弹出后按内容自适应；内容放得下则固定尺寸
+    DialogSizeHelper::fitToContents(this);
 }
 
 CSE_RangeExportDialogUi::~CSE_RangeExportDialogUi()
@@ -403,6 +407,13 @@ void CSE_RangeExportDialogUi::on_Button_OK_clicked()
         return;
     }
 
+    // 【2026-10-18】范围可选：本对话框只用来选格式和输出路径，不校验范围
+    if (m_bRangeOptional)
+    {
+        accept();
+        return;
+    }
+
     switch (ui.stackedWidget_pages->currentIndex())
     {
     case RangeInputCoord:
@@ -496,6 +507,43 @@ void CSE_RangeExportDialogUi::setAutoLoadAfterExport(bool on)
 bool CSE_RangeExportDialogUi::autoLoadAfterExport() const
 {
     return ui.checkBox_autoLoad->isChecked();
+}
+
+// 【2026-10-18】只取格式/输出路径，不要求导出范围
+void CSE_RangeExportDialogUi::setRangeOptional(bool on)
+{
+    m_bRangeOptional = on;
+
+    // 【2026-10-18】本模式下范围无意义：范围相关控件直接隐藏（不是置灰），
+    // 对话框只留格式、输出路径、自动加载与确定/取消。
+    ui.label_mode->setVisible(!on);
+    ui.radioButton_inputCoord->setVisible(!on);
+    ui.radioButton_manualDraw->setVisible(!on);
+    ui.radioButton_selectFeature->setVisible(!on);
+    ui.stackedWidget_pages->setVisible(!on);
+
+    // 模式行的横向占位也随之收起，避免隐藏后还留一条空行高度
+    ui.horizontalSpacer_mode->changeSize(on ? 0 : 40, on ? 0 : 20,
+        QSizePolicy::Expanding, QSizePolicy::Minimum);
+    ui.gridLayout_2->invalidate();
+
+    // 【2026-10-18】构造函数末尾的 fitToContents() 已经把窗口 setFixedSize，
+    // 隐藏控件后尺寸被固定住、收缩不了（对话框中间留一大片空白）。这里先解除
+    // 固定，再按剩下的控件重新自适应一次。
+    if (on)
+    {
+        setMinimumSize(0, 0);
+        setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+        ui.gridLayout_2->invalidate();
+        if (QLayout* lay = layout())
+            lay->activate();
+        DialogSizeHelper::fitToContents(this);
+    }
+}
+
+bool CSE_RangeExportDialogUi::rangeOptional() const
+{
+    return m_bRangeOptional;
 }
 
 QgsRectangle CSE_RangeExportDialogUi::exportExtent() const { return m_rect; }

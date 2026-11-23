@@ -1,5 +1,6 @@
 /*--------------SE---------------*/
 #include "se_main_area_clip.h"
+#include "core/dialog_size_helper.h"
 
 /*--------------QT---------------*/
 #include <QFileDialog>
@@ -8,6 +9,7 @@
 #include <QDir>
 #include <QListWidget>
 #include <QListWidgetItem>
+#include <QRegularExpression>
 #include <cmath>
 #include <algorithm>
 
@@ -117,6 +119,9 @@ CSE_MainAreaClipDialogUi::CSE_MainAreaClipDialogUi(QWidget* parent)
     on_comboBox_format_currentIndexChanged(ui.comboBox_format->currentIndex());
     // 4) 制图比例尺：尚未选择主区要素时为空
     refreshCartographicScale();
+
+    // 弹出后按内容自适应；内容放得下则固定尺寸
+    DialogSizeHelper::fitToContents(this);
 }
 
 CSE_MainAreaClipDialogUi::~CSE_MainAreaClipDialogUi()
@@ -201,6 +206,51 @@ void CSE_MainAreaClipDialogUi::reloadFeatures()
         item->setToolTip(tr("fid=%1，标识字段=%2").arg(fid).arg(name));
         ++dispIdx;
     }
+
+    // 重新填充后沿用当前搜索关键字，保持筛选结果
+    applyFeatureFilter(ui.lineEdit_featureFilter->text());
+}
+
+// 按关键字模糊筛选要素列表：不匹配的行隐藏（保留已选中状态，便于跨关键字累加选择）。
+// 多个关键字以空格分隔，需全部命中；匹配范围为显示文本与 fid，不区分大小写。
+void CSE_MainAreaClipDialogUi::applyFeatureFilter(const QString& keyword)
+{
+    QListWidget* list = ui.listWidget_features;
+    if (!list) return;
+
+    // 【2026-10-25】Qt 5.12 兼容：Qt::SkipEmptyParts 是 Qt 5.14 才有的枚举，
+    // 麒麟侧是 Qt 5.12.12，统一用 QString::SkipEmptyParts（5.15 上仅 deprecated 警告）。
+    const QStringList keys = keyword.trimmed().split(QRegularExpression(QStringLiteral("\\s+")),
+        QString::SkipEmptyParts);
+    const int n = list->count();
+    for (int i = 0; i < n; ++i)
+    {
+        QListWidgetItem* item = list->item(i);
+        if (!item) continue;
+        if (keys.isEmpty())
+        {
+            list->setRowHidden(i, false);
+            continue;
+        }
+        const QString haystack = item->text() + QLatin1String(" ")
+            + item->data(Qt::UserRole).toString();
+        const QString lower = haystack.toLower();
+        bool matched = true;
+        for (const QString& k : keys)
+        {
+            if (!lower.contains(k.toLower()))
+            {
+                matched = false;
+                break;
+            }
+        }
+        list->setRowHidden(i, !matched);
+    }
+}
+
+void CSE_MainAreaClipDialogUi::on_lineEdit_featureFilter_textChanged(const QString& text)
+{
+    applyFeatureFilter(text);
 }
 
 void CSE_MainAreaClipDialogUi::on_comboBox_field_currentIndexChanged(int /*index*/)
@@ -460,13 +510,33 @@ double CSE_MainAreaClipDialogUi::cartographicScaleDenominator() const
     return groundH / paperH_m;   // 经线方向（高度方向）
 }
 
-// 刷新"制图比例尺"文本框显示（形如 1:12345）
+// "推荐比例尺"默认取值：大于制图比例尺分母的最小"万"位整数。
+// 例：分母 282887 → 290000（29万）；分母 290000 → 300000（30万）
+static qint64 recommendedScaleDenominator(double cartographicDenom)
+{
+    if (cartographicDenom <= 0.0) return 0;
+    const qint64 d = static_cast<qint64>(std::floor(cartographicDenom));
+    return (d / 10000 + 1) * 10000;
+}
+
+// 刷新"制图比例尺"文本框显示（形如 1:12345），
+// 并在制图比例尺发生变化时，把"推荐比例尺"默认填为大于该分母的最小万位整数
 void CSE_MainAreaClipDialogUi::refreshCartographicScale()
 {
     const double s = cartographicScaleDenominator();
     ui.lineEdit_cartScale->setText(s > 0.0
         ? QStringLiteral("1:%1").arg(QString::number(s, 'f', 0))
         : QString());
+
+    // 仅在制图比例尺真正变化（或首次算出）时覆盖推荐比例尺，
+    // 避免把用户手工填写的比例尺反复冲掉
+    if (s > 0.0 && std::fabs(s - m_lastCartScaleDenom) > 0.5)
+    {
+        const qint64 rec = recommendedScaleDenominator(s);
+        if (rec > 0)
+            ui.comboBox_standardScale->setCurrentText(QString::number(rec));
+    }
+    m_lastCartScaleDenom = s;
 }
 
 void CSE_MainAreaClipDialogUi::on_listWidget_features_itemSelectionChanged()

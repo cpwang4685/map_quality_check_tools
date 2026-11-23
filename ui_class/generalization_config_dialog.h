@@ -26,6 +26,8 @@
 #include <QThread>
 #include <QXmlStreamReader>
 
+class QgisInterface;
+
 // ============================================================================
 // GeneralizationWorker — 在子线程中调用 DoXMLFile，逐 Link 发送进度信号
 // ============================================================================
@@ -72,11 +74,21 @@ public:
     explicit GeneralizationConfigDialog(QWidget* parent = nullptr);
     ~GeneralizationConfigDialog() override;
 
+    // 【2026-10-18】「从数据库获取数据」弹出的数据源对话框需要地图画布
+    // （按范围导出要手动绘制/选择要素），由插件入口注入。
+    void setQgisInterface(QgisInterface* iface);
+
     QString shpDirectory() const;
     QString gdbDirectory() const;   // 【2026-09-09】GDB 数据页：GDB 目录选择
     QString convXmlPath() const;    // 【2026-09-09】GDB 数据页：gdb→shp 转换知识库 XML 路径
     QString configXmlPath() const;
     QString outputDirectory() const;
+    // 【2026-10-10】注记工程目录：里面放甲方提供的 .2dm 地图工程文件（可多个）。
+    // 综合执行前会把该目录下所有 *.2dm 拷进结果目录——知识库里 <ProjectFile> 只写
+    // 文件名，引擎按 DoXMLFile 的 relativePath（= 结果目录）去解析，所以两者必须同处一地。
+    // 【2026-10-13】原来配套的「复制到结果目录」复选框已按需求去掉：目录非空就一律拷，
+    // 留空则什么都不做（视为该知识库没有 405 注记步骤）。
+    QString labelProjectDir() const;
     bool    isFileSystemSource() const;   // 仅文件系统数据源，恒 true
     // bool  isDatabaseSource() const;     // 【2026-08-23】PostGIS 数据库源已注释（与地图数据下载 UI 重复）
 
@@ -92,10 +104,17 @@ private slots:
     void onRunGdb2Shp();      // 【2026-09-09】GDB 数据页：执行 gdb→shp 转换
     void onBrowseConfigXml();
     void onBrowseOutputDir();
+    void onBrowseLabelProjectDir();   // 【2026-10-10】注记工程目录浏览
+    // 【2026-11-08】打开无极地图工作系统，用于制作 .2dm 注记工程文件
+    void onOpenLabelProjectMaker();
+    // 【2026-10-18】打开「从数据库获取数据源」对话框
+    void onOpenProductSource();
     // void onTestDbConnection();
     // void onFetchData();
     // void onSelectLayerTypes();
     void onSelectFsLayerTypes();
+    // 【2026-11-02】按当前数据重新识别「制图主区名称」
+    void onDetectMainRegion();
     void onExecute();
 
     // ---- Worker 信号回调 (主线程) ----
@@ -110,6 +129,8 @@ private:
     // QButtonGroup* m_btnGroupSource = nullptr;
 
     // ---- 文件系统面板 ----
+    // 【2026-10-18】QGIS 接口（由插件入口注入），供「从数据库获取数据源」使用
+    QgisInterface* m_pQgisIface = nullptr;
     QWidget*      m_widgetFileInput = nullptr;
     QLineEdit*    m_lineEditShpDir  = nullptr;
     QPushButton*  m_btnSelectFsLayerTypes = nullptr;
@@ -158,7 +179,23 @@ private:
     // ---- 公共配置 ----
     QLineEdit*    m_lineEditConfigXml   = nullptr;
     QLineEdit*    m_lineEditOutputDir   = nullptr;
+    // 【2026-10-10】注记工程目录（.2dm 所在文件夹）
+    // 【2026-10-13】原「复制到结果目录」复选框（m_chkCopyLabelProject）已去掉
+    QLineEdit*    m_lineEditLabelProjectDir = nullptr;
+    // 【2026-11-02】制图主区名称：放在「自定义综合比例尺」按钮右侧同一行。
+    // 从矢量数据里的 BOUA5（县级行政区划面）自动识别，用户可手改；
+    // 执行前据此校验知识库中是否存在对应县的预处理/后处理 XML，并把主 XML 的
+    // Link 切到该县（只改 Link，不改县 XML 内容）。
+    QLineEdit*    m_lineEditMainRegion  = nullptr;
     QPushButton*  m_btnExecute          = nullptr;
+
+    // ---- 【2026-10-23】GDB 输入（路线B）----
+    // 知识库没有 GDB→SHP 转换步骤时，插件自己把 GDB 转成 SHP 工作副本再跑整条链；
+    // 知识库里那条 EsriGDB→SHP 的成果导出步骤不在链里跑，改由整链结束后按它的
+    // <LayerNameList> 平铺导出。m_gdbExportXml 非空 = 本次需要做导出。
+    QString       m_gdbExportXml;
+    QString       m_exportSummary;   // 导出结果文案（拼到完成弹窗里）
+    void runGdbExportStep(const QString& xmlPath);
 
     // ---- 子线程 Worker ----
     QThread*              m_workerThread = nullptr;
@@ -167,6 +204,28 @@ private:
 
     // ---- 内部方法 ----
     void connectSignals();
+    // 【2026-11-02】从数据源（FileGDB / SHP 目录）里的 BOUA5 识别主区名称。
+    // 规则：跳过 NAME 以「属」开头的裁剪碎片，只认 AreaCode=620000（甘肃），
+    // 按要素几何面积取最大；识别不到返回空串。
+    QString detectMainRegionName(const QString& dataPath) const;
+    // 【2026-11-07】主区名称改为「改 SQL、不切 Link」：
+    // 顺着主 XML 里 1数据预处理_区县\<县名>.xml 这条 Link 找到被指向的那个县 XML
+    //（跳过 预处理 / 预处理新增 / 分层改名 这些公共文件），只把它里面
+    // <Mission id="11" note="属性查询:县级行政区划面"> 的
+    // <SQL>NAME LIKE '%<县名>'</SQL> 中的县名换成 region。
+    // Link 本身、县 XML 的其它内容一律不动，也不做 .bak 备份。
+    // 返回改动的 SQL 条数（0 = 没找到 Link / 没找到该 Mission / 已经是目标县名）。
+    int applyMainRegionToXml(const QString& xmlPath, const QString& region);
+    // 【2026-11-07】给结果目录（含子目录）里每个 .dbf 补一个 .cpg 编码声明。
+    // NMO 引擎按知识库的 Encoding_UTF8 落盘，但 DBF 头部的 LDID 固定写成 0x57(CP936)，
+    // 也不生成 .cpg；GDAL/QGIS 读的时候没有 .cpg 可参考就按 Latin-1 解，属性表中文全乱。
+    // 这里读第一条记录的字符字段判断实际编码（UTF-8 / CP936），写进 .cpg；
+    // 已有 .cpg 的不覆盖。返回新写的个数。
+    int writeDbfCpgFiles(const QString& rootDir);
+    // 【2026-10-10】把注记工程目录下的 *.2dm 拷进结果目录（保留原文件名）。
+    // 返回 false 表示已弹错/用户选择中止，调用方直接 return。
+    // 目录为空（未填）时视为"本知识库无注记步骤"，不拷不报错，返回 true。
+    bool copyLabelProjectFiles(const QString& outDir);
     // 【2026-09-09】通用启动一次 DoXMLFile 任务（onExecute / onRunGdb2Shp 共用）
     void startWorkerRun(const QString& xmlDir, const QString& dataDir,
                         const QVector<GeneralizationWorker::LinkEntry>& links,

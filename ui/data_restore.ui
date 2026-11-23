@@ -464,6 +464,11 @@
              </property>
             </widget>
            </item>
+                <!-- 【2026-09-22】「获取数据库」「设为默认」两个按钮已注释停用：
+                     「获取数据库」原本是加载数据库表列表的入口（与「刷新表列表」走同一个槽
+                     on_Button_GetBackupDbList_clicked），既然"指定表备份"不再需要，一并停用。
+                     注：「设为默认」在代码里本来就没有任何引用（连槽函数都没有写）。
+                     要恢复：把下面两个 <item> 外层的注释符号去掉即可。
                 <item>
                  <widget class="QPushButton" name="Button_GetDatabases">
                   <property name="text">
@@ -478,6 +483,7 @@
                   </property>
                  </widget>
                 </item>
+                -->
                 <item>
                  <spacer name="horizontalSpacer_dbButtons">
                   <property name="orientation">
@@ -493,7 +499,14 @@
                 </item>
                </layout>
               </item>
-              <!-- 备份范围 -->
+              <!-- 【2026-09-22】「备份范围:」标签 + 「备份全部数据」「手动选择备份」两个单选框
+                   已整行注释停用。数据库备份范围现在恒为"整个数据库"（代码里固定成
+                   DatabaseBackupScope::WholeDatabase），与以前选「备份全部数据」时一致。
+                   下面那个表选择列表（listWidget_backupTables）和它的「刷新表列表/全选/反选」
+                   三个按钮仍然保留在文件里、代码也仍然在跑，只是按设计恒为隐藏状态
+                   （见 se_data_restore.cpp 的 updateBackupScopeWidgets()），
+                   方便以后要恢复"指定表备份"时改动最小。
+                   要恢复：去掉下面 <item> 外层的注释符号即可。
               <item>
                <layout class="QHBoxLayout" name="horizontalLayout_backupScope">
                 <property name="spacing">
@@ -544,6 +557,7 @@
                 </item>
                </layout>
               </item>
+              -->
               <!-- 手动选择表列表 -->
               <item>
               <widget class="QListWidget" name="listWidget_backupTables">
@@ -637,7 +651,7 @@
                    </size>
                   </property>
                   <property name="text">
-                   <string>C:/Users/lenovo/Desktop/1</string>
+                   <string/>
                   </property>
                  </widget>
                 </item>
@@ -699,7 +713,7 @@
              <item row="0" column="1">
               <widget class="QLineEdit" name="lineEdit_SourcePath">
                <property name="text">
-                <string>C:/Users/lenovo/Desktop/2</string>
+                <string/>
                </property>
               </widget>
              </item>
@@ -720,7 +734,7 @@
              <item row="1" column="1">
               <widget class="QLineEdit" name="lineEdit_TargetPath">
                <property name="text">
-                <string>C:/Users/lenovo/Desktop/1</string>
+                <string/>
                </property>
               </widget>
              </item>
@@ -863,7 +877,7 @@
           <item>
            <widget class="QLineEdit" name="lineEdit_BackupDir">
             <property name="text">
-             <string>C:/Users/lenovo/Desktop/1</string>
+             <string/>
             </property>
            </widget>
           </item>
@@ -885,57 +899,10 @@
         </widget>
        </item>
        <!-- 备份列表 -->
-       <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_filter">
-         <property name="spacing">
-          <number>2</number>
-         </property>
-         <item>
-          <widget class="QLabel" name="label_filter">
-           <property name="text">
-            <string>备份类型过滤:</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QComboBox" name="comboBox_BackupTypeFilter">
-           <item>
-            <property name="text">
-             <string>全部类型</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>文件备份</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>数据库备份</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>全量备份</string>
-            </property>
-           </item>
-          </widget>
-         </item>
-         <item>
-          <spacer name="horizontalSpacer_filter">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-        </layout>
-       </item>
+       <!-- 【2026-09-22】原「备份类型过滤:」标签 + comboBox_BackupTypeFilter 下拉框
+            （全部类型/文件备份/数据库备份/全量备份）已整行移除。
+            原因：备份策略现在只剩"全量备份"一种类型，过滤条件恒等于"全部类型"，
+            下拉框选了也没区别，属于多余控件。备份列表始终显示全部扫描结果。 -->
        <item>
         <widget class="QGroupBox" name="groupBox_backupList">
          <property name="title">
@@ -1136,7 +1103,7 @@
                <item>
                 <widget class="QLineEdit" name="lineEdit_RestoreOriginalPath">
                  <property name="text">
-                  <string>C:/Users/lenovo/Desktop</string>
+                  <string/>
                  </property>
                 </widget>
                </item>
@@ -1180,7 +1147,7 @@
                <item>
                 <widget class="QLineEdit" name="lineEdit_RestoreDstPath">
                  <property name="text">
-                  <string>C:/Users/lenovo/Desktop/restore</string>
+                  <string/>
                  </property>
                 </widget>
                </item>

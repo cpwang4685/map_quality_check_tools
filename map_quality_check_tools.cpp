@@ -17,6 +17,10 @@
 #include <QFileInfo>
 #include <QCoreApplication>
 #include <QDir>
+// 【2026-10-09】插件工具窗口管理：QApplication 取 qApp、QEvent 判关闭事件、QTimer 延后一拍
+#include <QApplication>
+#include <QEvent>
+#include <QTimer>
 
 /*-------------SE---------------------*/
 
@@ -371,6 +375,15 @@ void CGarMap_MapQualityCheckToolsPlugin::initGui()
 	mQGisIface->addToolBarIcon(mActionParamConfig);
 	mQGisIface->addPluginToVectorMenu(tr("&参数配置"), mActionParamConfig);
 
+	/*【2026-10-09】装好"平台主界面关闭 → 插件窗口跟随关闭"的监视。
+	  放在这里是为了在第一个窗口打开之前就备好；若此刻 mainWindow() 还拿不到，
+	  hostWindow() 会在第一次打开窗口时再补装。*/
+	hostWindow();
+
+	// 兜底：万一平台走的是 qApp->quit() 而不是关主窗口，也要把窗口收干净。
+	connect(qApp, &QCoreApplication::aboutToQuit,
+		this, &CGarMap_MapQualityCheckToolsPlugin::closeAllToolWindows);
+
 	// 启动定时备份后台管理器（仅在启用时启动）
 	CMapCheckBackupManager::instance()->loadSettings();
 	if (CMapCheckBackupManager::instance()->isEnabled())
@@ -420,9 +433,11 @@ void CGarMap_MapQualityCheckToolsPlugin::initGui()
 
 void CGarMap_MapQualityCheckToolsPlugin::Test()
 {
-	CSE_VectorFormatConversionDialog* pDlg = new CSE_VectorFormatConversionDialog(nullptr, Qt::WindowCloseButtonHint);
-	pDlg->setModal(false);
-	pDlg->show();
+	openToolWindow(QStringLiteral("VectorFormatConversion"), [this]() -> QWidget* {
+		auto* pDlg = new CSE_VectorFormatConversionDialog(nullptr, Qt::WindowCloseButtonHint);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 
@@ -435,83 +450,108 @@ void CGarMap_MapQualityCheckToolsPlugin::openDbConfig()
 
 void CGarMap_MapQualityCheckToolsPlugin::openGeneralizationConfig()
 {
-	GeneralizationConfigDialog* pDlg = new GeneralizationConfigDialog(nullptr);
-	pDlg->setAttribute(Qt::WA_DeleteOnClose);
-	pDlg->setModal(false);
-	pDlg->show();
+	// 【2026-10-09】WA_DeleteOnClose 已由 openToolWindow 统一设置。
+	openToolWindow(QStringLiteral("GeneralizationConfig"), [this]() -> QWidget* {
+		auto* pDlg = new GeneralizationConfigDialog(nullptr);
+		// 【2026-10-18】「从数据库获取数据源」里的按范围导出需要地图画布
+		pDlg->setQgisInterface(mQGisIface);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 void CGarMap_MapQualityCheckToolsPlugin::DataImportToPostGIS()
 {
-	CSE_DataImportDialog* pDlg = new CSE_DataImportDialog(nullptr, Qt::WindowCloseButtonHint);
-	pDlg->setModal(false);
-	pDlg->show();
+	openToolWindow(QStringLiteral("DataImportToPostGIS"), [this]() -> QWidget* {
+		auto* pDlg = new CSE_DataImportDialog(nullptr, Qt::WindowCloseButtonHint);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 void CGarMap_MapQualityCheckToolsPlugin::AutoQualityCheck()
 {
-	CSE_AutoQualityCheckDialog* pDlg = new CSE_AutoQualityCheckDialog(nullptr, Qt::WindowCloseButtonHint);
-	pDlg->setModal(false);
-	pDlg->show();
+	openToolWindow(QStringLiteral("AutoQualityCheck"), [this]() -> QWidget* {
+		auto* pDlg = new CSE_AutoQualityCheckDialog(nullptr, Qt::WindowCloseButtonHint);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 void CGarMap_MapQualityCheckToolsPlugin::DataRestore()
 {
-	CSE_DataRestoreDialog* pDlg = new CSE_DataRestoreDialog(nullptr, Qt::WindowCloseButtonHint);
-	pDlg->setModal(false);
-	pDlg->show();
+	openToolWindow(QStringLiteral("DataRestore"), [this]() -> QWidget* {
+		auto* pDlg = new CSE_DataRestoreDialog(nullptr, Qt::WindowCloseButtonHint);
+		// 关窗即销毁（openToolWindow 里统一设的）：这个对话框没有父对象，不设这个属性
+		// 的话关掉之后既不会析构（内存泄漏），也没机会把"上次用的路径"存下来。
+		// 析构和 closeEvent 里都会 saveState()，双保险。
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 void CGarMap_MapQualityCheckToolsPlugin::DatabaseConnection()
 {
-	CSE_DatabaseConnectionDialog* pDlg = new CSE_DatabaseConnectionDialog(nullptr, Qt::WindowCloseButtonHint);
-	pDlg->setModal(false);
-	pDlg->show();
+	openToolWindow(QStringLiteral("DatabaseConnection"), [this]() -> QWidget* {
+		auto* pDlg = new CSE_DatabaseConnectionDialog(nullptr, Qt::WindowCloseButtonHint);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 void CGarMap_MapQualityCheckToolsPlugin::DataManagement()
 {
 	// 【2026-08-24】数据导出主入口：se_data_list_export（数据列表式导出，与样例包行为一致：批量/按条件/按范围/按主区裁切，
 	// 功能入口在数据树节点右键菜单，见 CSE_DataListExportDialog）
-	CSE_DataListExportDialog* pDlg = new CSE_DataListExportDialog(nullptr);
-	pDlg->setWindowFlags(pDlg->windowFlags() | Qt::WindowCloseButtonHint);
-	pDlg->setQgisInterface(mQGisIface);
-	pDlg->setModal(false);
-	pDlg->show();
+	openToolWindow(QStringLiteral("DataManagement"), [this]() -> QWidget* {
+		auto* pDlg = new CSE_DataListExportDialog(nullptr);
+		pDlg->setWindowFlags(pDlg->windowFlags() | Qt::WindowCloseButtonHint);
+		pDlg->setQgisInterface(mQGisIface);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 
 void CGarMap_MapQualityCheckToolsPlugin::Clip()
 {
-	ClipDialog* pDlg = new ClipDialog(mQGisIface, nullptr, Qt::WindowCloseButtonHint);
-	pDlg->setModal(false);
-	pDlg->show();
+	openToolWindow(QStringLiteral("Clip"), [this]() -> QWidget* {
+		auto* pDlg = new ClipDialog(mQGisIface, nullptr, Qt::WindowCloseButtonHint);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 void CGarMap_MapQualityCheckToolsPlugin::Merge()
 {
-	MergeDialog* pDlg = new MergeDialog(nullptr, Qt::WindowCloseButtonHint);
-	// 对话框只发 addLayerToMap 信号（与平台无关）。
-	// 集成到非 QGIS 平台时，替换下面这段 connect 为对方系统的图层加载接口即可。
-	connect(pDlg, &MergeDialog::addLayerToMap, this, [this](const QString& path) {
-		mQGisIface->addVectorLayer(path, QFileInfo(path).completeBaseName(), QStringLiteral("ogr"));
+	openToolWindow(QStringLiteral("Merge"), [this]() -> QWidget* {
+		auto* pDlg = new MergeDialog(nullptr, Qt::WindowCloseButtonHint);
+		// 对话框只发 addLayerToMap 信号（与平台无关）。
+		// 集成到非 QGIS 平台时，替换下面这段 connect 为对方系统的图层加载接口即可。
+		connect(pDlg, &MergeDialog::addLayerToMap, this, [this](const QString& path) {
+			mQGisIface->addVectorLayer(path, QFileInfo(path).completeBaseName(), QStringLiteral("ogr"));
+		});
+		pDlg->setModal(false);
+		return pDlg;
 	});
-	pDlg->setModal(false);
-	pDlg->show();
 }
 
 void CGarMap_MapQualityCheckToolsPlugin::FormatConversion()
 {
-	FormatConversionDialog* pDlg = new FormatConversionDialog(nullptr, Qt::WindowCloseButtonHint);
-	pDlg->setModal(false);
-	pDlg->show();
+	openToolWindow(QStringLiteral("FormatConversion"), [this]() -> QWidget* {
+		auto* pDlg = new FormatConversionDialog(nullptr, Qt::WindowCloseButtonHint);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 void CGarMap_MapQualityCheckToolsPlugin::AutoEdgeMatch()
 {
-	AutoEdgeMatchDialog* pDlg = new AutoEdgeMatchDialog(nullptr, Qt::WindowCloseButtonHint);
-	pDlg->setModal(false);
-	pDlg->show();
+	openToolWindow(QStringLiteral("AutoEdgeMatch"), [this]() -> QWidget* {
+		auto* pDlg = new AutoEdgeMatchDialog(nullptr, Qt::WindowCloseButtonHint);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 // ====== 地图成果管理槽函数 ======
@@ -567,10 +607,12 @@ void CGarMap_MapQualityCheckToolsPlugin::ProductStorage()
 		return;
 	}
 
-	ProductStorageDialog* pDlg = new ProductStorageDialog(nullptr, Qt::WindowCloseButtonHint);
-	pDlg->setQgisInterface(mQGisIface);
-	pDlg->setModal(false);
-	pDlg->show();
+	openToolWindow(QStringLiteral("ProductStorage"), [this]() -> QWidget* {
+		auto* pDlg = new ProductStorageDialog(nullptr, Qt::WindowCloseButtonHint);
+		pDlg->setQgisInterface(mQGisIface);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 void CGarMap_MapQualityCheckToolsPlugin::MetadataManager()
@@ -589,17 +631,19 @@ void CGarMap_MapQualityCheckToolsPlugin::MetadataManager()
 		return;
 	}
 
-	MetadataManagerDialog* pDlg = new MetadataManagerDialog(nullptr, Qt::WindowCloseButtonHint);
-	// 传入 QGIS 接口，启用"添加到地图"功能（新增的按目录树/按钮入口需要）
-	pDlg->setQgisInterface(mQGisIface);
-	// 继承全局深色 QSS（与上游一致）：追加透明规则，让 tab 页与栈容器透出 pane 深色背景
-	QString dlgStyle = qApp->styleSheet();
-	dlgStyle += QStringLiteral(
-		"\nQTabWidget#mCompileTabWidget > QStackedWidget,"
-		"\nQTabWidget#mCompileTabWidget > QStackedWidget > QWidget { background: transparent; }");
-	pDlg->setStyleSheet(dlgStyle);
-	pDlg->setModal(false);
-	pDlg->show();
+	openToolWindow(QStringLiteral("MetadataManager"), [this]() -> QWidget* {
+		auto* pDlg = new MetadataManagerDialog(nullptr, Qt::WindowCloseButtonHint);
+		// 传入 QGIS 接口，启用"添加到地图"功能（新增的按目录树/按钮入口需要）
+		pDlg->setQgisInterface(mQGisIface);
+		// 继承全局深色 QSS（与上游一致）：追加透明规则，让 tab 页与栈容器透出 pane 深色背景
+		QString dlgStyle = qApp->styleSheet();
+		dlgStyle += QStringLiteral(
+			"\nQTabWidget#mCompileTabWidget > QStackedWidget,"
+			"\nQTabWidget#mCompileTabWidget > QStackedWidget > QWidget { background: transparent; }");
+		pDlg->setStyleSheet(dlgStyle);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 void CGarMap_MapQualityCheckToolsPlugin::AccessControl()
@@ -619,10 +663,16 @@ void CGarMap_MapQualityCheckToolsPlugin::AccessControl()
 	}
 
 	ProductDAO dao;
-	AccessControlDialog* pDlg = new AccessControlDialog(&dao, nullptr, Qt::WindowCloseButtonHint);
-	pDlg->setCurrentOperator(gCurrentUserSession.userName);
-	pDlg->setModal(false);
-	pDlg->show();
+	// 【2026-10-09】&dao 是按引用捕获：openToolWindow 会**同步**调用这个 lambda
+	// （窗口已经开着时干脆不调用），所以 dao 在这里始终是活的，不存在悬空。
+	// 注意对话框存的是 ProductDAO* 裸指针，而 dao 是栈对象 —— 这是改动前就有的
+	// 隐患（函数一返回 dao 就析构了），本次不动它。
+	openToolWindow(QStringLiteral("AccessControl"), [this, &dao]() -> QWidget* {
+		auto* pDlg = new AccessControlDialog(&dao, nullptr, Qt::WindowCloseButtonHint);
+		pDlg->setCurrentOperator(gCurrentUserSession.userName);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 void CGarMap_MapQualityCheckToolsPlugin::DataImport()
@@ -673,9 +723,11 @@ void CGarMap_MapQualityCheckToolsPlugin::DataImport()
 
 void CGarMap_MapQualityCheckToolsPlugin::MapDataDownload()
 {
-	mapdata_download* pDlg = new mapdata_download(nullptr, Qt::WindowCloseButtonHint);
-	pDlg->setModal(false);
-	pDlg->show();
+	openToolWindow(QStringLiteral("MapDataDownload"), [this]() -> QWidget* {
+		auto* pDlg = new mapdata_download(nullptr, Qt::WindowCloseButtonHint);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 /*【2026-09-10】参数配置独立入口。
@@ -684,14 +736,21 @@ void CGarMap_MapQualityCheckToolsPlugin::MapDataDownload()
   那边已选的 XML（见 generalization_config_dialog.cpp 的 btnParamConfig）。*/
 void CGarMap_MapQualityCheckToolsPlugin::ParamConfig()
 {
-	ParamConfigDialog* pDlg = new ParamConfigDialog(nullptr, Qt::WindowCloseButtonHint);
-	pDlg->setAttribute(Qt::WA_DeleteOnClose);
-	pDlg->setModal(false);
-	pDlg->show();
+	// 【2026-10-09】WA_DeleteOnClose 已由 openToolWindow 统一设置。
+	openToolWindow(QStringLiteral("ParamConfig"), [this]() -> QWidget* {
+		auto* pDlg = new ParamConfigDialog(nullptr, Qt::WindowCloseButtonHint);
+		pDlg->setModal(false);
+		return pDlg;
+	});
 }
 
 void CGarMap_MapQualityCheckToolsPlugin::unload()
 {
+	/*【2026-10-09】先关掉本插件打开的全部窗口。
+	  插件对象马上要被 delete，窗口都是无父对象的独立顶层窗口、不会跟着销毁，
+	  不主动关的话会变成没人管的野窗口留在屏幕上。*/
+	closeAllToolWindows();
+
 	//// 去掉ui界面
 	// mActionTest 已隐藏
 	// mQGisIface->removePluginVectorMenu(tr("&测试矢量数据格式转换"), mActionTest);
@@ -835,6 +894,126 @@ void CGarMap_MapQualityCheckToolsPlugin::updateActions()
 	if (mActionAccessControl) mActionAccessControl->setEnabled(dbConnected);
 	if (mActionDataImport) mActionDataImport->setEnabled(dbConnected);
 }
+
+// ============================================================================
+// 插件工具窗口管理【2026-10-09 新增】
+//
+// 背景：本插件的功能窗口原来都是 new XxxDialog(nullptr, ...)，没有父对象，属于
+// "孤儿顶层窗口"。而 LTZK 平台主窗口类 LTZK 完全没有重写 closeEvent，退出动作就是
+// this->close() 只关自己（LTZK.cpp:9121-9124），析构函数也只清自己的成员
+// （LTZK.cpp:3294-3310），平台里也不存在任何"插件窗口登记表"。于是：
+//   1) 主界面关掉后这些窗口没人关也没人销毁，而且因为还有可见的顶层窗口在，
+//      quitOnLastWindowClosed 不生效，进程一直挂着 —— 现象就是"主界面没了，
+//      那些窗口还杵在那儿"；
+//   2) 每次点菜单都 new 一个新的，同一个窗口能开出多个。
+//
+// 解法就是下面三件事：注册表查重、关窗即销毁、主界面关闭时统一 close。
+// 窗口**刻意不挂父对象**，原因见 hostWindow() 的注释。
+// ============================================================================
+
+/* 取"平台主界面"，并在首次调用时装上关闭监视。
+   LTZK 并没有创建 QgisApp（LTZK.cpp:3226-3231 里 new QgisApp() 是注释掉的），
+   它自己的 LTZKQgisInterface::mainWindow() 直接返回 LTZK 主窗口
+   （LTZKQgisInterface.cpp:192-195：return mApp;）。所以这里拿到的
+   mQGisIface->mainWindow() 就是平台主界面本身；在纯 QGIS 下则是 QGIS 主窗口。
+
+   这里只"监视"、刻意不给窗口挂父对象：LTZK 靠一个装在 qApp 上的全局事件过滤器
+   给插件窗口刷 sci-fi 样式，判据是 watchedWidget->window() != this
+   （LTZK.cpp:6903）。一旦把窗口挂到主界面上，window() 就等于主界面，那段判断
+   会被整段跳过，平台就不再给这些窗口刷样式了（发光效果、GroupBox 标题、
+   表头列宽那一整套都会掉）。*/
+QWidget* CGarMap_MapQualityCheckToolsPlugin::hostWindow()
+{
+	if (m_hostWindow)
+		return m_hostWindow;
+
+	if (!mQGisIface)
+		return nullptr;
+
+	QWidget* w = mQGisIface->mainWindow();
+	if (!w)
+		return nullptr;
+
+	m_hostWindow = w;
+	m_hostWindow->installEventFilter(this);
+	return m_hostWindow;
+}
+
+/* 平台主界面关闭时，把本插件开着的窗口一起关掉。
+   必须"主动 close"而不是等它们被连带隐藏：数据备份恢复、参数配置、接边这几个
+   对话框的路径/设置写在 closeEvent 与析构里，只隐藏不关的话配置会丢。*/
+bool CGarMap_MapQualityCheckToolsPlugin::eventFilter(QObject* watched, QEvent* event)
+{
+	if (watched == m_hostWindow && event && event->type() == QEvent::Close)
+	{
+		// 延后一拍再判断：万一以后平台加了"确认退出"对话框而用户点了取消，
+		// 主界面此时仍然可见，那就不该关插件窗口。
+		QPointer<QWidget> host = m_hostWindow;
+		QTimer::singleShot(0, this, [this, host]() {
+			if (host && host->isVisible())
+				return;
+			closeAllToolWindows();
+		});
+	}
+	return QObject::eventFilter(watched, event);
+}
+
+/* 同一个 key 的窗口只保留一个：已经开着就拉到前台返回，否则用 factory 造一个。
+   重复打开时选择"前置激活"而不是"什么都不做"，是为了让用户点了菜单有反馈。
+   factory 里只做"构造 + 配置"，不要 show()（统一由本函数 show）。*/
+QWidget* CGarMap_MapQualityCheckToolsPlugin::openToolWindow(
+	const QString& key, const std::function<QWidget*()>& factory)
+{
+	auto it = m_openToolWindows.find(key);
+	if (it != m_openToolWindows.end())
+	{
+		if (QWidget* existing = it.value().data())
+		{
+			// isHidden() 说明它已经 close() 过、正等着事件循环来销毁
+			// （WA_DeleteOnClose 走的是 deleteLater），这种不能再 show() 回来，
+			// 清掉当没开过。
+			if (!existing->isHidden())
+			{
+				if (existing->isMinimized())
+					existing->showNormal();
+				existing->show();
+				existing->raise();
+				existing->activateWindow();
+				return existing;
+			}
+		}
+		m_openToolWindows.erase(it);   // 空项或已关闭的残项
+	}
+
+	QWidget* w = factory();
+	if (!w)
+		return nullptr;
+
+	// 关窗即销毁。统一在这里设：一来 QPointer 能自动置空、不留野指针；
+	// 二来原先只有 3 个对话框设了这个属性，其余十几个关掉之后既不析构也不释放
+	// （顺带修掉这个泄漏；有几个对话框的窗口几何位置也正是在析构里落盘的，
+	// 以前那个逻辑其实从来没跑到过）。
+	w->setAttribute(Qt::WA_DeleteOnClose);
+	m_openToolWindows.insert(key, w);
+	w->show();
+	return w;
+}
+
+void CGarMap_MapQualityCheckToolsPlugin::closeAllToolWindows()
+{
+	// 先拷贝一份再逐个关：close() 会触发 WA_DeleteOnClose 的销毁，
+	// 进而改动 m_openToolWindows（QPointer 变空），边遍历边改会出问题。
+	const QHash<QString, QPointer<QWidget>> snapshot = m_openToolWindows;
+	for (const QPointer<QWidget>& w : snapshot)
+	{
+		if (w)
+			w->close();
+	}
+	// 这里刻意不 clear()：万一有窗口在 closeEvent 里 ignore() 了、并没有真的关掉，
+	// 清表会让它彻底失联（下次打不开也关不掉）。留着残项无害 ——
+	// openToolWindow 查表时会顺手把空项和已关闭的残项清掉。
+}
+
 
 /**
  * Required extern functions needed  for every plugin

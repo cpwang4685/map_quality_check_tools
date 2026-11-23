@@ -427,23 +427,20 @@ void SeLayerMappingDialog::onImportCsv()
     QTextStream ts(&file);
     ts.setCodec("UTF-8");
 
-    int lineNo = 0;
     while (!ts.atEnd()) {
-        QString line = ts.readLine().trimmed();
-        lineNo++;
+        QString line = ts.readLine();
+        if (line.startsWith(QChar(0xFEFF)))
+            line.remove(0, 1);
+        line = line.trimmed();
         if (line.isEmpty() || line.startsWith("#")) continue;
 
-        QStringList parts = line.split(",");
-        // 格式：源图层名称,源图层代码,标准成果图层,实际数据SHP,几何类型,备注
+        const QStringList parts = line.split(",");
         if (parts.size() < 3) continue;
 
+        // 兼容两种6列列序（代码在前/名称在前）以及旧4列格式，见 LayerMappingCsv
         LayerMappingItem item;
-        item.sourceDesc = parts.value(0).trimmed();
-        item.sourceCode = parts.value(1).trimmed();
-        item.stdName    = parts.value(2).trimmed();
-        item.actualShp  = parts.value(3).trimmed();
-        item.geomType   = parts.value(4).trimmed();
-        item.note       = parts.value(5).trimmed();
+        bool oldFormat = false;
+        LayerMappingCsv::parseRow(parts, item, oldFormat);
         if (!item.stdName.isEmpty())
             imported.append(item);
     }
@@ -461,6 +458,8 @@ void SeLayerMappingDialog::onImportCsv()
         item.sourceCode = src.sourceCode;
         item.sourceDesc = src.sourceDesc;
         item.stdName    = src.stdName;
+        item.actualShp  = src.actualShp;   // 保留导入文件里的实际SHP映射
+        item.geomType   = src.geomType;
         item.note       = src.note;
         item.autoMatched = false;
         item.comboBox   = nullptr;
@@ -487,17 +486,20 @@ void SeLayerMappingDialog::onExportCsv()
         return;
     }
 
+    // 【2026-10-26】先写 UTF-8 BOM：中文 Windows 的 Excel 只认 BOM，没有就按 GBK 读 → 全表乱码。
+    // 本程序的读取侧（QTextStream + setCodec("UTF-8")）实测会吃掉 BOM，不影响导入。
+    file.write("\xEF\xBB\xBF");
     QTextStream ts(&file);
     ts.setCodec("UTF-8");
-    ts << "# 源图层名称,源图层代码,标准成果图层,实际数据SHP,几何类型,备注\n";
+    // 【2026-10-26】表头必须显式 QString::fromUtf8。Qt5 的
+    // QTextStream::operator<<(const char*) 是按 Latin-1（QLatin1String）解释的，
+    // 源码里的 UTF-8 中文会被逐字节再编码一遍，写出来是 "æº\x90å\x9b¾…"。
+    // 数据行都是 QString，没这个毛病，所以只有表头一行会坏。
+    ts << LayerMappingCsv::headerLine() << "\n";
 
+    // 与收到的工作表保持一致：代码,名称,标准图层,实际SHP,几何类型,备注
     for (const auto& item : m_items) {
-        ts << item.sourceDesc << ","
-           << item.sourceCode << ","
-           << item.stdName << ","
-           << item.actualShp << ","
-           << item.geomType << ","
-           << item.note << "\n";
+        ts << LayerMappingCsv::codeFirstFields(item).join(",") << "\n";
     }
     file.close();
 

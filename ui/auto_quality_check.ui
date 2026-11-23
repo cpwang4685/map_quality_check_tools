@@ -26,100 +26,133 @@ QCheckBox { padding: 3px 4px; spacing: 4px; }</string>
    <property name="rightMargin"><number>10</number></property>
    <property name="topMargin"><number>10</number></property>
    <property name="bottomMargin"><number>10</number></property>
-   <!-- ====== 数据源 ====== -->
+   <!-- ============================================================
+        与「数据导出」(ui/data_export.ui)、「数据管理」(ui/data_management.ui) 同款结构：
+        内容整块放进 QScrollArea（widgetResizable、无边框），
+        底部的进度条与按钮行留在滚动区之外——窗口缩小时出纵向滚动条，
+        而不是把各分组框压得比自己的最小高度还矮（那种情况下分组框内部的行
+        会互相压盖、底边框被压没，就是之前反馈的「控件压盖」）。
+        ============================================================ -->
    <item>
-    <widget class="QGroupBox" name="groupBox_DataSource">
-     <property name="title"><string>数据源</string></property>
-     <layout class="QGridLayout" name="gridLayout_DataSource">
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_OrigData"><property name="text"><string>原始数据路径：</string></property></widget>
+    <widget class="QScrollArea" name="scrollArea_main">
+     <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+     <property name="widgetResizable"><bool>true</bool></property>
+     <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarAsNeeded</enum></property>
+     <widget class="QWidget" name="scrollAreaWidgetContents">
+      <property name="geometry"><rect><x>0</x><y>0</y><width>900</width><height>780</height></rect></property>
+      <layout class="QVBoxLayout" name="verticalLayout_scroll">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+      <!-- ====== 数据源 ====== -->
+      <item>
+       <widget class="QGroupBox" name="groupBox_DataSource">
+        <property name="title"><string>数据源</string></property>
+        <layout class="QGridLayout" name="gridLayout_DataSource">
+         <item row="0" column="0">
+          <widget class="QLabel" name="label_OrigData"><property name="text"><string>原始数据路径（综合前 SHP/GDB）：</string></property></widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="lineEdit_OrigDataPath">
+           <property name="placeholderText"><string>选择原始数据目录（综合前SHP或FileGDB）</string></property></widget>
+         </item>
+         <item row="0" column="2">
+          <widget class="QPushButton" name="btn_BrowseOrigData"><property name="text"><string>浏览...</string></property></widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="label_ResultData"><property name="text"><string>成果数据路径：</string></property></widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QLineEdit" name="lineEdit_ResultDataPath">
+           <property name="placeholderText"><string>选择成果数据目录（综合后SHP）</string></property></widget>
+         </item>
+         <item row="1" column="2">
+          <widget class="QPushButton" name="btn_BrowseResultData"><property name="text"><string>浏览...</string></property></widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="label_MissionXml"><property name="text"><string>Mission XML：</string></property></widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QLineEdit" name="lineEdit_MissionXml">
+           <property name="placeholderText"><string>mission_config.xml（自动加载）</string></property></widget>
+         </item>
+         <item row="2" column="2">
+          <widget class="QPushButton" name="btn_BrowseMissionXml"><property name="text"><string>浏览...</string></property></widget>
+         </item>
+         <item row="3" column="0">
+          <widget class="QLabel" name="label_MappingConfig"><property name="text"><string>字段映射表：</string></property></widget>
+         </item>
+         <item row="3" column="1">
+          <widget class="QLineEdit" name="lineEdit_MappingConfig">
+           <property name="placeholderText"><string>字段映射表CSV（自动加载）</string></property></widget>
+         </item>
+         <item row="3" column="2">
+          <layout class="QHBoxLayout" name="hLayout_MappingBtns">
+           <item><widget class="QPushButton" name="btn_BrowseMapping"><property name="text"><string>浏览</string></property><property name="maximumWidth"><number>60</number></property></widget></item>
+           <item><widget class="QPushButton" name="btn_ConfigMapping"><property name="text"><string>配置</string></property><property name="maximumWidth"><number>60</number></property></widget></item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
       </item>
-      <item row="0" column="1">
-       <widget class="QLineEdit" name="lineEdit_OrigDataPath">
-        <property name="placeholderText"><string>选择原始数据目录（综合前SHP）</string></property></widget>
+      <!-- ====== 检查项（QTabWidget 由代码填充） ====== -->
+      <item>
+       <widget class="QGroupBox" name="groupBox_Missions">
+        <property name="title"><string>检查项</string></property>
+        <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Expanding"><horstretch>1</horstretch><verstretch>4</verstretch></sizepolicy></property>
+        <layout class="QVBoxLayout" name="missionsLayout">
+         <property name="spacing"><number>0</number></property>
+         <property name="leftMargin"><number>0</number></property>
+         <property name="rightMargin"><number>0</number></property>
+        </layout>
+       </widget>
       </item>
-      <item row="0" column="2">
-       <widget class="QPushButton" name="btn_BrowseOrigData"><property name="text"><string>浏览...</string></property></widget>
+      <!-- ====== 阈值参数 ====== -->
+      <item>
+       <widget class="QGroupBox" name="groupBox_Params">
+        <property name="title"><string>阈值参数</string></property>
+        <!-- 【2026-10-26】解决"比例尺：和它后面的数值框隔得太远"，同时保持标签左对齐。
+             病根：4 列平分整行宽度，标签控件本身被拉到 200 多像素，而文字左对齐，
+             "比例尺："后面就拖出一大段控件内部的空白（实测 158 像素）。
+             治法：7 个标签的横向 sizePolicy 设成 Fixed —— 控件只占文字本身的宽度，
+             不再被拉宽；文字保持默认左对齐，同一列标签左边缘对齐；
+             多出来的宽度由数值框吸收，所以整行照样铺满，不留尾巴。
+             现在"标签右边缘 → 数值框左边缘"就是布局 spacing(6px)；
+             短标签（比例尺：）与长标签（节点最小距离(m)：）左对齐后，
+             它前面的空白就是两者文字宽度之差，跟上面"数据源"区一个风格。 -->
+        <layout class="QGridLayout" name="gridLayout_Params">
+         <item row="0" column="0"><widget class="QLabel" name="label_Scale"><property name="text"><string>比例尺：</string></property><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property></widget></item>
+         <item row="0" column="1"><widget class="QSpinBox" name="spinBox_Scale"><property name="minimum"><number>500</number></property><property name="maximum"><number>1000000</number></property><property name="value"><number>10000</number></property></widget></item>
+         <item row="0" column="3"><widget class="QLabel" name="label_Tolerance"><property name="text"><string>结点容差(m)：</string></property><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property></widget></item>
+         <item row="0" column="4"><widget class="QDoubleSpinBox" name="doubleSpinBox_Tolerance"><property name="decimals"><number>6</number></property><property name="minimum"><double>0.000001</double></property><property name="maximum"><double>100.0</double></property><property name="value"><double>0.001000</double></property></widget></item>
+         <item row="1" column="0"><widget class="QLabel" name="label_AcuteAngle"><property name="text"><string>尖锐角(°)：</string></property><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property></widget></item>
+         <item row="1" column="1"><widget class="QDoubleSpinBox" name="doubleSpinBox_AcuteAngle"><property name="decimals"><number>1</number></property><property name="minimum"><double>0.1</double></property><property name="maximum"><double>180.0</double></property><property name="value"><double>10.0</double></property></widget></item>
+         <item row="1" column="3"><widget class="QLabel" name="label_SliverArea"><property name="text"><string>碎面面积：</string></property><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property></widget></item>
+         <item row="1" column="4"><widget class="QDoubleSpinBox" name="doubleSpinBox_SliverArea"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>100000.0</double></property><property name="value"><double>1.00</double></property></widget></item>
+         <item row="2" column="0"><widget class="QLabel" name="label_NarrowWidth"><property name="text"><string>狭长面宽度(m)：</string></property><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property></widget></item>
+         <item row="2" column="1"><widget class="QDoubleSpinBox" name="doubleSpinBox_NarrowWidth"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1000.0</double></property><property name="value"><double>0.50</double></property></widget></item>
+         <item row="2" column="3"><widget class="QLabel" name="label_MinArea"><property name="text"><string>小面积：</string></property><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property></widget></item>
+         <item row="2" column="4"><widget class="QDoubleSpinBox" name="doubleSpinBox_MinArea"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>100000.0</double></property><property name="value"><double>1.00</double></property></widget></item>
+         <item row="3" column="0"><widget class="QLabel" name="label_MinNodeDist"><property name="text"><string>节点最小距离(m)：</string></property><property name="sizePolicy"><sizepolicy hsizetype="Fixed" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property></widget></item>
+         <item row="3" column="1"><widget class="QDoubleSpinBox" name="doubleSpinBox_MinNodeDist"><property name="decimals"><number>6</number></property><property name="minimum"><double>0.000000</double></property><property name="maximum"><double>100.0</double></property><property name="value"><double>0.001000</double></property></widget></item>
+        </layout>
+       </widget>
       </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_ResultData"><property name="text"><string>成果数据路径：</string></property></widget>
+      <!-- ====== 输出 ====== -->
+      <item>
+       <widget class="QGroupBox" name="groupBox_Output">
+        <property name="title"><string>输出设置</string></property>
+        <layout class="QHBoxLayout" name="gridLayout_Output">
+         <item><widget class="QLabel" name="label_OutputDir"><property name="text"><string>输出目录：</string></property></widget></item>
+         <item><widget class="QLineEdit" name="lineEdit_OutputDir"><property name="placeholderText"><string>质检结果SHP和JSON日志输出目录</string></property></widget></item>
+         <item><widget class="QPushButton" name="btn_BrowseOutputDir"><property name="text"><string>浏览...</string></property></widget></item>
+        </layout>
+       </widget>
       </item>
-      <item row="1" column="1">
-       <widget class="QLineEdit" name="lineEdit_ResultDataPath">
-        <property name="placeholderText"><string>选择成果数据目录（综合后SHP）</string></property></widget>
-      </item>
-      <item row="1" column="2">
-       <widget class="QPushButton" name="btn_BrowseResultData"><property name="text"><string>浏览...</string></property></widget>
-      </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="label_MissionXml"><property name="text"><string>Mission XML：</string></property></widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="QLineEdit" name="lineEdit_MissionXml">
-        <property name="placeholderText"><string>mission_config.xml（自动加载）</string></property></widget>
-      </item>
-      <item row="2" column="2">
-       <widget class="QPushButton" name="btn_BrowseMissionXml"><property name="text"><string>浏览...</string></property></widget>
-      </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_MappingConfig"><property name="text"><string>字段映射表：</string></property></widget>
-      </item>
-      <item row="3" column="1">
-       <widget class="QLineEdit" name="lineEdit_MappingConfig">
-        <property name="placeholderText"><string>字段映射表CSV（自动加载）</string></property></widget>
-      </item>
-      <item row="3" column="2">
-       <layout class="QHBoxLayout" name="hLayout_MappingBtns">
-        <item><widget class="QPushButton" name="btn_BrowseMapping"><property name="text"><string>浏览</string></property><property name="maximumWidth"><number>60</number></property></widget></item>
-        <item><widget class="QPushButton" name="btn_ConfigMapping"><property name="text"><string>配置</string></property><property name="maximumWidth"><number>60</number></property></widget></item>
-       </layout>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <!-- ====== 检查项（QTabWidget 由代码填充） ====== -->
-   <item>
-    <widget class="QGroupBox" name="groupBox_Missions">
-     <property name="title"><string>检查项</string></property>
-     <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Expanding"><horstretch>1</horstretch><verstretch>4</verstretch></sizepolicy></property>
-     <layout class="QVBoxLayout" name="missionsLayout">
-      <property name="spacing"><number>0</number></property>
-      <property name="leftMargin"><number>0</number></property>
-      <property name="rightMargin"><number>0</number></property>
-     </layout>
-    </widget>
-   </item>
-   <!-- ====== 阈值参数 ====== -->
-   <item>
-    <widget class="QGroupBox" name="groupBox_Params">
-     <property name="title"><string>阈值参数</string></property>
-     <layout class="QGridLayout" name="gridLayout_Params">
-      <item row="0" column="0"><widget class="QLabel" name="label_Scale"><property name="text"><string>比例尺：</string></property></widget></item>
-      <item row="0" column="1"><widget class="QSpinBox" name="spinBox_Scale"><property name="minimum"><number>500</number></property><property name="maximum"><number>1000000</number></property><property name="value"><number>10000</number></property></widget></item>
-      <item row="0" column="2"><widget class="QLabel" name="label_Tolerance"><property name="text"><string>结点容差(m)：</string></property></widget></item>
-      <item row="0" column="3"><widget class="QDoubleSpinBox" name="doubleSpinBox_Tolerance"><property name="decimals"><number>6</number></property><property name="minimum"><double>0.000001</double></property><property name="maximum"><double>100.0</double></property><property name="value"><double>0.001000</double></property></widget></item>
-      <item row="1" column="0"><widget class="QLabel" name="label_AcuteAngle"><property name="text"><string>尖锐角(°)：</string></property></widget></item>
-      <item row="1" column="1"><widget class="QDoubleSpinBox" name="doubleSpinBox_AcuteAngle"><property name="decimals"><number>1</number></property><property name="minimum"><double>0.1</double></property><property name="maximum"><double>180.0</double></property><property name="value"><double>10.0</double></property></widget></item>
-      <item row="1" column="2"><widget class="QLabel" name="label_SliverArea"><property name="text"><string>碎面面积：</string></property></widget></item>
-      <item row="1" column="3"><widget class="QDoubleSpinBox" name="doubleSpinBox_SliverArea"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>100000.0</double></property><property name="value"><double>1.00</double></property></widget></item>
-      <item row="2" column="0"><widget class="QLabel" name="label_NarrowWidth"><property name="text"><string>狭长面宽度(m)：</string></property></widget></item>
-      <item row="2" column="1"><widget class="QDoubleSpinBox" name="doubleSpinBox_NarrowWidth"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1000.0</double></property><property name="value"><double>0.50</double></property></widget></item>
-      <item row="2" column="2"><widget class="QLabel" name="label_MinArea"><property name="text"><string>小面积：</string></property></widget></item>
-      <item row="2" column="3"><widget class="QDoubleSpinBox" name="doubleSpinBox_MinArea"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>100000.0</double></property><property name="value"><double>1.00</double></property></widget></item>
-      <item row="3" column="0"><widget class="QLabel" name="label_MinNodeDist"><property name="text"><string>节点最小距离(m)：</string></property></widget></item>
-      <item row="3" column="1"><widget class="QDoubleSpinBox" name="doubleSpinBox_MinNodeDist"><property name="decimals"><number>6</number></property><property name="minimum"><double>0.000000</double></property><property name="maximum"><double>100.0</double></property><property name="value"><double>0.001000</double></property></widget></item>
-     </layout>
-    </widget>
-   </item>
-   <!-- ====== 输出 ====== -->
-   <item>
-    <widget class="QGroupBox" name="groupBox_Output">
-     <property name="title"><string>输出设置</string></property>
-     <layout class="QHBoxLayout" name="gridLayout_Output">
-      <item><widget class="QLabel" name="label_OutputDir"><property name="text"><string>输出目录：</string></property></widget></item>
-      <item><widget class="QLineEdit" name="lineEdit_OutputDir"><property name="placeholderText"><string>质检结果SHP和JSON日志输出目录</string></property></widget></item>
-      <item><widget class="QPushButton" name="btn_BrowseOutputDir"><property name="text"><string>浏览...</string></property></widget></item>
-     </layout>
+      </layout>
+     </widget>
     </widget>
    </item>
    <!-- ====== 进度条 ====== -->

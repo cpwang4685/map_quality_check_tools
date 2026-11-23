@@ -277,6 +277,33 @@ QgsCoordinateReferenceSystem probeRasterCrs(const QString& file)
     return crs;
 }
 
+// 【2026-10-18】读取栅格自身范围（GDAL 直读）。
+// 用于"不裁剪、原样导出"：直接拿源栅格的地理范围作为裁切矩形，
+// 效果等价于整幅导出，且仍走原有的栅格写出流程。
+QgsRectangle probeRasterExtent(const QString& file)
+{
+    QgsRectangle rect;
+    GDALDatasetH hProbe = GDALOpen(file.toUtf8().constData(), GA_ReadOnly);
+    if (!hProbe)
+        return rect;
+
+    double gt[6] = { 0, 1, 0, 0, 0, 1 };
+    if (GDALGetGeoTransform(hProbe, gt) == CE_None
+        && !(qFuzzyIsNull(gt[1]) && qFuzzyIsNull(gt[5])))
+    {
+        const int w = GDALGetRasterXSize(hProbe);
+        const int h = GDALGetRasterYSize(hProbe);
+        const double x1 = gt[0];
+        const double y1 = gt[3];
+        const double x2 = gt[0] + w * gt[1] + h * gt[2];
+        const double y2 = gt[3] + w * gt[4] + h * gt[5];
+        rect = QgsRectangle(std::min(x1, x2), std::min(y1, y2),
+                            std::max(x1, x2), std::max(y1, y2));
+    }
+    GDALClose(hProbe);
+    return rect;
+}
+
 // ------------------------------------------------------------------
 // 矢量裁剪（与成果模块 map_product_clip_engine.cpp 的 writeVectorClip 一致）
 // ------------------------------------------------------------------
@@ -691,7 +718,8 @@ Result clipOneSource(const Source& src, const Options& opt, bool appendToContain
         return !report || report(msg);
     };
 
-    if (opt.clipGeom.isNull() || opt.clipGeom.isEmpty())
+    // noClip 时不需要裁剪范围，按源数据自身范围完整导出
+    if (!opt.noClip && (opt.clipGeom.isNull() || opt.clipGeom.isEmpty()))
     {
         r.error = QStringLiteral("裁剪范围为空");
         return r;
@@ -720,14 +748,22 @@ Result clipOneSource(const Source& src, const Options& opt, bool appendToContain
         }
 
         // 栅格按裁剪范围（多边形/矩形）的外接矩形裁切，保持源坐标系与分辨率
-        const QgsCoordinateReferenceSystem rasterCrs = probeRasterCrs(src.uri);
         QgsRectangle targetRect;
-        bool hasRect = transformBBox(opt.clipGeom.boundingBox(), opt.clipCrs,
-                                     rasterCrs, targetRect);
-        if (!hasRect)
+        if (opt.noClip)
         {
-            // 无坐标系信息时按同一坐标直接计算
-            targetRect = opt.clipGeom.boundingBox();
+            // 不裁剪：直接用栅格自身范围，等价于整幅导出
+            targetRect = probeRasterExtent(src.uri);
+        }
+        else
+        {
+            const QgsCoordinateReferenceSystem rasterCrs = probeRasterCrs(src.uri);
+            bool hasRect = transformBBox(opt.clipGeom.boundingBox(), opt.clipCrs,
+                                         rasterCrs, targetRect);
+            if (!hasRect)
+            {
+                // 无坐标系信息时按同一坐标直接计算
+                targetRect = opt.clipGeom.boundingBox();
+            }
         }
         if (targetRect.isNull() || targetRect.isEmpty())
         {
@@ -768,8 +804,15 @@ Result clipOneSource(const Source& src, const Options& opt, bool appendToContain
         return r;
     }
 
-    // 裁剪几何换算到源图层坐标系
-    TransformResult tr = transformGeom(opt.clipGeom, opt.clipCrs, layer->crs());
+    // 裁剪几何换算到源图层坐标系；不裁剪时用图层自身范围（等价于整层导出）
+    QgsGeometry clipGeom = opt.clipGeom;
+    QgsCoordinateReferenceSystem clipCrs = opt.clipCrs;
+    if (opt.noClip)
+    {
+        clipGeom = rectToPolygon(layer->extent());
+        clipCrs = layer->crs();
+    }
+    TransformResult tr = transformGeom(clipGeom, clipCrs, layer->crs());
     if (!tr.ok)
     {
         r.error = tr.err;

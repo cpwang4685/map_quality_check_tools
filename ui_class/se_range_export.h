@@ -118,6 +118,12 @@ public:
     void setAutoLoadAfterExport(bool on);
     bool autoLoadAfterExport() const;
 
+    // 【2026-10-18】范围可选：为 true 时点「确定」不校验范围，只取格式与输出路径。
+    // 供「将该数据设置为数据源」复用本对话框的选择界面（直接把数据整份导出）。
+    // 默认 false，不影响原有按范围导出流程。
+    void setRangeOptional(bool on);
+    bool rangeOptional() const;
+
 private slots:
     void on_radioButton_inputCoord_toggled(bool checked);
     void on_radioButton_manualDraw_toggled(bool checked);
@@ -158,6 +164,7 @@ private:
     QString m_lastOpenDir; // 本地矢量文件浏览的起始目录
 
     bool m_bHasExtent = false;
+    bool m_bRangeOptional = false; // 【2026-10-18】只取格式/输出路径，不要求范围
     QgsRectangle m_rect;
     QgsGeometry m_featureGeom; // "选择要素"选中的要素几何（坐标系与 m_extentCrs 一致）
     bool m_bDrawRequested = false;

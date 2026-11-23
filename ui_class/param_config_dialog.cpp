@@ -43,6 +43,14 @@ static void setupParamsTableColumns(QTableWidget* table)
         QStringLiteral("状态"),
         QStringLiteral("常用")
     });
+    // 【2026-10-26】表头字号压到 13px、窄列放宽。
+    // 平台样式表 ltzk_sci_fi.qss 第 34 行把所有 QTableWidget 的表头强制成 16px 粗体，
+    // 而这几列是按小字号设计的（序号 36 / 状态 46 / 常用 40），16px 下「序号」「状态」
+    // 「常用」都被裁掉一半。表格正文只有 12px 左右，表头 16px 也偏大。
+    // 这里只压本表格的表头（表格自带样式表优先于平台样式表），并把三列放宽到放得下。
+    table->setStyleSheet(QStringLiteral(
+        "QTableWidget { gridline-color: #ddd; }"
+        "QTableWidget QHeaderView::section { font-size: 13px; font-weight: 600; padding: 4px 5px; }"));
     QHeaderView* hdr = table->horizontalHeader();
     hdr->setSectionResizeMode(0, QHeaderView::Fixed);
     hdr->setSectionResizeMode(1, QHeaderView::Fixed);
@@ -51,12 +59,12 @@ static void setupParamsTableColumns(QTableWidget* table)
     hdr->setSectionResizeMode(4, QHeaderView::Stretch);
     hdr->setSectionResizeMode(5, QHeaderView::Fixed);
     hdr->setSectionResizeMode(6, QHeaderView::Fixed);
-    table->setColumnWidth(0, 36);
+    table->setColumnWidth(0, 44);
     table->setColumnWidth(1, 100);
     table->setColumnWidth(2, 96);
     table->setColumnWidth(3, 70);
-    table->setColumnWidth(5, 46);
-    table->setColumnWidth(6, 40);
+    table->setColumnWidth(5, 44);
+    table->setColumnWidth(6, 44);
 }
 
 // 只读属性视图：2 列（属性/值）
@@ -235,33 +243,19 @@ ParamConfigDialog::ParamConfigDialog(QWidget* parent, Qt::WindowFlags fl)
     radioFavorites->setStyleSheet(radioStyle);
     radioAll->setStyleSheet(radioStyle);
 
-    QVBoxLayout* viewModeLayout = new QVBoxLayout();
-    viewModeLayout->setSpacing(2);
-    viewModeLayout->addWidget(radioFavorites);
-    viewModeLayout->addWidget(radioAll);
-
+    // 【2026-10-26】两个单选按钮从"搜索框上方的竖排"挪到"展开全部/折叠全部"那一行，
+    // 紧跟在"折叠全部"按钮后面（原来它们在竖排里各占满一行，很占地方）。
+    QHBoxLayout* viewModeRow = new QHBoxLayout();
+    viewModeRow->setSpacing(12);
+    viewModeRow->setContentsMargins(0, 0, 0, 0);
+    viewModeRow->addWidget(radioFavorites);
+    viewModeRow->addWidget(radioAll);
     {
-        QLayout* viewParentLayout = ui.lineEdit_search->parentWidget()->layout();
-        if (viewParentLayout) {
-            int lineEditIdx = -1;
-            for (int i = 0; i < viewParentLayout->count(); ++i) {
-                QLayoutItem* li = viewParentLayout->itemAt(i);
-                if (li && li->widget() == ui.lineEdit_search) {
-                    lineEditIdx = i;
-                    break;
-                }
-                if (li && li->layout()) {
-                    QLayout* inner = li->layout();
-                    for (int j = 0; j < inner->count(); ++j) {
-                        if (inner->itemAt(j) && inner->itemAt(j)->widget() == ui.lineEdit_search) {
-                            lineEditIdx = i;
-                            break;
-                        }
-                    }
-                }
-            }
-            if (lineEditIdx >= 0)
-                static_cast<QBoxLayout*>(viewParentLayout)->insertLayout(lineEditIdx, viewModeLayout);
+        QLayout* toolbar = ui.treeToolbarLayout;
+        if (toolbar) {
+            const int colIdx = toolbar->indexOf(ui.pushButton_collapseAll);
+            if (colIdx >= 0)
+                static_cast<QBoxLayout*>(toolbar)->insertLayout(colIdx + 1, viewModeRow);
         }
     }
 

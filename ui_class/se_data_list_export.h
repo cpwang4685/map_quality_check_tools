@@ -32,6 +32,7 @@ class QAbstractItemView;
 class QTreeWidget;
 class QTextEdit;
 class QPushButton;
+class QToolButton;
 class QCheckBox;
 class QLineEdit;
 class QComboBox;
@@ -342,14 +343,18 @@ protected:
 	void showEvent(QShowEvent* event) override;
 
 private slots:
-	// ---- 顶部按钮行：5 个按钮全部转调 CSE_DataCatalogBrowser 中与 LTZK 平台
-	//      DataCatalogWidget 同名的实现（选择数据库 / 刷新 / 选择文件夹 / 断开连接 / 刷新）----
-	void on_Button_ConnectDatabase_clicked();   // → 平台 connectDatabase()
-	void on_Button_RefreshDatabase_clicked();   // → 平台 refreshDatabaseData()
-	void on_Button_ConnectFolder_clicked();     // → 平台 connectLocalFolder()
-	void on_Button_DisconnectFolder_clicked();  // → 平台 disconnectSelectedLocalFolder()
-	void on_Button_RefreshLocal_clicked();      // → 平台 refreshLocalFolders()
-	// 列表右键（数据库段 / 本地段 / 地图图层段统一入口）
+	// ---- 顶部按钮行（数据列表操作）----
+	void on_Button_ConnectDatabase_clicked();   // 选择数据库
+	void on_Button_ConnectFolder_clicked();     // 选择文件夹
+	void on_Button_RefreshAll_clicked();        // 刷新（数据库 / 本地 / 地图图层 一起重读）
+	// 列表上方关键字过滤
+	void onFilterTextChanged(const QString& text);
+	// 勾选批量导出
+	void onExportCheckedByRange();
+	void onExportCheckedByMainArea();
+	// 展开/收起底部日志区
+	void onToggleLog();
+	// 列表右键（数据库 / 本地 / 地图图层统一入口）
 	void onCatalogContextMenuRequested(const QPoint& globalPos,
 		const CSE_DataCatalogBrowser::CatalogItem& item);
 	// 列表双击 → 添加到地图
@@ -366,8 +371,14 @@ private:
 	QString m_strRootDir;
 	QString m_strOutputDir;
 
-	// 数据列表（数据库数据 / 本地数据 / 地图图层 三段），平台左侧数据列表的移植实现
+	// 数据列表（数据库数据 / 本地数据 / 地图图层 合成的一棵勾选树）
 	CSE_DataCatalogBrowser* m_pBrowser = nullptr;
+	QLabel* m_pStatusLabel = nullptr;             // 顶部状态行（连接的是哪个库 / 几个文件夹）
+	QLabel* m_pHintLabel = nullptr;               // 灰色操作提示
+	QLineEdit* m_pFilterEdit = nullptr;           // 关键字过滤框
+	QPushButton* m_btnRangeChecked = nullptr;     // 按范围导出勾选项
+	QPushButton* m_btnMainAreaChecked = nullptr;  // 按制图导出勾选项
+	QToolButton* m_btnLog = nullptr;              // 显示/隐藏日志
 	QTextEdit* m_pLog = nullptr;
 	QCheckBox* m_chkAutoLoadAfterExport = nullptr; // 主界面"导出后自动加载到地图"开关
 
@@ -429,10 +440,13 @@ private:
 	// （数据库表 / 本地数据文件 / GDB 子图层 / 目录下所有数据）
 	QList<ClipExportEngine::Source> sourcesFromCatalog(
 		const CSE_DataCatalogBrowser::CatalogItem& item) const;
+	// 多个节点（勾选批量 / 单节点右键共用）→ 裁剪数据源，按数据源 uri 去重
+	QList<ClipExportEngine::Source> sourcesFromCatalog(
+		const QList<CSE_DataCatalogBrowser::CatalogItem>& items) const;
 	// 按范围导出（CSE_RangeExportDialogUi + ClipExportEngine）
-	void exportByRangeFromCatalog(const CSE_DataCatalogBrowser::CatalogItem& item);
+	void exportByRange(const QList<CSE_DataCatalogBrowser::CatalogItem>& items);
 	// 按制图导出（CSE_MainAreaClipDialogUi + ClipExportEngine）
-	void exportByMainAreaFromCatalog(const CSE_DataCatalogBrowser::CatalogItem& item);
+	void exportByMainArea(const QList<CSE_DataCatalogBrowser::CatalogItem>& items);
 	// 添加到地图
 	void addCatalogItemToMap(const CSE_DataCatalogBrowser::CatalogItem& item);
 	// 执行裁剪并按需把结果自动加载到地图（两个导出共用）

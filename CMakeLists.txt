@@ -147,9 +147,13 @@ set(PLUGIN_SOURCES
     ui_class/merge_dialog.cpp
     ui_class/metadata_manager_dialog.cpp
     ui_class/param_config_dialog.cpp
+    # 【2026-10-18】地图综合 → 从数据库获取数据源（成果库目录树 + 右键裁剪导出）
+    ui_class/product_source_dialog.cpp
     ui_class/product_storage_dialog.cpp
     ui_class/scale_selector_dialog.cpp
+    ui_class/knowledge_rename_dialog.cpp
     ui_class/se_auto_quality_check.cpp
+    ui_class/se_check_params_dialog.cpp
     ui_class/se_data_export.cpp
     ui_class/se_data_import.cpp
     ui_class/se_data_list_export.cpp

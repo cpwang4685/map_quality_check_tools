@@ -3,7 +3,40 @@
      BufferDistance  缓冲匹配距离（米）
      MinOverlapRatio 重叠面积/长度比低于该值视为未匹配（0~1）
      MaxChangeRatio  面积/长度变化率超过该值视为显著变形（0~1，0.3=30%）
-     MaxVertexChange 顶点数变化超过该值视为显著变形（个） -->
+     MaxVertexChange 顶点数变化超过该值视为显著变形（个）
+     —— 以下为「综合前后拓扑检查」组补充参数（M460，同样供M458使用） ——
+     MaxDisplacement  过度偏移缓冲半径（米）：以同路原始线缓冲为基准，成果线落在缓冲外即视为偏移；
+                      隧道线也按该值缓冲，成果线经隧道的段落不计入偏移（隧道属于道路的一部分）
+     MaxOutsideRatio  过度偏移缓冲外长度占比阈值（0~1）：缓冲外长度/成果线长超过该值报"道路过度偏移"（默认0.2）
+     MaxSinuosityDrop 弯曲度下降阈值：线弯曲度(线长/首尾直线距离)较综合前下降超过该值报"道路拉直异常"（默认0.5）
+     ConnectTolerance 连通判定容差（米）：综合前后端点间距小于该值视为相接，断裂判定按此容差
+     MinBreakGap      ③综合后短断口报错下限（米）：综合后断口≤该值不报，>该值且≤LongGapThreshold 报③（默认50）
+     LongGapThreshold 长距离断口阈值（米）：综合后断口大于该值报"道路长距离连接"，否则报"道路·河流断裂"
+     TunnelPortalTolerance ②③隧道口豁免（米）：成果道路端点距隧道线端点（隧道口）≤该值
+                     视为经隧道连通，不报断口；隧道按 CLASID(4506xx)/TYPE(含"隧道")识别；0=关闭。
+                     ⑤过度偏移的隧道段剔除按隧道线缓冲实现，不使用本参数
+     RightAngleMinAngle/RightAngleMaxAngle ⑥直角拉直（重点）成果拐点转角范围（度，默认70~110）
+     RightAngleOrigMaxTurn ⑥原始同位置最大转角（度，默认30）：原始接近直行才判为新增直角
+     RightAngleMinSegment ⑥拐点两侧最短线段（米，默认5），避免小折点误报
+     RightAngleSearchRadius ⑥在原始同名线上搜索对应拐点的半径（米，默认60）
+     EndpointBuffer ①村道/乡道端点连接缓冲（米）：端点距其他道路或居民点≤该值视为
+                    已连接/已压盖；默认50米，0=必须严格相接（距离0）
+     PointSideTolerance ①居民点道路左右换边判定距离（米）：只对距最近道路≤该值的居民点
+                        比较综合前后左右侧；超出该值视为远离道路，不判定
+     MinSimplifyVertexCount ④/⑥线要素化简检查最少原始顶点数：原始顶点数达到该值才判断是否化简
+     MinVertexReduceRatio   ④/⑥线要素化简检查顶点最少减少比例（0~1）：顶点减少比例低于该值
+                            视为"未化简/化简不足"，输出为"线要素化简检查"
+                            （2026-10-30 起检查对象含道路与水系，水系在勾选④或⑥时一并检查）
+     MaxLocalBulge      ④局部鼓包弦高阈值（米）：顶点到相邻顶点弦线的垂距超过该值，
+                        且该点距原始线>MaxLocalDeviation时，报"道路变形异常"(局部突出)
+     MaxLocalDeviation  ④局部鼓包点距原始线阈值（米）：排除原始道路本身急弯的情况
+     RoadLayerKeywords  M460检查的道路图层名单（名称包含匹配，逗号分隔，含铁路）
+     RiverLayerKeywords M460检查的河流/渠图层名单（参与②③断裂、化简检查与⑦属性；注记/代码类自动排除）
+     BoundaryLayerKeywords ⑦境界图层名单（只参与⑦线要素属性一致性，仅比对CLASID）
+     RoadAttrFields/BoundaryAttrFields/WaterAttrFields ⑦各类线要素参与比对的字段
+                        （逗号分隔，大小写不敏感；CLASSID/CLASID视为同一字段；
+                         只比对原始/成果两边都存在的字段）
+     参数按数据情况调整，改完直接生效，无需重新编译 -->
 <MapGeneBatchProcessing>
     <Mission id="458">
         <Parameter>
@@ -11,6 +44,52 @@
             <MinOverlapRatio>0.5</MinOverlapRatio>
             <MaxChangeRatio>0.3</MaxChangeRatio>
             <MaxVertexChange>10</MaxVertexChange>
+            <MaxDisplacement>100</MaxDisplacement>
+            <MaxOutsideRatio>0.2</MaxOutsideRatio>
+            <MaxSinuosityDrop>0.5</MaxSinuosityDrop>
+            <ConnectTolerance>1.0</ConnectTolerance>
+            <!-- ③ 综合后短断口报错下限（米）：断口≤该值视为可接受、不报；
+                 >该值且≤LongGapThreshold 报“道路·河流断裂”。默认50 -->
+            <MinBreakGap>50</MinBreakGap>
+            <LongGapThreshold>100</LongGapThreshold>
+            <!-- ②③ 隧道断口豁免（米）：成果道路端点距隧道线端点（隧道口）≤该值
+                 视为经隧道连通，不报断口；0=关闭。隧道按 CLASID(4506xx)/
+                 TYPE(含“隧道”)识别，跨县通用，不另建隧道口点图层 -->
+            <TunnelPortalTolerance>5</TunnelPortalTolerance>
+            <!-- ⑥ 直角拉直（重点）：成果拐点转角在 70~110°、原始同位置转角≤30°、
+                 拐点两侧线段≥5米时，单独输出“道路直角拉直（重点）”，
+                 不受 MaxSinuosityDrop 限制；原始本来就有直角则不报 -->
+            <RightAngleMinAngle>70</RightAngleMinAngle>
+            <RightAngleMaxAngle>110</RightAngleMaxAngle>
+            <RightAngleOrigMaxTurn>30</RightAngleOrigMaxTurn>
+            <RightAngleMinSegment>5</RightAngleMinSegment>
+            <RightAngleSearchRadius>60</RightAngleSearchRadius>
+            <!-- ① 村道/乡道端点连接缓冲（米）：端点距其他道路或居民点≤该值视为
+                 已连接/已压盖；50=50米，0=必须严格相接 -->
+            <EndpointBuffer>50</EndpointBuffer>
+            <!-- ① 边界端点排除距离（米）：端点位于数据外框或县界/市界/省界附近≤该值
+                 视为被数据范围截断，不报断点；0=不排除 -->
+            <BoundaryTolerance>50</BoundaryTolerance>
+            <!-- ① 左右换边判定距离（米）：只比较距最近道路≤该值的居民点（0=不判定换边） -->
+            <PointSideTolerance>100</PointSideTolerance>
+            <!-- ④/⑥ 线要素化简检查：原始顶点数≥MinSimplifyVertexCount 且顶点减少比例
+                 <MinVertexReduceRatio 时输出“线要素化简检查”（0=关闭化简检查）；
+                 勾选④或⑥即对水系（河流/渠）一并检查 -->
+            <MinSimplifyVertexCount>20</MinSimplifyVertexCount>
+            <MinVertexReduceRatio>0.05</MinVertexReduceRatio>
+            <!-- ④ 局部鼓包/突刺：弦高>MaxLocalBulge 且距原始线>MaxLocalDeviation（米） -->
+            <MaxLocalBulge>20</MaxLocalBulge>
+            <MaxLocalDeviation>20</MaxLocalDeviation>
+            <!-- M460 检查图层范围（名称包含匹配，逗号分隔）：道路/铁路图层参与②~⑦；
+                 河流/渠图层参与②③断裂+⑦属性；境界图层仅参与⑦；注记类图层程序自动排除 -->
+            <RoadLayerKeywords>国道,省道,县道,乡道,村道,专用道,高速公路,高速铁路,普通铁路</RoadLayerKeywords>
+            <RiverLayerKeywords>河流,干渠,支渠</RiverLayerKeywords>
+            <!-- ⑦ 境界图层名单（只看CLASID）：默认行政界线；国家公园界等如也要查可加入 -->
+            <BoundaryLayerKeywords>省界,未定省界,市界,县界</BoundaryLayerKeywords>
+            <!-- ⑦ 线要素属性一致性：各类线要素参与比对的字段（逗号分隔，大小写不敏感） -->
+            <RoadAttrFields>NAME,RN,CLASID,TYPE</RoadAttrFields>
+            <BoundaryAttrFields>CLASID</BoundaryAttrFields>
+            <WaterAttrFields>TYPE,LEVEL,NAME</WaterAttrFields>
         </Parameter>
     </Mission>
 </MapGeneBatchProcessing>

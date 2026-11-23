@@ -102,6 +102,8 @@ private slots:
     void on_comboBox_orient_currentIndexChanged(int index);
     // 主区要素选择变化 → 刷新制图比例尺显示
     void on_listWidget_features_itemSelectionChanged();
+    // 要素列表模糊搜索：关键字变化时筛选列表项
+    void on_lineEdit_featureFilter_textChanged(const QString& text);
 
 private:
     Ui_SeMainAreaClipDialog ui;
@@ -109,9 +111,12 @@ private:
     QString d_srcPath;
     // 缓存主区 layer，以便标识字段切换时无须重新读取整个 shp
     QgsVectorLayer* m_pMainAreaLayer = nullptr;
+    // 上一次算出的制图比例尺分母（用于判断变化后是否刷新推荐比例尺）
+    double m_lastCartScaleDenom = 0.0;
 
     void loadMainAreaFields();              // 选择主区文件后加载字段与要素列表
     void reloadFeatures();                  // 标识字段切换时重新填充要素列表
+    void applyFeatureFilter(const QString& keyword);  // 按关键字模糊筛选要素列表（隐藏不匹配项）
     QgsRectangle selectedMainAreaRect() const;  // 已选要素的合并外包矩形（主区 layer 原始 CRS）
     void syncInnerFrameToPaper();           // 内图廓宽/高与纸张宽/高保持一致
     void refreshCartographicScale();        // 刷新"制图比例尺"文本框显示
